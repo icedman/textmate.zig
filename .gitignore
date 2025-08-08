@@ -1,0 +1,35 @@
+# Zig cache & build artifacts
+.zig-cache/
+zig-out/
+
+# If using `zig build test` or `zig build install`
+test-output/
+install/
+
+# Editor files
+*.swp
+*.swo
+*.tmp
+*.bak
+*.orig
+*.log
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# macOS
+.DS_Store
+
+# Linux
+*~
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Git-specific
+*.patch
+*.rej
+*.diff
+

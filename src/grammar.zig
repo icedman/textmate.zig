@@ -1,0 +1,246 @@
+const std = @import("std");
+const oni = @import("oniguruma");
+
+pub const Syntax = struct {
+    id: u32 = 0,
+    name: []const u8,
+    content_name: []const u8,
+    scope_name: []const u8,
+
+    // regex strings
+    regexs_match: ?[]const u8 = null,
+    regexs_begin: ?[]const u8 = null,
+    regexs_while: ?[]const u8 = null,
+    regexs_end: ?[]const u8 = null,
+
+    regex_match: ?oni.Regex = null,
+    regex_begin: ?oni.Regex = null,
+    regex_while: ?oni.Regex = null,
+    regex_end: ?oni.Regex = null,
+
+    repository: ?std.StringHashMap(Syntax) = null,
+
+    // children nodes
+    patterns: ?[]Syntax = null,
+    captures: ?std.StringHashMap(Syntax) = null,
+    while_captures: ?std.StringHashMap(Syntax) = null,
+    begin_captures: ?std.StringHashMap(Syntax) = null,
+    end_captures: ?std.StringHashMap(Syntax) = null,
+
+    // include
+    include_path: ?[]const u8 = null,
+    include: ?*Syntax = null,
+
+    // other internals
+    parent: ?*Syntax = null,
+
+    fn parseSyntaxMap(aa: std.mem.Allocator, json: std.json.Value, field_name: []const u8, parent: ?*Syntax) !?std.StringHashMap(Syntax) {
+        const obj = json.object;
+        return blk: {
+            if (obj.get(field_name)) |source| {
+                if (source != .object) break :blk null;
+                var res = std.StringHashMap(Syntax).init(aa);
+                var it = source.object.iterator();
+                while (it.next()) |kv| {
+                    const k = kv.key_ptr.*;
+                    const v = kv.value_ptr.*;
+                    var syntax = try Syntax.init(aa, v);
+                    syntax.parent = parent;
+                    try res.put(k, syntax);
+                }
+                break :blk res;
+            }
+            break :blk null;
+        };
+    }
+
+    pub fn init(aa: std.mem.Allocator, json: std.json.Value) error{ OutOfMemory, InvalidSyntax }!Syntax {
+        const obj = json.object;
+
+        var syntax = try aa.create(Syntax);
+        const include = obj.get("include");
+        if (include) |path| {
+            syntax.* = Syntax{
+                .name = "",
+                .content_name = "",
+                .scope_name = "",
+                .include_path = path.string,
+            };
+            return syntax.*;
+        }
+
+        const name = if (obj.get("name")) |v| v.string else "";
+        const content_name = if (obj.get("contentName")) |v| v.string else "";
+        const scope_name = if (obj.get("scopeName")) |v| v.string else "";
+
+        const regexs_match = if (obj.get("match")) |v| v.string else null;
+        const regexs_begin = if (obj.get("begin")) |v| v.string else null;
+        const regexs_while = if (obj.get("while")) |v| v.string else null;
+        const regexs_end = if (obj.get("end")) |v| v.string else null;
+
+        // std.debug.print("{s}", .{regexs_match orelse ""});
+
+        syntax.* = Syntax{
+            .name = name,
+            .content_name = content_name,
+            .scope_name = scope_name,
+            .regexs_match = regexs_match,
+            .regexs_begin = regexs_begin,
+            .regexs_while = regexs_while,
+            .regexs_end = regexs_end,
+        };
+
+        syntax.*.compile_all_regexes() catch {};
+
+        const patterns: ?[]Syntax = blk: {
+            const opt = obj.get("patterns");
+            if (opt) |patterns_arr| {
+                const res = try aa.alloc(Syntax, patterns_arr.array.items.len);
+                for (patterns_arr.array.items, 0..) |item, i| {
+                    res[i] = try Syntax.init(aa, item);
+                    // res[i].parent = syntax;
+                }
+                break :blk res;
+            } else {
+                break :blk null;
+            }
+        };
+
+        const captures = try parseSyntaxMap(aa, json, "captures", null);
+        const begin_captures = try parseSyntaxMap(aa, json, "beginCaptures", null);
+        const while_captures = try parseSyntaxMap(aa, json, "whileCaptures", null);
+        const end_captures = try parseSyntaxMap(aa, json, "endCaptures", null);
+        const repository = try parseSyntaxMap(aa, json, "repository", null);
+
+        syntax.patterns = patterns;
+        syntax.captures = captures;
+        syntax.begin_captures = begin_captures;
+        syntax.while_captures = while_captures;
+        syntax.end_captures = end_captures;
+        syntax.repository = repository;
+
+        // if (syntax.regex_match != null) {
+        //     std.debug.print("!!!\n", .{});
+        // }
+        return syntax.*;
+    }
+
+    pub fn deinit(self: *Syntax) void {
+        // TODO deinit all regexes
+        _ = self;
+    }
+
+    pub fn compile_all_regexes(self: *Syntax) !void {
+        const Entry = struct {
+            string: *const ?[]const u8,
+            out_ptr: *?oni.Regex,
+        };
+
+        const entries = [_]Entry{
+            .{ .string = &self.regexs_match, .out_ptr = &self.regex_match },
+            .{ .string = &self.regexs_begin, .out_ptr = &self.regex_begin },
+            .{ .string = &self.regexs_while, .out_ptr = &self.regex_while },
+            .{ .string = &self.regexs_end, .out_ptr = &self.regex_end },
+        };
+
+        for (entries) |entry| {
+            if (entry.string.*) |regex| {
+                const re = try oni.Regex.init(
+                    regex,
+                    .{},
+                    oni.Encoding.utf8,
+                    oni.Syntax.default,
+                    null,
+                );
+                errdefer re.deinit();
+                entry.out_ptr.* = re;
+            }
+        }
+    }
+
+    pub fn lookup(self: *const Syntax, syntax: *const Syntax) ?*const Syntax {
+        if (syntax.include_path) |include_path| {
+            if (self.repository) |repo| {
+                if (include_path.len >= 1) {
+                    const name = include_path[1..];
+                    const ls = repo.get(name);
+                    if (ls) |s| {
+                        //std.debug.print("{s} found!\n", .{name});
+                        return &s;
+                    }
+                    return null;
+                } else {
+                    //std.debug.print("(name too short)\n", .{});
+                    return syntax;
+                }
+            }
+            if (self.parent) |p| {
+                return p.lookup(syntax);
+            }
+        }
+        return syntax;
+    }
+
+    pub fn setId(self: *Syntax, id: u32) u32 {
+        self.id = id;
+        return self.id;
+    }
+};
+
+pub const Grammar = struct {
+    arena: std.heap.ArenaAllocator,
+    allocator: std.mem.Allocator,
+
+    name: []const u8,
+    syntax: Syntax,
+
+    syntax_id: usize = 0,
+    syntax_map: std.AutoHashMap(u32, *Syntax),
+
+    pub fn init(allocator: std.mem.Allocator, source_path: []const u8) !Grammar {
+        const file = try std.fs.cwd().openFile(source_path, .{});
+        defer file.close();
+        const file_size = (try file.stat()).size;
+        const file_contents = try file.readToEndAlloc(allocator, file_size);
+        defer allocator.free(file_contents);
+        return Grammar.parse(allocator, file_contents);
+    }
+
+    pub fn deinit(self: *Grammar) void {
+        self.arena.deinit();
+    }
+
+    pub fn parse(allocator: std.mem.Allocator, source: []const u8) !Grammar {
+        var arena = std.heap.ArenaAllocator.init(allocator);
+        const aa = arena.allocator();
+        errdefer arena.deinit();
+
+        const parsed = try std.json.parseFromSlice(std.json.Value, aa, source, .{ .ignore_unknown_fields = true });
+        const root = parsed.value;
+        const obj = root.object;
+
+        // grammar meta
+        const name = obj.get("name").?.string;
+        const syntax = try Syntax.init(aa, root);
+
+        const syntax_map = std.AutoHashMap(u32, *Syntax).init(aa);
+        return Grammar{
+            .arena = arena,
+            .allocator = allocator,
+            .name = name,
+            .syntax = syntax,
+            .syntax_id = 0,
+            .syntax_map = syntax_map,
+        };
+    }
+
+    /// prepare Syntax by assigning IDs (for serialization)
+    /// also loads up external includes like source.*
+    pub fn prepareSyntax(self: *Grammar, syntax: *Syntax) *Syntax {
+        if (syntax.id == 0) {
+            syntax.id = self.syntax_id;
+            self.syntax_id += 1;
+        }
+        return syntax;
+    }
+};
