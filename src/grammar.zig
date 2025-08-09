@@ -98,7 +98,6 @@ pub const Syntax = struct {
                 const res = try aa.alloc(Syntax, patterns_arr.array.items.len);
                 for (patterns_arr.array.items, 0..) |item, i| {
                     res[i] = try Syntax.init(aa, item);
-                    // res[i].parent = syntax;
                 }
                 break :blk res;
             } else {
@@ -119,28 +118,57 @@ pub const Syntax = struct {
         syntax.end_captures = end_captures;
         syntax.repository = repository;
 
-        // if (syntax.regex_match != null) {
-        //     std.debug.print("!!!\n", .{});
-        // }
         return syntax.*;
     }
 
     pub fn deinit(self: *Syntax) void {
-        // TODO deinit all regexes
-        _ = self;
+        self.parent = null;
+
+        const Entry = struct {
+            string: *const ?[]const u8,
+            regex_ptr: *?oni.Regex,
+        };
+
+        const entries = [_]Entry{
+            .{ .string = &self.regexs_match, .regex_ptr = &self.regex_match },
+            .{ .string = &self.regexs_begin, .regex_ptr = &self.regex_begin },
+            .{ .string = &self.regexs_while, .regex_ptr = &self.regex_while },
+            .{ .string = &self.regexs_end, .regex_ptr = &self.regex_end },
+        };
+
+        for (entries) |entry| {
+            if (entry.regex_ptr.*) |*regex| {
+                regex.deinit();
+            }
+        }
+
+        self.regex_match = null;
+        self.regex_begin = null;
+        self.regex_while = null;
+        self.regex_end = null;
+
+        if (self.patterns) |pats| {
+            for (pats) |p| {
+                const ls = @constCast(p.lookup(&p));
+                if (ls) |syn| {
+                    syn.deinit();
+                }
+            }
+            self.patterns = null;
+        }
     }
 
     pub fn compile_all_regexes(self: *Syntax) !void {
         const Entry = struct {
             string: *const ?[]const u8,
-            out_ptr: *?oni.Regex,
+            regex_ptr: *?oni.Regex,
         };
 
         const entries = [_]Entry{
-            .{ .string = &self.regexs_match, .out_ptr = &self.regex_match },
-            .{ .string = &self.regexs_begin, .out_ptr = &self.regex_begin },
-            .{ .string = &self.regexs_while, .out_ptr = &self.regex_while },
-            .{ .string = &self.regexs_end, .out_ptr = &self.regex_end },
+            .{ .string = &self.regexs_match, .regex_ptr = &self.regex_match },
+            .{ .string = &self.regexs_begin, .regex_ptr = &self.regex_begin },
+            .{ .string = &self.regexs_while, .regex_ptr = &self.regex_while },
+            .{ .string = &self.regexs_end, .regex_ptr = &self.regex_end },
         };
 
         for (entries) |entry| {
@@ -153,7 +181,7 @@ pub const Syntax = struct {
                     null,
                 );
                 errdefer re.deinit();
-                entry.out_ptr.* = re;
+                entry.regex_ptr.* = re;
             }
         }
     }
@@ -207,6 +235,7 @@ pub const Grammar = struct {
     }
 
     pub fn deinit(self: *Grammar) void {
+        self.syntax.deinit();
         self.arena.deinit();
     }
 

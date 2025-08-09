@@ -4,6 +4,7 @@
 const oni = lib.oni;
 const theme = lib.theme;
 const grammar = lib.grammar;
+const parser = lib.parser;
 
 fn dumpSyntax(syntax: *const grammar.Syntax, block: []const u8) !void {
     // std.debug.print("===================\nSyntax\n------------\n", .{});
@@ -84,8 +85,16 @@ pub fn main() !void {
     defer gmr.deinit();
     std.debug.print("{s}\n", .{gmr.name});
 
-    try dumpSyntax(&gmr.syntax, "int main(int argc, char **argv)");
-    try dumpSyntax(&gmr.syntax, "typedef");
+    // try dumpSyntax(&gmr.syntax, "int main(int argc, char **argv)");
+    // try dumpSyntax(&gmr.syntax, "typedef");
+
+    var par = try parser.Parser.init(allocator, &gmr);
+    defer par.deinit();
+
+    var state = try parser.ParseState.init(allocator, &gmr.syntax);
+    defer state.deinit();
+
+    par.parseLine(&state, "int main(int argc, char **argv)");
 
     //
     // std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
