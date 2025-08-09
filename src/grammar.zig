@@ -34,6 +34,7 @@ pub const Syntax = struct {
     // other internals
     parent: ?*Syntax = null,
 
+    // a syntaxMap is where a name is mapped to a syntax node
     fn parseSyntaxMap(aa: std.mem.Allocator, json: std.json.Value, field_name: []const u8, parent: ?*Syntax) !?std.StringHashMap(Syntax) {
         const obj = json.object;
         return blk: {
@@ -60,6 +61,7 @@ pub const Syntax = struct {
         var syntax = try aa.create(Syntax);
         const include = obj.get("include");
         if (include) |path| {
+            // std.debug.print("add include {s}\n", .{path.string});
             syntax.* = Syntax{
                 .name = "",
                 .content_name = "",
@@ -149,7 +151,7 @@ pub const Syntax = struct {
 
         if (self.patterns) |pats| {
             for (pats) |p| {
-                const ls = @constCast(p.lookup(&p));
+                const ls = @constCast(p.resolve(&p));
                 if (ls) |syn| {
                     syn.deinit();
                 }
@@ -186,8 +188,9 @@ pub const Syntax = struct {
         }
     }
 
-    pub fn lookup(self: *const Syntax, syntax: *const Syntax) ?*const Syntax {
+    pub fn resolve(self: *const Syntax, syntax: *const Syntax) ?*const Syntax {
         if (syntax.include_path) |include_path| {
+            // std.debug.print("s:{s} find include {s}\n", .{ syntax.name, include_path });
             if (self.repository) |repo| {
                 if (include_path.len >= 1) {
                     const name = include_path[1..];
@@ -203,7 +206,7 @@ pub const Syntax = struct {
                 }
             }
             if (self.parent) |p| {
-                return p.lookup(syntax);
+                return p.resolve(syntax);
             }
         }
         return syntax;

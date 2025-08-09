@@ -14,6 +14,21 @@ pub const Match = struct {
     syntax: ?*Syntax = null,
     count: u8 = 0,
     captures: [MAX_CAPTURES]MatchRange = [_]MatchRange{MatchRange{ .start = 0, .end = 0 }} ** MAX_CAPTURES,
+    begin: bool = false,
+
+    pub fn firstStart(self: *const Match) usize {
+        if (self.count > 0) {
+            return self.captures[0].start;
+        }
+        return 0;
+    }
+
+    pub fn firstEnd(self: *const Match) usize {
+        if (self.count > 0) {
+            return self.captures[0].end;
+        }
+        return 0;
+    }
 };
 
 pub const ParseState = struct {
@@ -73,11 +88,11 @@ pub const Parser = struct {
         self.arena.deinit();
     }
 
-    fn execRegex(self: *Parser, syntax: *Syntax, regex: ?oni.Regex, buffer: []const u8) Match {
+    fn execRegex(self: *Parser, syntax: *Syntax, regex: ?oni.Regex, block: []const u8) Match {
         if (regex) |*re| {
             // std.debug.print("matching\n", .{});
             const reg = blk: {
-                const result = @constCast(re).search(buffer, .{}) catch |err| {
+                const result = @constCast(re).search(block, .{}) catch |err| {
                     if (err == error.Mismatch) {
                         // std.debug.print("no match\n", .{});
                         break :blk null; // return null instead
@@ -91,9 +106,11 @@ pub const Parser = struct {
 
             if (reg) |r| {
                 std.debug.print("found!<<<<<<<<<<<<<<<<<<<\n", .{});
-                std.debug.print("count: {d}\n", .{r.count()});
-                std.debug.print("starts: {d}\n", .{r.starts()});
-                std.debug.print("ends: {d}\n", .{r.ends()});
+                std.debug.print("{s}\n", .{syntax.name});
+                std.debug.print("{s}\n", .{syntax.scope_name});
+                // std.debug.print("count: {d}\n", .{r.count()});
+                // std.debug.print("starts: {d}\n", .{r.starts()});
+                // std.debug.print("ends: {d}\n", .{r.ends()});
                 return Match{
                     .syntax = syntax,
                     .count = @intCast(r.count()),
@@ -105,6 +122,7 @@ pub const Parser = struct {
                         while (i < r.count()) : (i += 1) {
                             captures[i].start = @intCast(starts[i]);
                             captures[i].end = @intCast(ends[i]);
+                            std.debug.print("{d}: {s}\n", .{ i, block[captures[i].start..captures[i].end] });
                         }
                         break :blk captures;
                     },
@@ -118,49 +136,122 @@ pub const Parser = struct {
         return Match{};
     }
 
+    fn matchBegin(self: *Parser, syntax: *Syntax, block: []const u8) Match {
+        // match
+        {
+            const m = self.execRegex(syntax, syntax.regex_match, block);
+            if (m.count > 0) {
+                return m;
+            }
+        }
+        // begin
+        {
+            var m = self.execRegex(syntax, syntax.regex_begin, block);
+            if (m.count > 0) {
+                m.begin = true;
+                std.debug.print("begin!<<<<<<<<<<<<<<<<<<<<\n", .{});
+                return m;
+            }
+        }
+        // patterns
+        return self.matchPatterns(syntax.patterns, block);
+    }
+
     fn matchPatterns(self: *Parser, patterns: ?[]Syntax, block: []const u8) Match {
+        var earliest_match = Match{};
         if (patterns) |pats| {
             for (pats) |p| {
-                const ls = p.lookup(&p);
+                const ls = p.resolve(&p);
                 if (ls) |syn| {
-                    const m = self.execRegex(@constCast(syn), syn.regex_match, block);
+                    const m = self.matchBegin(@constCast(syn), block);
                     if (m.count > 0) {
-                        return m;
+                        if (earliest_match.count == 0) {
+                            earliest_match = m;
+                        } else if (earliest_match.firstStart() > m.firstStart()) {
+                            earliest_match = m;
+                        } else if (earliest_match.firstStart() == m.firstStart() and
+                            earliest_match.firstEnd() < m.firstEnd())
+                        {
+                            earliest_match = m;
+                        }
                     }
                 }
             }
         }
         _ = .{ self, block };
-        return Match{};
+        if (earliest_match.count > 0) {
+            std.debug.print("pattern: {}-{}\n", .{ earliest_match.firstStart(), earliest_match.firstEnd() });
+        }
+        return earliest_match;
     }
 
     pub fn parseLine(self: *Parser, state: *ParseState, block: []const u8) void {
-        // get top
+        var start: usize = 0;
+        var end = block.len;
+
+        const ROWS = 100;
+        const COLS = 32;
+
+        var bag: [ROWS][COLS]u8 = [_][COLS]u8{[_]u8{0} ** COLS} ** ROWS;
+        var bagIdx: usize = 0;
+
+        // todo handle while
+
         while (true) {
+            const text = block[start..end];
+            std.debug.print("====================================\n", .{});
+            std.debug.print("s:{} e:{} {s}\n", .{ start, end, text });
             const top = state.top();
             if (top) |t| {
-                const ls = t.lookup(t);
-
-                // is->while ... match while
-                // has->end ... match end
-                // match top->patterns
-
+                const ls = t.resolve(t);
                 if (ls) |syn| {
-                    _ = self.execRegex(@constCast(syn), syn.regex_match, block);
-                    const pattern_match = self.matchPatterns(syn.patterns, block);
-                    if (pattern_match.syntax) |match_syn| {
-                        state.push(match_syn);
+                    std.debug.print("{s}\n", .{syn.name});
+                    const pattern_match: Match = self.matchPatterns(syn.patterns, text);
+                    const end_match: Match = self.execRegex(@constCast(syn), syn.regex_end, text);
+                    if (end_match.count > 0 and
+                        (pattern_match.count == 0 or
+                            (pattern_match.count > 0 and pattern_match.firstStart() >= end_match.firstStart())))
+                    {
+                        const s = start + end_match.firstStart();
+                        const e = start + end_match.firstEnd();
+                        const tx = block[s..e];
+                        @memcpy(bag[bagIdx][0..tx.len], tx);
+                        bagIdx += 1;
+                        std.debug.print("??{}-{} ..{s}\n", .{ s, e, tx });
+                        start += end_match.firstEnd();
+                        state.pop();
+                    } else if (pattern_match.count > 0) {
+                        const s = start + pattern_match.firstStart();
+                        const e = start + pattern_match.firstEnd();
+                        const tx = block[s..e];
+                        @memcpy(bag[bagIdx][0..tx.len], tx);
+                        bagIdx += 1;
+                        std.debug.print("??{}-{} ..{s}\n", .{ s, e, tx });
+                        //bag.append("block[s..e]") catch {};
+                        start += pattern_match.firstEnd();
+                        if (pattern_match.syntax) |match_syn| {
+                            if (pattern_match.begin) {
+                                _ = match_syn;
+                                //state.push(match_syn);
+                            }
+                        }
                     }
+                } else {
+                    unreachable;
                 }
             } else {
                 unreachable;
             }
 
-            state.pop();
-            if (state.size() == 0) break;
+            end = block.len;
+            if (start == end) break;
         }
-
-        _ = .{ self, block };
+        std.debug.print("---------------------------------------------------\n", .{});
+        for (bag, 0..) |row, i| {
+            if (i == bagIdx) break;
+            std.debug.print("{s} |", .{row});
+        }
+        std.debug.print("\n", .{});
     }
 };
 

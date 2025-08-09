@@ -94,7 +94,9 @@ pub fn main() !void {
     var state = try parser.ParseState.init(allocator, &gmr.syntax);
     defer state.deinit();
 
-    par.parseLine(&state, "int main(int argc, char **argv)");
+    par.parseLine(&state, "int main(int argc, char **argv) {\n");
+    par.parseLine(&state, "return 0;\n");
+    par.parseLine(&state, "}\n");
 
     //
     // std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
