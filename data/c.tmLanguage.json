@@ -102,7 +102,7 @@
                "name" : "punctuation.definition.directive.c"
             },
             "7" : {
-               "name" : "entity.name.function.preprocessor.c"
+               "name" : "entddity.name.function.preprocessor.c"
             },
             "8" : {
                "name" : "punctuation.definition.parameters.begin.c"

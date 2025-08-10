@@ -31,16 +31,12 @@ pub const Match = struct {
     }
 
     pub fn offset(self: *const Match, start: usize) Match {
-        return blk: {
-            var m: Match = self.*;
-            if (m.count > 0) {
-                for (0..m.count) |i| {
-                    m.captures[i].start += start;
-                    m.captures[i].end += start;
-                }
-            }
-            break :blk m;
-        };
+        var m = self.*;
+        for (0..m.count) |i| {
+            m.captures[i].start += start;
+            m.captures[i].end += start;
+        }
+        return m;
     }
 };
 
@@ -97,11 +93,12 @@ pub const Parser = struct {
         _ = self;
     }
 
-    fn execRegex(self: *Parser, syntax: *Syntax, regex: ?oni.Regex, block: []const u8) Match {
+    fn execRegex(self: *Parser, syntax: *Syntax, regex: ?oni.Regex, regexs: ?[]const u8, block: []const u8, start: usize) Match {
         if (regex) |*re| {
-            // std.debug.print("matching\n", .{});
             const reg = blk: {
-                const result = @constCast(re).search(block, .{}) catch |err| {
+                var result: oni.Region = .{};
+                //const result = @constCast(re).search(block, .{}) catch |err| {
+                _ = @constCast(re).searchAdvanced(block, start, block.len, &result, .{}) catch |err| {
                     if (err == error.Mismatch) {
                         // std.debug.print("no match\n", .{});
                         break :blk null; // return null instead
@@ -114,7 +111,8 @@ pub const Parser = struct {
             };
 
             if (reg) |r| {
-                std.debug.print("found!<<<<<<<<<<<<<<<<<<<\n", .{});
+                // std.debug.print("found!<<<<<<<<<<<<<<<<<<<\n", .{});
+                std.debug.print("{s}\n", .{regexs orelse ""});
                 std.debug.print("{s}\n", .{syntax.name});
                 std.debug.print("{s}\n", .{syntax.scope_name});
                 // std.debug.print("count: {d}\n", .{r.count()});
@@ -145,34 +143,33 @@ pub const Parser = struct {
         return Match{};
     }
 
-    fn matchBegin(self: *Parser, syntax: *Syntax, block: []const u8) Match {
+    fn matchBegin(self: *Parser, syntax: *Syntax, block: []const u8, start: usize) Match {
         // match
         {
-            const m = self.execRegex(syntax, syntax.regex_match, block);
+            const m = self.execRegex(syntax, syntax.regex_match, syntax.regexs_match, block, start);
             if (m.count > 0) {
                 return m;
             }
         }
         // begin
         {
-            var m = self.execRegex(syntax, syntax.regex_begin, block);
+            var m = self.execRegex(syntax, syntax.regex_begin, syntax.regexs_begin, block, start);
             if (m.count > 0) {
                 m.begin = true;
-                std.debug.print("begin!<<<<<<<<<<<<<<<<<<<<\n", .{});
                 return m;
             }
         }
         // patterns
-        return self.matchPatterns(syntax.patterns, block);
+        return self.matchPatterns(syntax.patterns, block, start);
     }
 
-    fn matchPatterns(self: *Parser, patterns: ?[]*Syntax, block: []const u8) Match {
+    fn matchPatterns(self: *Parser, patterns: ?[]*Syntax, block: []const u8, start: usize) Match {
         var earliest_match = Match{};
         if (patterns) |pats| {
             for (pats) |p| {
                 const ls = p.resolve(p);
                 if (ls) |syn| {
-                    const m = self.matchBegin(@constCast(syn), block);
+                    const m = self.matchBegin(@constCast(syn), block, start);
                     if (m.count > 0) {
                         if (earliest_match.count == 0) {
                             earliest_match = m;
@@ -194,9 +191,15 @@ pub const Parser = struct {
         return earliest_match;
     }
 
-    pub fn parseLine(self: *Parser, state: *ParseState, block: []const u8) void {
+    pub fn parseLine(self: *Parser, state: *ParseState, buffer: []const u8) void {
+        var block = self.allocator.alloc(u8, buffer.len + 1) catch {
+            return;
+        };
+        @memcpy(block[0..buffer.len], buffer);
+        block[buffer.len] = '\n'; // if you want to add newline
+
         var start: usize = 0;
-        var end = block.len;
+        const end = block.len;
 
         var matches = std.ArrayList(Match).init(self.allocator);
         defer matches.deinit();
@@ -212,24 +215,29 @@ pub const Parser = struct {
                 const ls = t.resolve(t);
                 if (ls) |syn| {
                     std.debug.print("{s}\n", .{syn.name});
-                    const pattern_match: Match = self.matchPatterns(syn.patterns, text);
-                    const end_match: Match = self.execRegex(@constCast(syn), syn.regex_end, text);
+                    const pattern_match: Match = self.matchPatterns(syn.patterns, block, start);
+                    const end_match: Match = self.execRegex(@constCast(syn), syn.regex_end, syn.regexs_end, block, start);
                     if (end_match.count > 0 and
                         (pattern_match.count == 0 or
                             (pattern_match.count > 0 and pattern_match.firstStart() >= end_match.firstStart())))
                     {
-                        matches.append(end_match.offset(start)) catch {};
-                        start += end_match.firstEnd();
+                        matches.append(end_match) catch {};
+                        start = end_match.firstEnd();
                         state.pop();
                     } else if (pattern_match.count > 0) {
-                        matches.append(pattern_match.offset(start)) catch {};
-                        start += pattern_match.firstEnd();
                         if (pattern_match.syntax) |match_syn| {
+                            matches.append(pattern_match) catch {};
+                            start = pattern_match.firstEnd();
                             if (pattern_match.begin) {
-                                state.push(match_syn);
+                                // std.debug.print("begin!<<<<<<<<<<<<<<<<<<<< {s}\n", .{match_syn.regexs_orelse ""});
+                                _ = match_syn;
+                                //state.push(match_syn);
                                 std.debug.print("push {}\n", .{state.size()});
                             }
                         }
+                    } else {
+                        // not match
+                        break;
                     }
                 } else {
                     unreachable;
@@ -238,7 +246,6 @@ pub const Parser = struct {
                 unreachable;
             }
 
-            end = block.len;
             if (start == end) break;
         }
         std.debug.print("---------------------------------------------------\n", .{});
