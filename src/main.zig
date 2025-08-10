@@ -91,12 +91,12 @@ pub fn main() !void {
     var par = try parser.Parser.init(allocator, &gmr);
     defer par.deinit();
 
-    var state = try parser.ParseState.init(allocator, &gmr.syntax);
+    var state = try parser.ParseState.init(allocator, gmr.syntax);
     defer state.deinit();
 
     par.parseLine(&state, "int main(int argc, char **argv) {\n");
-    par.parseLine(&state, "return 0;\n");
-    par.parseLine(&state, "}\n");
+    //    par.parseLine(&state, "return 0;\n");
+    //    par.parseLine(&state, "}\n");
 
     //
     // std.debug.print("All your {s} are belong to us.\n", .{"codebase"});

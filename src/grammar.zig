@@ -18,14 +18,14 @@ pub const Syntax = struct {
     regex_while: ?oni.Regex = null,
     regex_end: ?oni.Regex = null,
 
-    repository: ?std.StringHashMap(Syntax) = null,
+    repository: ?std.StringHashMap(*Syntax) = null,
 
     // children nodes
-    patterns: ?[]Syntax = null,
-    captures: ?std.StringHashMap(Syntax) = null,
-    while_captures: ?std.StringHashMap(Syntax) = null,
-    begin_captures: ?std.StringHashMap(Syntax) = null,
-    end_captures: ?std.StringHashMap(Syntax) = null,
+    patterns: ?[]*Syntax = null,
+    captures: ?std.StringHashMap(*Syntax) = null,
+    while_captures: ?std.StringHashMap(*Syntax) = null,
+    begin_captures: ?std.StringHashMap(*Syntax) = null,
+    end_captures: ?std.StringHashMap(*Syntax) = null,
 
     // include
     include_path: ?[]const u8 = null,
@@ -35,17 +35,19 @@ pub const Syntax = struct {
     parent: ?*Syntax = null,
 
     // a syntaxMap is where a name is mapped to a syntax node
-    fn parseSyntaxMap(aa: std.mem.Allocator, json: std.json.Value, field_name: []const u8, parent: ?*Syntax) !?std.StringHashMap(Syntax) {
+    fn parseSyntaxMap(allocator: std.mem.Allocator, json: std.json.Value, field_name: []const u8, parent: ?*Syntax) !?std.StringHashMap(*Syntax) {
+        if (json != .object) return error.InvalidSyntax;
         const obj = json.object;
         return blk: {
             if (obj.get(field_name)) |source| {
                 if (source != .object) break :blk null;
-                var res = std.StringHashMap(Syntax).init(aa);
+                var res = std.StringHashMap(*Syntax).init(allocator);
+                errdefer res.deinit();
                 var it = source.object.iterator();
                 while (it.next()) |kv| {
                     const k = kv.key_ptr.*;
                     const v = kv.value_ptr.*;
-                    var syntax = try Syntax.init(aa, v);
+                    var syntax = try Syntax.init(allocator, v);
                     syntax.parent = parent;
                     try res.put(k, syntax);
                 }
@@ -55,10 +57,11 @@ pub const Syntax = struct {
         };
     }
 
-    pub fn init(aa: std.mem.Allocator, json: std.json.Value) error{ OutOfMemory, InvalidSyntax }!Syntax {
+    pub fn init(allocator: std.mem.Allocator, json: std.json.Value) error{ OutOfMemory, InvalidSyntax }!*Syntax {
+        if (json != .object) return error.InvalidSyntax;
         const obj = json.object;
 
-        var syntax = try aa.create(Syntax);
+        var syntax = try allocator.create(Syntax);
         const include = obj.get("include");
         if (include) |path| {
             // std.debug.print("add include {s}\n", .{path.string});
@@ -68,7 +71,7 @@ pub const Syntax = struct {
                 .scope_name = "",
                 .include_path = path.string,
             };
-            return syntax.*;
+            return syntax;
         }
 
         const name = if (obj.get("name")) |v| v.string else "";
@@ -92,14 +95,20 @@ pub const Syntax = struct {
             .regexs_end = regexs_end,
         };
 
-        syntax.*.compile_all_regexes() catch {};
+        syntax.compile_all_regexes() catch {
+            std.debug.print("Failed to compile regex: // TODO which one?\n", .{});
+        };
 
-        const patterns: ?[]Syntax = blk: {
+        const patterns: ?[]*Syntax = blk: {
             const opt = obj.get("patterns");
             if (opt) |patterns_arr| {
-                const res = try aa.alloc(Syntax, patterns_arr.array.items.len);
+                if (patterns_arr.array.items.len == 0) {
+                    break :blk null;
+                }
+                const res = try allocator.alloc(*Syntax, patterns_arr.array.items.len);
+                errdefer allocator.free(res);
                 for (patterns_arr.array.items, 0..) |item, i| {
-                    res[i] = try Syntax.init(aa, item);
+                    res[i] = try Syntax.init(allocator, item);
                 }
                 break :blk res;
             } else {
@@ -107,11 +116,11 @@ pub const Syntax = struct {
             }
         };
 
-        const captures = try parseSyntaxMap(aa, json, "captures", null);
-        const begin_captures = try parseSyntaxMap(aa, json, "beginCaptures", null);
-        const while_captures = try parseSyntaxMap(aa, json, "whileCaptures", null);
-        const end_captures = try parseSyntaxMap(aa, json, "endCaptures", null);
-        const repository = try parseSyntaxMap(aa, json, "repository", null);
+        const captures = try parseSyntaxMap(allocator, json, "captures", null);
+        const begin_captures = try parseSyntaxMap(allocator, json, "beginCaptures", null);
+        const while_captures = try parseSyntaxMap(allocator, json, "whileCaptures", null);
+        const end_captures = try parseSyntaxMap(allocator, json, "endCaptures", null);
+        const repository = try parseSyntaxMap(allocator, json, "repository", null);
 
         syntax.patterns = patterns;
         syntax.captures = captures;
@@ -120,7 +129,7 @@ pub const Syntax = struct {
         syntax.end_captures = end_captures;
         syntax.repository = repository;
 
-        return syntax.*;
+        return syntax;
     }
 
     pub fn deinit(self: *Syntax) void {
@@ -144,19 +153,19 @@ pub const Syntax = struct {
             }
         }
 
-        self.regex_match = null;
-        self.regex_begin = null;
-        self.regex_while = null;
-        self.regex_end = null;
-
         if (self.patterns) |pats| {
-            for (pats) |p| {
-                const ls = @constCast(p.resolve(&p));
-                if (ls) |syn| {
-                    syn.deinit();
-                }
+            for (pats) |*p| {
+                const v = p.*;
+                v.deinit();
             }
-            self.patterns = null;
+        }
+
+        if (self.repository) |repo| {
+            var it = repo.iterator();
+            while (it.next()) |kv| {
+                const v = kv.value_ptr.*;
+                v.deinit();
+            }
         }
     }
 
@@ -192,12 +201,12 @@ pub const Syntax = struct {
         if (syntax.include_path) |include_path| {
             // std.debug.print("s:{s} find include {s}\n", .{ syntax.name, include_path });
             if (self.repository) |repo| {
-                if (include_path.len >= 1) {
+                if (include_path.len > 1) {
                     const name = include_path[1..];
                     const ls = repo.get(name);
                     if (ls) |s| {
                         //std.debug.print("{s} found!\n", .{name});
-                        return &s;
+                        return s;
                     }
                     return null;
                 } else {
@@ -219,14 +228,15 @@ pub const Syntax = struct {
 };
 
 pub const Grammar = struct {
-    arena: std.heap.ArenaAllocator,
     allocator: std.mem.Allocator,
 
     name: []const u8,
-    syntax: Syntax,
+    syntax: *Syntax,
 
     syntax_id: usize = 0,
     syntax_map: std.AutoHashMap(u32, *Syntax),
+
+    parsed: ?std.json.Parsed(std.json.Value) = null,
 
     pub fn init(allocator: std.mem.Allocator, source_path: []const u8) !Grammar {
         const file = try std.fs.cwd().openFile(source_path, .{});
@@ -239,30 +249,30 @@ pub const Grammar = struct {
 
     pub fn deinit(self: *Grammar) void {
         self.syntax.deinit();
-        self.arena.deinit();
+        if (self.parsed) |*parsed| {
+            parsed.deinit();
+        }
     }
 
     pub fn parse(allocator: std.mem.Allocator, source: []const u8) !Grammar {
-        var arena = std.heap.ArenaAllocator.init(allocator);
-        const aa = arena.allocator();
-        errdefer arena.deinit();
-
-        const parsed = try std.json.parseFromSlice(std.json.Value, aa, source, .{ .ignore_unknown_fields = true });
+        const parsed = try std.json.parseFromSlice(std.json.Value, allocator, source, .{ .ignore_unknown_fields = true });
         const root = parsed.value;
+
+        if (root != .object) return error.InvalidSyntax;
         const obj = root.object;
 
         // grammar meta
         const name = obj.get("name").?.string;
-        const syntax = try Syntax.init(aa, root);
+        const syntax = try Syntax.init(allocator, root);
 
-        const syntax_map = std.AutoHashMap(u32, *Syntax).init(aa);
+        const syntax_map = std.AutoHashMap(u32, *Syntax).init(allocator);
         return Grammar{
-            .arena = arena,
             .allocator = allocator,
             .name = name,
             .syntax = syntax,
             .syntax_id = 0,
             .syntax_map = syntax_map,
+            .parsed = parsed,
         };
     }
 

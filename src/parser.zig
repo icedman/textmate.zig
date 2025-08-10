@@ -6,8 +6,8 @@ const Syntax = grammar.Syntax;
 const MAX_CAPTURES = 100;
 
 pub const MatchRange = struct {
-    start: u32,
-    end: u32,
+    start: usize,
+    end: usize,
 };
 
 pub const Match = struct {
@@ -28,6 +28,19 @@ pub const Match = struct {
             return self.captures[0].end;
         }
         return 0;
+    }
+
+    pub fn offset(self: *const Match, start: usize) Match {
+        return blk: {
+            var m: Match = self.*;
+            if (m.count > 0) {
+                for (0..m.count) |i| {
+                    m.captures[i].start += start;
+                    m.captures[i].end += start;
+                }
+            }
+            break :blk m;
+        };
     }
 };
 
@@ -73,19 +86,15 @@ pub const ParseState = struct {
 };
 
 pub const Parser = struct {
-    arena: std.heap.ArenaAllocator,
     allocator: std.mem.Allocator,
     lang: *grammar.Grammar,
 
     pub fn init(allocator: std.mem.Allocator, lang: *grammar.Grammar) !Parser {
-        var arena = std.heap.ArenaAllocator.init(allocator);
-        const aa = arena.allocator();
-        errdefer arena.deinit();
-        return Parser{ .arena = arena, .allocator = aa, .lang = lang };
+        return Parser{ .allocator = allocator, .lang = lang };
     }
 
     pub fn deinit(self: *Parser) void {
-        self.arena.deinit();
+        _ = self;
     }
 
     fn execRegex(self: *Parser, syntax: *Syntax, regex: ?oni.Regex, block: []const u8) Match {
@@ -157,11 +166,11 @@ pub const Parser = struct {
         return self.matchPatterns(syntax.patterns, block);
     }
 
-    fn matchPatterns(self: *Parser, patterns: ?[]Syntax, block: []const u8) Match {
+    fn matchPatterns(self: *Parser, patterns: ?[]*Syntax, block: []const u8) Match {
         var earliest_match = Match{};
         if (patterns) |pats| {
             for (pats) |p| {
-                const ls = p.resolve(&p);
+                const ls = p.resolve(p);
                 if (ls) |syn| {
                     const m = self.matchBegin(@constCast(syn), block);
                     if (m.count > 0) {
@@ -189,11 +198,8 @@ pub const Parser = struct {
         var start: usize = 0;
         var end = block.len;
 
-        const ROWS = 100;
-        const COLS = 32;
-
-        var bag: [ROWS][COLS]u8 = [_][COLS]u8{[_]u8{0} ** COLS} ** ROWS;
-        var bagIdx: usize = 0;
+        var matches = std.ArrayList(Match).init(self.allocator);
+        defer matches.deinit();
 
         // todo handle while
 
@@ -212,27 +218,16 @@ pub const Parser = struct {
                         (pattern_match.count == 0 or
                             (pattern_match.count > 0 and pattern_match.firstStart() >= end_match.firstStart())))
                     {
-                        const s = start + end_match.firstStart();
-                        const e = start + end_match.firstEnd();
-                        const tx = block[s..e];
-                        @memcpy(bag[bagIdx][0..tx.len], tx);
-                        bagIdx += 1;
-                        std.debug.print("??{}-{} ..{s}\n", .{ s, e, tx });
+                        matches.append(end_match.offset(start)) catch {};
                         start += end_match.firstEnd();
                         state.pop();
                     } else if (pattern_match.count > 0) {
-                        const s = start + pattern_match.firstStart();
-                        const e = start + pattern_match.firstEnd();
-                        const tx = block[s..e];
-                        @memcpy(bag[bagIdx][0..tx.len], tx);
-                        bagIdx += 1;
-                        std.debug.print("??{}-{} ..{s}\n", .{ s, e, tx });
-                        //bag.append("block[s..e]") catch {};
+                        matches.append(pattern_match.offset(start)) catch {};
                         start += pattern_match.firstEnd();
                         if (pattern_match.syntax) |match_syn| {
                             if (pattern_match.begin) {
-                                _ = match_syn;
-                                //state.push(match_syn);
+                                state.push(match_syn);
+                                std.debug.print("push {}\n", .{state.size()});
                             }
                         }
                     }
@@ -247,9 +242,9 @@ pub const Parser = struct {
             if (start == end) break;
         }
         std.debug.print("---------------------------------------------------\n", .{});
-        for (bag, 0..) |row, i| {
-            if (i == bagIdx) break;
-            std.debug.print("{s} |", .{row});
+        for (matches.items) |m| {
+            const text = block[m.firstStart()..m.firstEnd()];
+            std.debug.print("{s} {}-{} |", .{ text, m.firstStart(), m.firstEnd() });
         }
         std.debug.print("\n", .{});
     }
