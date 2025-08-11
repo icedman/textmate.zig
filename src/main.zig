@@ -95,9 +95,32 @@ pub fn main() !void {
     defer state.deinit();
 
     // par.parseLine(&state, "int x = 123;\n");
-    par.parseLine(&state, "int main(int argc, char **argv) {\n");
-    //    par.parseLine(&state, "return 0;\n");
-    //    par.parseLine(&state, "}\n");
+    // par.parseLine(&state, "int main(int argc, char **argv) {\n");
+    // par.parseLine(&state, "return 0;\n");
+    // par.parseLine(&state, "}\n");
+
+    { // Open file
+        var file = try std.fs.cwd().openFile("./data/test.c", .{});
+        defer file.close();
+
+        var reader = file.reader();
+
+        // We'll read line-by-line
+        var buf: [1024]u8 = undefined;
+        var line_no: usize = 1;
+
+        while (try reader.readUntilDelimiterOrEof(&buf, '\n')) |line| {
+            // Remove trailing \r if present
+            const trimmed = if (line.len > 0 and line[line.len - 1] == '\r')
+                line[0 .. line.len - 1]
+            else
+                line;
+
+            std.debug.print("{} {s}\n", .{ line_no, trimmed });
+            par.parseLine(&state, trimmed);
+            line_no += 1;
+        }
+    }
 
     //
     // std.debug.print("All your {s} are belong to us.\n", .{"codebase"});

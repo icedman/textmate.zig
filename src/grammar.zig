@@ -1,6 +1,7 @@
 const std = @import("std");
 const oni = @import("oniguruma");
 
+var syntax_id: u32 = 1;
 pub const Syntax = struct {
     id: u32 = 0,
     name: []const u8,
@@ -61,11 +62,15 @@ pub const Syntax = struct {
         if (json != .object) return error.InvalidSyntax;
         const obj = json.object;
 
+        const id = syntax_id;
+        syntax_id += 1;
+
         var syntax = try allocator.create(Syntax);
         const include = obj.get("include");
         if (include) |path| {
             // std.debug.print("add include {s}\n", .{path.string});
             syntax.* = Syntax{
+                .id = id,
                 .name = "",
                 .content_name = "",
                 .scope_name = "",
@@ -86,6 +91,7 @@ pub const Syntax = struct {
         // std.debug.print("{s}", .{regexs_match orelse ""});
 
         syntax.* = Syntax{
+            .id = id,
             .name = name,
             .content_name = content_name,
             .scope_name = scope_name,
@@ -167,6 +173,8 @@ pub const Syntax = struct {
                 v.deinit();
             }
         }
+
+        // todo... free the captures
     }
 
     pub fn compile_all_regexes(self: *Syntax) !void {
@@ -274,15 +282,5 @@ pub const Grammar = struct {
             .syntax_map = syntax_map,
             .parsed = parsed,
         };
-    }
-
-    /// prepare Syntax by assigning IDs (for serialization)
-    /// also loads up external includes like source.*
-    pub fn prepareSyntax(self: *Grammar, syntax: *Syntax) *Syntax {
-        if (syntax.id == 0) {
-            syntax.id = self.syntax_id;
-            self.syntax_id += 1;
-        }
-        return syntax;
     }
 };
