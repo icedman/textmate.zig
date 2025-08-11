@@ -205,8 +205,11 @@ pub const Syntax = struct {
         }
     }
 
-    pub fn resolve(self: *const Syntax, syntax: *const Syntax) ?*const Syntax {
+    pub fn resolve(self: *Syntax, syntax: *const Syntax) ?*const Syntax {
         if (syntax.include_path) |include_path| {
+            if (self.include) |inc_syn| {
+                return inc_syn;
+            }
             // std.debug.print("s:{s} find include {s}\n", .{ syntax.name, include_path });
             if (self.repository) |repo| {
                 if (include_path.len > 1) {
@@ -214,6 +217,7 @@ pub const Syntax = struct {
                     const ls = repo.get(name);
                     if (ls) |s| {
                         //std.debug.print("{s} found!\n", .{name});
+                        self.include = s;
                         return s;
                     }
                     return null;

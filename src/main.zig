@@ -100,7 +100,10 @@ pub fn main() !void {
     // par.parseLine(&state, "}\n");
 
     { // Open file
-        var file = try std.fs.cwd().openFile("./data/test.c", .{});
+        var args = std.process.args();
+        _ = args.next();
+        const path = args.next() orelse "./data/test.c";
+        var file = try std.fs.cwd().openFile(path, .{});
         defer file.close();
 
         var reader = file.reader();
@@ -109,6 +112,7 @@ pub fn main() !void {
         var buf: [1024]u8 = undefined;
         var line_no: usize = 1;
 
+        const start = std.time.nanoTimestamp();
         while (try reader.readUntilDelimiterOrEof(&buf, '\n')) |line| {
             // Remove trailing \r if present
             const trimmed = if (line.len > 0 and line[line.len - 1] == '\r')
@@ -120,6 +124,10 @@ pub fn main() !void {
             par.parseLine(&state, trimmed);
             line_no += 1;
         }
+        const end = std.time.nanoTimestamp();
+        const elapsed = @as(f64, @floatFromInt(end - start)) / 1_000_000_000.0;
+        std.debug.print("execs: {}\n", .{par.regex_execs});
+        std.debug.print("done in {d:.6}s\n", .{elapsed});
     }
 
     //

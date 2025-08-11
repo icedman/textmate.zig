@@ -35,19 +35,21 @@ pub const Match = struct {
 pub const ParseState = struct {
     allocator: std.mem.Allocator,
     stack: std.ArrayList(*Syntax),
+    // this stack holds only dynamic regex_end - ones that requires begin's capture
+    end_stack: std.ArrayList(?*oni.Regex),
 
     pub fn init(allocator: std.mem.Allocator, syntax: *Syntax) !ParseState {
         var stack = std.ArrayList(*Syntax).init(allocator);
         try stack.append(syntax);
-
-        return ParseState{
-            .allocator = allocator,
-            .stack = stack,
-        };
+        var end_stack = std.ArrayList(?*oni.Regex).init(allocator);
+        try end_stack.append(null);
+        return ParseState{ .allocator = allocator, .stack = stack, .end_stack = end_stack };
     }
 
     pub fn deinit(self: *ParseState) void {
         self.stack.deinit();
+        // end_stack regexes need to be freed
+        self.end_stack.deinit();
     }
 
     pub fn top(self: *ParseState) ?*Syntax {
@@ -58,14 +60,25 @@ pub const ParseState = struct {
         }
     }
 
+    pub fn at(self: *ParseState, idx: usize) ?*Syntax {
+        if (idx < self.stack.items.len) {
+            return self.stack.items[idx];
+        } else {
+            return null;
+        }
+    }
+
     pub fn pop(self: *ParseState) void {
         if (self.stack.items.len > 0) {
             _ = self.stack.pop();
+            // regex need to be free
+            _ = self.end_stack.pop();
         }
     }
 
     pub fn push(self: *ParseState, syntax: *Syntax) void {
         _ = self.stack.append(syntax) catch {};
+        _ = self.end_stack.append(null) catch {};
     }
 
     pub fn size(self: *ParseState) usize {
@@ -76,6 +89,7 @@ pub const ParseState = struct {
 pub const Parser = struct {
     allocator: std.mem.Allocator,
     lang: *grammar.Grammar,
+    regex_execs: usize = 0,
 
     pub fn init(allocator: std.mem.Allocator, lang: *grammar.Grammar) !Parser {
         return Parser{ .allocator = allocator, .lang = lang };
@@ -87,10 +101,12 @@ pub const Parser = struct {
 
     fn execRegex(self: *Parser, syntax: *Syntax, regex: ?oni.Regex, regexs: ?[]const u8, block: []const u8, start: usize, end: usize) Match {
         if (regex) |*re| {
+            self.regex_execs += 1;
             const reg = blk: {
                 var result: oni.Region = .{};
                 const hard_start: usize = start;
-                _ = @constCast(re).searchAdvanced(block, hard_start, end, &result, .{}) catch |err| {
+                const hard_end: usize = end;
+                _ = @constCast(re).searchAdvanced(block, hard_start, hard_end, &result, .{}) catch |err| {
                     if (err == error.Mismatch) {
                         break :blk null; // return null instead
                     } else {
@@ -101,7 +117,7 @@ pub const Parser = struct {
             };
 
             if (reg) |r| {
-                std.debug.print("found!<<<<<<<<<<<<<<<<<<\n", .{});
+                std.debug.print("<<<<<<<<<<<<<<<<<< {s}\n", .{syntax.name});
                 var m = Match{
                     .syntax = syntax,
                 };
@@ -130,7 +146,7 @@ pub const Parser = struct {
                 m.count = count;
 
                 if (count > 0) {
-                    std.debug.print("{s}\n", .{regexs orelse ""});
+                    // std.debug.print("{s}\n", .{regexs orelse ""});
                     std.debug.print("{s}\n", .{syntax.name});
                     std.debug.print("{s}\n", .{syntax.scope_name});
                 }
@@ -138,7 +154,7 @@ pub const Parser = struct {
             }
         }
 
-        _ = .{self};
+        _ = .{ self, regexs };
         return Match{};
     }
 
@@ -189,19 +205,12 @@ pub const Parser = struct {
     }
 
     fn collectCaptures(self: *Parser, match: *const Match, captures: *const std.StringHashMap(*Syntax), block: []const u8) void {
-        std.debug.print("capture<<<<<<<<\n", .{});
+        std.debug.print("captures\n", .{});
         _ = .{ self, match, captures, block };
-        var it = captures.iterator();
-        while (it.next()) |kv| {
-            const k = kv.key_ptr.*;
-            const v = kv.value_ptr.*;
-            std.debug.print("capture {s}\n", .{k});
-            _ = .{v};
-        }
-
         for (0..match.count) |i| {
             var buf: [32]u8 = undefined; // enough to hold any int as string
             const range = match.captures[i];
+            if (range.start == 0 and range.end == 0) continue;
             const key = std.fmt.bufPrint(&buf, "{}", .{range.group}) catch {
                 continue;
             };
@@ -232,6 +241,26 @@ pub const Parser = struct {
 
         var matches = std.ArrayList(Match).init(self.allocator);
         defer matches.deinit();
+
+        // handle while
+        // todo track while count
+        var state_depth = state.size();
+        while (state_depth > 1) : (state_depth -= 1) {
+            const top = state.at(state_depth - 1);
+            if (top) |t| {
+                const ls = t.resolve(t);
+                if (ls) |syn| {
+                    if (syn.regex_while) |regex| {
+                        const m = self.execRegex(@constCast(syn), regex, syn.regexs_while, block, start, end);
+                        if (m.count == 0) {
+                            while (state.size() >= state_depth) {
+                                state.pop();
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         while (true) {
             end = block.len;
