@@ -1,14 +1,16 @@
 const std = @import("std");
 const oni = @import("oniguruma");
 const grammar = @import("grammar.zig");
+const utils = @import("utils.zig");
 const Syntax = grammar.Syntax;
 
 const MAX_CAPTURES = 100;
+const MAX_SCOPE_SIZE = 64;
 
-pub const MatchCapture = struct {
+pub const Capture = struct {
     start: usize,
     end: usize,
-    scope: [32]u8 = [_]u8{0} ** 32,
+    scope: [MAX_SCOPE_SIZE]u8 = [_]u8{0} ** MAX_SCOPE_SIZE,
 };
 
 pub const MatchRange = struct {
@@ -36,20 +38,11 @@ pub const Match = struct {
         }
         return 0;
     }
-
-    pub fn applyReferences(self: *const Match, block: []const u8, target: []const u8) void {
-        _ = target;
-        _ = block;
-        for (0..self.count) |i| {
-            std.debug.print("apply {}\n", .{i});
-            // build regexs_end and compile
-        }
-    }
 };
 
 pub const StateContext = struct {
     syntax: *Syntax,
-    end_regex: ?*oni.Regex = null,
+    end_regex: ?oni.Regex = null,
 };
 
 pub const ParseState = struct {
@@ -70,8 +63,8 @@ pub const ParseState = struct {
     pub fn deinit(self: *ParseState) void {
         for (self.stack.items) |item| {
             // free parse-time compiled regex
-            if (item.end_regex) |regex| {
-                regex.deinit();
+            if (item.end_regex) |*regex| {
+                @constCast(regex).deinit();
             }
         }
         self.stack.deinit();
@@ -99,18 +92,31 @@ pub const ParseState = struct {
         }
     }
 
-    pub fn push(self: *ParseState, syntax: *Syntax, block: []const u8, match: ?Match) void {
+    pub fn push(self: *ParseState, syntax: *Syntax, block: []const u8, match: ?Match) !void {
+        var sc = StateContext{
+            .syntax = syntax,
+        };
         if (syntax.has_back_references) {
             // compile regex_end
             if (match) |m| {
                 if (syntax.regexs_end) |regexs| {
-                    m.applyReferences(block, regexs);
+                    var output: [utils.TEMP_BUFFER_SIZE]u8 = [_]u8{0} ** utils.TEMP_BUFFER_SIZE;
+                    _ = utils.applyReferences(&m, block, regexs, &output);
+
+                    {
+                        sc.end_regex = try oni.Regex.init(
+                            &output,
+                            .{},
+                            oni.Encoding.utf8,
+                            oni.Syntax.default,
+                            null,
+                        );
+                        errdefer sc.end_regex.deinit();
+                    }
                 }
             }
         }
-        _ = self.stack.append(StateContext{
-            .syntax = syntax,
-        }) catch {};
+        _ = self.stack.append(sc) catch {};
     }
 
     pub fn size(self: *ParseState) usize {
@@ -210,7 +216,7 @@ pub const Parser = struct {
                     break :blk mm;
                 } orelse self.execRegex(syntax, syntax.regex_match, syntax.regexs_match, block, start, end);
                 if (m.start() > start) {
-                    // save to cache it reusable
+                    // save to cache if reusable
                     _ = self.match_cache.put(&regex, m) catch {};
                 }
                 // const m = self.execRegex(syntax, regex, syntax.regexs_match, block, start, end);
@@ -231,7 +237,7 @@ pub const Parser = struct {
                     break :blk mm;
                 } orelse self.execRegex(syntax, syntax.regex_begin, syntax.regexs_begin, block, start, end);
                 if (m.start() > start) {
-                    // save to cache it reusable
+                    // save to cache if reusable
                     _ = self.match_cache.put(&regex, m) catch {};
                 }
                 // const m = self.execRegex(syntax, regex, syntax.regexs_begin, block, start, end);
@@ -284,8 +290,10 @@ pub const Parser = struct {
             };
             const capture: ?*Syntax = captures.get(key);
             if (capture) |syn| {
-                // todo.. expand name
                 std.debug.print("capture {} {s}\n", .{ range.group, syn.name });
+                var output: [utils.TEMP_BUFFER_SIZE]u8 = [_]u8{0} ** utils.TEMP_BUFFER_SIZE;
+                _ = utils.applyCaptures(match, block, syn.name, &output);
+                std.debug.print("{s}\n", .{output});
                 if (syn.patterns) |pat| {
                     _ = pat;
                     // todo.. collect patterns
@@ -350,7 +358,15 @@ pub const Parser = struct {
                 if (ls) |syn| {
                     std.debug.print("{s}\n", .{syn.name});
                     const pattern_match: Match = self.matchPatterns(syn.patterns, block, start, end);
-                    const end_match: Match = self.execRegex(@constCast(syn), syn.regex_end, syn.regexs_end, block, start, end);
+                    const end_match: Match = blk: {
+                        if (t.end_regex) |r| {
+                            // use dynamic end_regex here if one was compiled
+                            const m = self.execRegex(@constCast(syn), r, syn.regexs_end, block, start, end);
+                            break :blk m;
+                        }
+                        const m = self.execRegex(@constCast(syn), syn.regex_end, syn.regexs_end, block, start, end);
+                        break :blk m;
+                    };
                     if (end_match.count > 0 and
                         (pattern_match.count == 0 or
                             (pattern_match.count > 0 and pattern_match.start() >= end_match.start())))
@@ -374,7 +390,9 @@ pub const Parser = struct {
                             start = pattern_match.start();
                             end = pattern_match.end();
                             if (match_syn.regex_end != null) {
-                                state.push(match_syn, block, pattern_match);
+                                state.push(match_syn, block, pattern_match) catch {
+                                    // fail silently?
+                                };
                                 std.debug.print("push {}\n", .{state.size()});
                                 // collect begin captures
                                 if (match_syn.begin_captures) |beg_cap| {

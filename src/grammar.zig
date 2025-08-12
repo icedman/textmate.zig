@@ -2,6 +2,7 @@ const std = @import("std");
 const oni = @import("oniguruma");
 
 var syntax_id: u32 = 1;
+
 pub const Syntax = struct {
     id: u32 = 0,
     name: []const u8,
@@ -92,7 +93,6 @@ pub const Syntax = struct {
         var syntax = try allocator.create(Syntax);
         const include = obj.get("include");
         if (include) |path| {
-            // std.debug.print("add include {s}\n", .{path.string});
             syntax.* = Syntax{
                 .id = id,
                 .name = "",
@@ -103,33 +103,22 @@ pub const Syntax = struct {
             return syntax;
         }
 
-        const name = if (obj.get("name")) |v| v.string else "";
-        const content_name = if (obj.get("contentName")) |v| v.string else "";
-        const scope_name = if (obj.get("scopeName")) |v| v.string else "";
-
-        const regexs_match = if (obj.get("match")) |v| v.string else null;
-        const regexs_begin = if (obj.get("begin")) |v| v.string else null;
-        const regexs_while = if (obj.get("while")) |v| v.string else null;
-        const regexs_end = if (obj.get("end")) |v| v.string else null;
-
-        // std.debug.print("{s}", .{regexs_match orelse ""});
-
         syntax.* = Syntax{
             .id = id,
-            .name = name,
-            .content_name = content_name,
-            .scope_name = scope_name,
-            .regexs_match = regexs_match,
-            .regexs_begin = regexs_begin,
-            .regexs_while = regexs_while,
-            .regexs_end = regexs_end,
+            .name = if (obj.get("name")) |v| v.string else "",
+            .content_name = if (obj.get("contentName")) |v| v.string else "",
+            .scope_name = if (obj.get("scopeName")) |v| v.string else "",
+            .regexs_match = if (obj.get("match")) |v| v.string else null,
+            .regexs_begin = if (obj.get("begin")) |v| v.string else null,
+            .regexs_while = if (obj.get("while")) |v| v.string else null,
+            .regexs_end = if (obj.get("end")) |v| v.string else null,
         };
 
         syntax.compile_all_regexes() catch {
             std.debug.print("Failed to compile regex: // TODO which one?\n", .{});
         };
 
-        const patterns: ?[]*Syntax = blk: {
+        syntax.patterns = blk: {
             const opt = obj.get("patterns");
             if (opt) |patterns_arr| {
                 if (patterns_arr.array.items.len == 0) {
@@ -146,18 +135,11 @@ pub const Syntax = struct {
             }
         };
 
-        const captures = try parseSyntaxMap(allocator, json, "captures", null);
-        const begin_captures = try parseSyntaxMap(allocator, json, "beginCaptures", null);
-        const while_captures = try parseSyntaxMap(allocator, json, "whileCaptures", null);
-        const end_captures = try parseSyntaxMap(allocator, json, "endCaptures", null);
-        const repository = try parseSyntaxMap(allocator, json, "repository", null);
-
-        syntax.patterns = patterns;
-        syntax.captures = captures;
-        syntax.begin_captures = begin_captures;
-        syntax.while_captures = while_captures;
-        syntax.end_captures = end_captures;
-        syntax.repository = repository;
+        syntax.captures = try parseSyntaxMap(allocator, json, "captures", null);
+        syntax.begin_captures = try parseSyntaxMap(allocator, json, "beginCaptures", null);
+        syntax.while_captures = try parseSyntaxMap(allocator, json, "whileCaptures", null);
+        syntax.end_captures = try parseSyntaxMap(allocator, json, "endCaptures", null);
+        syntax.repository = try parseSyntaxMap(allocator, json, "repository", null);
 
         return syntax;
     }
