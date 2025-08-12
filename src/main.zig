@@ -99,7 +99,7 @@ pub fn main() !void {
     // par.parseLine(&state, "return 0;\n");
     // par.parseLine(&state, "}\n");
 
-    { // Open file
+    if (true) { // Open file
         var args = std.process.args();
         _ = args.next();
         const path = args.next() orelse "./data/test.c";
@@ -170,4 +170,4 @@ test "fuzz example" {
 const std = @import("std");
 
 /// This imports the separate module containing `root.zig`. Take a look in `build.zig` for details.
-const lib = @import("cc_textmate_zig_lib");
+const lib = @import("textmate_zig_lib");

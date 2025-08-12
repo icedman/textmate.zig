@@ -999,3 +999,4 @@ int main(int argc, char* argv[])
     wl_display_destroy(server.wl_display);
     return 0;
 }
+

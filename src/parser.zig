@@ -90,13 +90,18 @@ pub const Parser = struct {
     allocator: std.mem.Allocator,
     lang: *grammar.Grammar,
     regex_execs: usize = 0,
+    match_cache: std.AutoHashMap(*const oni.Regex, Match),
 
     pub fn init(allocator: std.mem.Allocator, lang: *grammar.Grammar) !Parser {
-        return Parser{ .allocator = allocator, .lang = lang };
+        return Parser{
+            .allocator = allocator,
+            .lang = lang,
+            .match_cache = std.AutoHashMap(*const oni.Regex, Match).init(allocator),
+        };
     }
 
     pub fn deinit(self: *Parser) void {
-        _ = self;
+        self.match_cache.deinit();
     }
 
     fn execRegex(self: *Parser, syntax: *Syntax, regex: ?oni.Regex, regexs: ?[]const u8, block: []const u8, start: usize, end: usize) Match {
@@ -161,18 +166,47 @@ pub const Parser = struct {
     fn matchBegin(self: *Parser, syntax: *Syntax, block: []const u8, start: usize, end: usize) Match {
         // match
         if (syntax.regex_match != null) {
-            const m = self.execRegex(syntax, syntax.regex_match, syntax.regexs_match, block, start, end);
-            if (m.count > 0) {
-                return m;
+            if (syntax.regex_match) |regex| {
+                const m = blk: {
+                    // fetch cache if valid
+                    const mm = self.match_cache.get(&regex) orelse break :blk null;
+                    if (mm.count > 0 and mm.start() < start) {
+                        break :blk null;
+                    }
+                    break :blk mm;
+                } orelse self.execRegex(syntax, syntax.regex_match, syntax.regexs_match, block, start, end);
+                if (m.start() > start) {
+                    // save to cache it reusable
+                    _ = self.match_cache.put(&regex, m) catch {};
+                }
+                // const m = self.execRegex(syntax, regex, syntax.regexs_match, block, start, end);
+                if (m.count > 0) {
+                    return m;
+                }
             }
         }
         // begin
         if (syntax.regex_begin != null) {
-            const m = self.execRegex(syntax, syntax.regex_begin, syntax.regexs_begin, block, start, end);
-            if (m.count > 0) {
-                return m;
+            if (syntax.regex_begin) |regex| {
+                const m = blk: {
+                    // fetch cache if valid
+                    const mm = self.match_cache.get(&regex) orelse break :blk null;
+                    if (mm.count > 0 and mm.start() < start) {
+                        break :blk null;
+                    }
+                    break :blk mm;
+                } orelse self.execRegex(syntax, syntax.regex_begin, syntax.regexs_begin, block, start, end);
+                if (m.start() > start) {
+                    // save to cache it reusable
+                    _ = self.match_cache.put(&regex, m) catch {};
+                }
+                // const m = self.execRegex(syntax, regex, syntax.regexs_begin, block, start, end);
+                if (m.count > 0) {
+                    return m;
+                }
             }
         }
+
         // check patterns
         if (syntax.regex_match == null and syntax.regex_begin == null) {
             return self.matchPatterns(syntax.patterns, block, start, end);
@@ -235,6 +269,8 @@ pub const Parser = struct {
         @memcpy(block[0..buffer.len], buffer);
         block[buffer.len] = '\n';
 
+        self.match_cache.clearRetainingCapacity();
+
         var start: usize = 0;
         var end = block.len;
         var last_syntax: ?*Syntax = null;
@@ -294,6 +330,7 @@ pub const Parser = struct {
                             }
                         }
 
+                        std.debug.print("!pop\n", .{});
                         state.pop();
                     } else if (pattern_match.count > 0) {
                         if (pattern_match.syntax) |match_syn| {
@@ -317,6 +354,7 @@ pub const Parser = struct {
                     } else {
                         // no match
                         if (end_match.count > 0 and state.size() > 0) {
+                            std.debug.print("!pop\n", .{});
                             state.pop();
                         }
                     }
