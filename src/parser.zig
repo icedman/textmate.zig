@@ -5,6 +5,12 @@ const Syntax = grammar.Syntax;
 
 const MAX_CAPTURES = 100;
 
+pub const MatchCapture = struct {
+    start: usize,
+    end: usize,
+    scope: [32]u8 = [_]u8{0} ** 32,
+};
+
 pub const MatchRange = struct {
     group: u16,
     start: usize,
@@ -30,29 +36,48 @@ pub const Match = struct {
         }
         return 0;
     }
+
+    pub fn applyReferences(self: *const Match, block: []const u8, target: []const u8) void {
+        _ = target;
+        _ = block;
+        for (0..self.count) |i| {
+            std.debug.print("apply {}\n", .{i});
+            // build regexs_end and compile
+        }
+    }
+};
+
+pub const StateContext = struct {
+    syntax: *Syntax,
+    end_regex: ?*oni.Regex = null,
 };
 
 pub const ParseState = struct {
     allocator: std.mem.Allocator,
-    stack: std.ArrayList(*Syntax),
-    // this stack holds only dynamic regex_end - ones that requires begin's capture
-    end_stack: std.ArrayList(?*oni.Regex),
+    stack: std.ArrayList(StateContext),
 
     pub fn init(allocator: std.mem.Allocator, syntax: *Syntax) !ParseState {
-        var stack = std.ArrayList(*Syntax).init(allocator);
-        try stack.append(syntax);
-        var end_stack = std.ArrayList(?*oni.Regex).init(allocator);
-        try end_stack.append(null);
-        return ParseState{ .allocator = allocator, .stack = stack, .end_stack = end_stack };
+        var stack = std.ArrayList(StateContext).init(allocator);
+        try stack.append(StateContext{
+            .syntax = syntax,
+        });
+        return ParseState{
+            .allocator = allocator,
+            .stack = stack,
+        };
     }
 
     pub fn deinit(self: *ParseState) void {
+        for (self.stack.items) |item| {
+            // free parse-time compiled regex
+            if (item.end_regex) |regex| {
+                regex.deinit();
+            }
+        }
         self.stack.deinit();
-        // end_stack regexes need to be freed
-        self.end_stack.deinit();
     }
 
-    pub fn top(self: *ParseState) ?*Syntax {
+    pub fn top(self: *ParseState) ?StateContext {
         if (self.stack.items.len > 0) {
             return self.stack.items[self.stack.items.len - 1];
         } else {
@@ -60,7 +85,7 @@ pub const ParseState = struct {
         }
     }
 
-    pub fn at(self: *ParseState, idx: usize) ?*Syntax {
+    pub fn at(self: *ParseState, idx: usize) ?StateContext {
         if (idx < self.stack.items.len) {
             return self.stack.items[idx];
         } else {
@@ -71,14 +96,21 @@ pub const ParseState = struct {
     pub fn pop(self: *ParseState) void {
         if (self.stack.items.len > 0) {
             _ = self.stack.pop();
-            // regex need to be free
-            _ = self.end_stack.pop();
         }
     }
 
-    pub fn push(self: *ParseState, syntax: *Syntax) void {
-        _ = self.stack.append(syntax) catch {};
-        _ = self.end_stack.append(null) catch {};
+    pub fn push(self: *ParseState, syntax: *Syntax, block: []const u8, match: ?Match) void {
+        if (syntax.has_back_references) {
+            // compile regex_end
+            if (match) |m| {
+                if (syntax.regexs_end) |regexs| {
+                    m.applyReferences(block, regexs);
+                }
+            }
+        }
+        _ = self.stack.append(StateContext{
+            .syntax = syntax,
+        }) catch {};
     }
 
     pub fn size(self: *ParseState) usize {
@@ -89,8 +121,10 @@ pub const ParseState = struct {
 pub const Parser = struct {
     allocator: std.mem.Allocator,
     lang: *grammar.Grammar,
-    regex_execs: usize = 0,
     match_cache: std.AutoHashMap(*const oni.Regex, Match),
+
+    // stats
+    regex_execs: usize = 0,
 
     pub fn init(allocator: std.mem.Allocator, lang: *grammar.Grammar) !Parser {
         return Parser{
@@ -159,7 +193,7 @@ pub const Parser = struct {
             }
         }
 
-        _ = .{ self, regexs };
+        _ = .{regexs};
         return Match{};
     }
 
@@ -284,7 +318,8 @@ pub const Parser = struct {
         while (state_depth > 1) : (state_depth -= 1) {
             const top = state.at(state_depth - 1);
             if (top) |t| {
-                const ls = t.resolve(t);
+                const ts = t.syntax;
+                const ls = ts.resolve(ts);
                 if (ls) |syn| {
                     if (syn.regex_while) |regex| {
                         const m = self.execRegex(@constCast(syn), regex, syn.regexs_while, block, start, end);
@@ -310,7 +345,8 @@ pub const Parser = struct {
 
             const top = state.top();
             if (top) |t| {
-                const ls = t.resolve(t);
+                const ts = t.syntax;
+                const ls = ts.resolve(ts);
                 if (ls) |syn| {
                     std.debug.print("{s}\n", .{syn.name});
                     const pattern_match: Match = self.matchPatterns(syn.patterns, block, start, end);
@@ -338,7 +374,7 @@ pub const Parser = struct {
                             start = pattern_match.start();
                             end = pattern_match.end();
                             if (match_syn.regex_end != null) {
-                                state.push(match_syn);
+                                state.push(match_syn, block, pattern_match);
                                 std.debug.print("push {}\n", .{state.size()});
                                 // collect begin captures
                                 if (match_syn.begin_captures) |beg_cap| {
@@ -353,24 +389,22 @@ pub const Parser = struct {
                         }
                     } else {
                         // no match
-                        if (end_match.count > 0 and state.size() > 0) {
-                            std.debug.print("!pop\n", .{});
-                            state.pop();
-                        }
                     }
                 } else {
+                    // no top.syntax
                     unreachable;
                 }
+
+                if (start == end and last_syntax == ts) {
+                    break;
+                }
+
+                last_syntax = ts;
+                start = end;
             } else {
+                // no top
                 unreachable;
             }
-
-            if (start == end and last_syntax == top) {
-                break;
-            }
-
-            last_syntax = top;
-            start = end;
         }
 
         std.debug.print("---------------------------------------------------\n", .{});
@@ -379,5 +413,9 @@ pub const Parser = struct {
             std.debug.print("{s} {}-{} |", .{ text, m.start(), m.end() });
         }
         std.debug.print("\n", .{});
+    }
+
+    pub fn begin(self: *Parser) void {
+        self.regex_execs = 0;
     }
 };

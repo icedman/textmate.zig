@@ -34,6 +34,30 @@ pub const Syntax = struct {
 
     // other internals
     parent: ?*Syntax = null,
+    is_anchored: bool = false,
+    has_back_references: bool = false,
+
+    pub fn patternHasBackReference(ptrn: []const u8) bool {
+        var escape = false;
+        for (ptrn) |ch| {
+            if (escape and std.ascii.isDigit(ch)) {
+                return true;
+            }
+            escape = (!escape) and (ch == '\\');
+        }
+        return false;
+    }
+
+    pub fn patternHasAnchor(ptrn: []const u8) bool {
+        var escape = false;
+        for (ptrn) |ch| {
+            if (escape and ch == 'G') {
+                return true;
+            }
+            escape = (!escape) and (ch == '\\');
+        }
+        return false;
+    }
 
     // a syntaxMap is where a name is mapped to a syntax node
     fn parseSyntaxMap(allocator: std.mem.Allocator, json: std.json.Value, field_name: []const u8, parent: ?*Syntax) !?std.StringHashMap(*Syntax) {
@@ -153,12 +177,14 @@ pub const Syntax = struct {
             .{ .string = &self.regexs_end, .regex_ptr = &self.regex_end },
         };
 
+        // free regexes
         for (entries) |entry| {
             if (entry.regex_ptr.*) |*regex| {
                 regex.deinit();
             }
         }
 
+        // free patterns
         if (self.patterns) |pats| {
             for (pats) |*p| {
                 const v = p.*;
@@ -166,6 +192,7 @@ pub const Syntax = struct {
             }
         }
 
+        // free repository
         if (self.repository) |repo| {
             var it = repo.iterator();
             while (it.next()) |kv| {
@@ -174,7 +201,28 @@ pub const Syntax = struct {
             }
         }
 
-        // todo... free the captures
+        // free captures
+        if (self.captures) |captures| {
+            var it = captures.iterator();
+            while (it.next()) |kv| {
+                const v = kv.value_ptr.*;
+                v.deinit();
+            }
+        }
+        if (self.begin_captures) |captures| {
+            var it = captures.iterator();
+            while (it.next()) |kv| {
+                const v = kv.value_ptr.*;
+                v.deinit();
+            }
+        }
+        if (self.end_captures) |captures| {
+            var it = captures.iterator();
+            while (it.next()) |kv| {
+                const v = kv.value_ptr.*;
+                v.deinit();
+            }
+        }
     }
 
     pub fn compile_all_regexes(self: *Syntax) !void {
@@ -190,8 +238,13 @@ pub const Syntax = struct {
             .{ .string = &self.regexs_end, .regex_ptr = &self.regex_end },
         };
 
-        for (entries) |entry| {
+        for (entries, 0..) |entry, i| {
             if (entry.string.*) |regex| {
+                // deal with back references for while and end
+                if (i > 1 and Syntax.patternHasBackReference(regex)) {
+                    self.has_back_references = true;
+                    continue;
+                }
                 const re = try oni.Regex.init(
                     regex,
                     .{},
