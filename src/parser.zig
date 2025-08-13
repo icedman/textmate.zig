@@ -127,6 +127,9 @@ pub const ParseState = struct {
 pub const Parser = struct {
     allocator: std.mem.Allocator,
     lang: *grammar.Grammar,
+
+    // line parse data
+    captures: std.ArrayList(Capture),
     match_cache: std.AutoHashMap(*const oni.Regex, Match),
 
     // stats
@@ -136,11 +139,13 @@ pub const Parser = struct {
         return Parser{
             .allocator = allocator,
             .lang = lang,
+            .captures = std.ArrayList(Capture).init(allocator),
             .match_cache = std.AutoHashMap(*const oni.Regex, Match).init(allocator),
         };
     }
 
     pub fn deinit(self: *Parser) void {
+        self.captures.deinit();
         self.match_cache.deinit();
     }
 
@@ -293,11 +298,16 @@ pub const Parser = struct {
                 std.debug.print("capture {} {s}\n", .{ range.group, syn.name });
                 var output: [utils.TEMP_BUFFER_SIZE]u8 = [_]u8{0} ** utils.TEMP_BUFFER_SIZE;
                 _ = utils.applyCaptures(match, block, syn.name, &output);
+                self.captures.append(Capture{
+                    .start = range.start,
+                    .end = range.end,
+                    .scope = output,
+                }) catch {};
                 std.debug.print("{s}\n", .{output});
                 if (syn.patterns) |pat| {
                     _ = pat;
                     // todo.. collect patterns
-                    std.debug.print("has patterns\n", .{});
+                    std.debug.print("has uncollected patterns\n", .{});
                 }
             }
         }
@@ -396,6 +406,20 @@ pub const Parser = struct {
                                 std.debug.print("push {}\n", .{state.size()});
                                 // collect begin captures
                                 if (match_syn.begin_captures) |beg_cap| {
+                                    self.captures.append(Capture{
+                                        .start = pattern_match.start(),
+                                        .end = pattern_match.end(),
+                                        .scope = blk: {
+                                            var scope: [MAX_SCOPE_SIZE]u8 = [_]u8{0} ** MAX_SCOPE_SIZE;
+                                            var l = match_syn.name.len;
+                                            if (l > MAX_SCOPE_SIZE) {
+                                                l = MAX_SCOPE_SIZE;
+                                            }
+                                            @memcpy(scope[0..l], match_syn.name);
+                                            break :blk scope;
+                                        },
+                                    }) catch {};
+
                                     self.collectCaptures(&pattern_match, &beg_cap, block);
                                 }
                             } else {
@@ -426,11 +450,13 @@ pub const Parser = struct {
         }
 
         std.debug.print("---------------------------------------------------\n", .{});
-        for (matches.items) |m| {
-            const text = block[m.start()..m.end()];
-            std.debug.print("{s} {}-{} |", .{ text, m.start(), m.end() });
+        for (self.captures.items) |m| {
+            const text = block[m.start..m.end];
+            std.debug.print("{s} {s}\n", .{ text, m.scope });
         }
         std.debug.print("\n", .{});
+
+        self.captures.clearRetainingCapacity();
     }
 
     pub fn begin(self: *Parser) void {

@@ -49,6 +49,7 @@ pub const Syntax = struct {
         return false;
     }
 
+    // todo make use of anchors
     pub fn patternHasAnchor(ptrn: []const u8) bool {
         var escape = false;
         for (ptrn) |ch| {
