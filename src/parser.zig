@@ -1,11 +1,11 @@
 const std = @import("std");
 const oni = @import("oniguruma");
 const grammar = @import("grammar.zig");
-const utils = @import("utils.zig");
 const Syntax = grammar.Syntax;
 
 const MAX_CAPTURES = 100;
 const MAX_SCOPE_SIZE = 64;
+const TEMP_BUFFER_SIZE = 64;
 
 pub const Capture = struct {
     start: usize,
@@ -38,6 +38,60 @@ pub const Match = struct {
         }
         return 0;
     }
+
+    fn applyRef(self: *const Match, block: []const u8, target: []const u8, escape_character: u8, output: *[TEMP_BUFFER_SIZE]u8) []const u8 {
+        var output_idx: usize = 0;
+        var escape = false;
+        var skip: usize = 0;
+        for (target, 0..) |ch, idx| {
+            if (skip > 0) {
+                skip -= 1;
+                continue;
+            }
+            if (output_idx >= output.len) break;
+            if (escape and std.ascii.isDigit(ch)) {
+                output_idx -= 1;
+                for (0..self.count) |i| {
+                    const r = self.captures[i];
+                    const digit: u8 = blk: {
+                        const d = ch - '0';
+                        if (output_idx < output.len - 1) {
+                            // check for another digit
+                            const ch2 = target[idx + 1];
+                            if (std.ascii.isDigit(ch2)) {
+                                const d2 = ch2 - '0';
+                                skip = 1;
+                                const dd = (d * 10) + d2;
+                                break :blk dd;
+                            }
+                        }
+                        break :blk d;
+                    };
+                    if (digit == r.group) {
+                        for (r.start..r.end) |bi| {
+                            output[output_idx] = block[bi];
+                            output_idx += 1;
+                        }
+                    }
+                }
+            } else {
+                output[output_idx] = ch;
+                output_idx += 1;
+            }
+            escape = (!escape) and (ch == escape_character);
+        }
+
+        // std.debug.print("{s}\n", .{output});
+        return output;
+    }
+
+    pub fn applyReferences(self: *const Match, block: []const u8, target: []const u8, output: *[TEMP_BUFFER_SIZE]u8) []const u8 {
+        return self.applyRef(block, target, '\\', output);
+    }
+
+    pub fn applyCaptures(self: *const Match, block: []const u8, target: []const u8, output: *[TEMP_BUFFER_SIZE]u8) []const u8 {
+        return self.applyRef(block, target, '$', output);
+    }
 };
 
 pub const StateContext = struct {
@@ -45,6 +99,7 @@ pub const StateContext = struct {
     end_regex: ?oni.Regex = null,
 };
 
+/// ParseState is a StateContext stack
 pub const ParseState = struct {
     allocator: std.mem.Allocator,
     stack: std.ArrayList(StateContext),
@@ -100,9 +155,8 @@ pub const ParseState = struct {
             // compile regex_end
             if (match) |m| {
                 if (syntax.regexs_end) |regexs| {
-                    var output: [utils.TEMP_BUFFER_SIZE]u8 = [_]u8{0} ** utils.TEMP_BUFFER_SIZE;
-                    _ = utils.applyReferences(&m, block, regexs, &output);
-
+                    var output: [TEMP_BUFFER_SIZE]u8 = [_]u8{0} ** TEMP_BUFFER_SIZE;
+                    _ = m.applyReferences(block, regexs, &output);
                     {
                         sc.end_regex = try oni.Regex.init(
                             &output,
@@ -167,7 +221,6 @@ pub const Parser = struct {
             };
 
             if (reg) |r| {
-                std.debug.print("<<<<<<<<<<<<<<<<<< {s}\n", .{syntax.name});
                 var m = Match{
                     .syntax = syntax,
                 };
@@ -296,8 +349,8 @@ pub const Parser = struct {
             const capture: ?*Syntax = captures.get(key);
             if (capture) |syn| {
                 std.debug.print("capture {} {s}\n", .{ range.group, syn.name });
-                var output: [utils.TEMP_BUFFER_SIZE]u8 = [_]u8{0} ** utils.TEMP_BUFFER_SIZE;
-                _ = utils.applyCaptures(match, block, syn.name, &output);
+                var output: [TEMP_BUFFER_SIZE]u8 = [_]u8{0} ** TEMP_BUFFER_SIZE;
+                _ = match.applyCaptures(block, syn.name, &output);
                 self.captures.append(Capture{
                     .start = range.start,
                     .end = range.end,
@@ -313,9 +366,9 @@ pub const Parser = struct {
         }
     }
 
-    pub fn parseLine(self: *Parser, state: *ParseState, buffer: []const u8) void {
+    pub fn parseLine(self: *Parser, state: *ParseState, buffer: []const u8) !*std.ArrayList(Capture) {
         var block = self.allocator.alloc(u8, buffer.len + 1) catch {
-            return;
+            return error.OutOfMemory;
         };
         defer self.allocator.free(block);
         @memcpy(block[0..buffer.len], buffer);
@@ -451,9 +504,28 @@ pub const Parser = struct {
             std.debug.print("{s} {s}\n", .{ text, m.scope });
         }
         std.debug.print("\n", .{});
+
+        return &self.captures;
     }
 
     pub fn begin(self: *Parser) void {
         self.regex_execs = 0;
     }
 };
+
+test "test references" {
+    const block: []const u8 = "abcdefg";
+    var m = Match{};
+    m.count = 2;
+    m.captures[0].group = 1;
+    m.captures[0].start = 0;
+    m.captures[0].end = 2;
+    m.captures[1].group = 2;
+    m.captures[1].start = 3;
+    m.captures[1].end = 5;
+    var output: [TEMP_BUFFER_SIZE]u8 = [_]u8{0} ** TEMP_BUFFER_SIZE;
+    _ = m.applyReferences(block, "hello \\1 world \\2.", &output);
+
+    const expectedOutput = "hello ab world de.";
+    try std.testing.expectEqualStrings(output[0..expectedOutput.len], expectedOutput);
+}

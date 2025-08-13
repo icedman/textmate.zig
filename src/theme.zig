@@ -37,18 +37,15 @@ pub const Scope = struct {
         }
         var target: *Scope = gop.value_ptr;
 
-        std.debug.print("[{s}]\n", .{key});
         if ((key.len + 1) < scope.len) {
             const next = scope[key.len + 1 ..];
-            std.debug.print("--[{s}]\n", .{next});
             target.addScope(next, token);
         } else {
             target.token = token;
-            std.debug.print("done\n", .{});
         }
     }
 
-    pub fn getScope(self: *const Scope, scope: []const u8) ?*const Scope {
+    pub fn getScope(self: *const Scope, scope: []const u8, colors: ?*Settings) ?*const Scope {
         // split
         const dot: []const u8 = ".";
         var key = scope[0..scope.len];
@@ -56,15 +53,19 @@ pub const Scope = struct {
             key = scope[0..idx];
         }
 
-        std.debug.print("?[{s}]\n", .{key});
-
         const target = self.children.get(key) orelse null;
         if (target) |*t| {
-            std.debug.print("found\n", .{});
+            if (colors) |clr| {
+                if (t.token) |tk| {
+                    if (tk.settings) |ss| {
+                        clr.foreground = ss.foreground;
+                        clr.background = ss.background;
+                    }
+                }
+            }
             if ((key.len + 1) < scope.len) {
                 const next = scope[key.len + 1 ..];
-                std.debug.print("?--[{s}]\n", .{next});
-                return t.getScope(next) orelse self;
+                return t.getScope(next, colors) orelse self;
             } else {
                 return t;
             }
@@ -109,7 +110,8 @@ test "test theme" {
 
     thm.root.dump(0);
 
-    const scope = thm.root.getScope("meta.group.toml");
+    var colors = Settings{};
+    const scope = thm.root.getScope("meta.group.toml", &colors);
     if (scope) |sc| {
         if (sc.token) |tk| {
             if (tk.settings) |ss| {
@@ -118,6 +120,9 @@ test "test theme" {
                 }
             }
         }
+    }
+    if (colors.foreground) |fg| {
+        std.debug.print("fg: {s}\n", .{fg});
     }
 }
 

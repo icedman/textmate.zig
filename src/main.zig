@@ -5,7 +5,6 @@ const oni = lib.oni;
 const theme = lib.theme;
 const grammar = lib.grammar;
 const parser = lib.parser;
-const utils = lib.utils;
 
 fn dumpSyntax(syntax: *const grammar.Syntax, block: []const u8) !void {
     // std.debug.print("===================\nSyntax\n------------\n", .{});
@@ -100,9 +99,9 @@ pub fn main() !void {
 
     par.begin();
     //par.parseLine(&state, "int x = 123;\n");
-    par.parseLine(&state, "int main(int argc, char **argv) {\n");
-    par.parseLine(&state, "return 0;\n");
-    par.parseLine(&state, "}\n");
+    _ = try par.parseLine(&state, "int main(int argc, char **argv) {\n");
+    _ = try par.parseLine(&state, "return 0;\n");
+    _ = try par.parseLine(&state, "}\n");
 
     if (true) { // Open file
         par.begin();
@@ -127,7 +126,7 @@ pub fn main() !void {
                 line;
 
             std.debug.print("{} {s}\n", .{ line_no, trimmed });
-            par.parseLine(&state, trimmed);
+            _ = try par.parseLine(&state, trimmed);
             line_no += 1;
         }
         const end = std.time.nanoTimestamp();
@@ -149,23 +148,6 @@ pub fn main() !void {
     // try stdout.print("Run `zig build test` to run the tests.\n", .{});
 
     try bw.flush(); // Don't forget to flush!
-}
-
-test "test references" {
-    const block: []const u8 = "abcdefg";
-    var m = parser.Match{};
-    m.count = 2;
-    m.captures[0].group = 1;
-    m.captures[0].start = 0;
-    m.captures[0].end = 2;
-    m.captures[1].group = 2;
-    m.captures[1].start = 3;
-    m.captures[1].end = 5;
-    var output: [utils.TEMP_BUFFER_SIZE]u8 = [_]u8{0} ** utils.TEMP_BUFFER_SIZE;
-    _ = utils.applyReferences(&m, block, "hello \\1 world \\2.", &output);
-
-    const expectedOutput = "hello ab world de.";
-    try std.testing.expectEqualStrings(output[0..expectedOutput.len], expectedOutput);
 }
 
 const std = @import("std");

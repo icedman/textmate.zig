@@ -7,6 +7,5 @@ pub const oni = @import("oniguruma");
 pub const theme = @import("theme.zig");
 pub const grammar = @import("grammar.zig");
 pub const parser = @import("parser.zig");
-pub const utils = @import("utils.zig");
 
 const testing = std.testing;
