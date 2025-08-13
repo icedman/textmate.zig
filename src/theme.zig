@@ -13,7 +13,7 @@ pub const Scope = struct {
     }
 
     pub fn deinit(self: *Scope) void {
-        std.debug.print("deinit scope\n", .{});
+        // std.debug.print("deinit scope\n", .{});
         var it = self.children.iterator();
         while (it.next()) |kv| {
             const v = kv.value_ptr;
@@ -48,23 +48,50 @@ pub const Scope = struct {
         }
     }
 
-    pub fn getScope(self: *Scope, scope: []const u8) ?*Scope {
+    pub fn getScope(self: *const Scope, scope: []const u8) ?*const Scope {
+        // split
         const dot: []const u8 = ".";
         var key = scope[0..scope.len];
         if (std.mem.indexOf(u8, scope, dot)) |idx| {
             key = scope[0..idx];
         }
 
-        // find child
-        const child_opt = self.children.get(key) orelse return null;
-        var child = @constCast(child_opt);
+        std.debug.print("?[{s}]\n", .{key});
 
-        // recurse if there's more after the dot
-        if (key.len + 1 < scope.len) {
-            const next = scope[key.len + 1 ..];
-            return child.getScope(next);
-        } else {
-            return child;
+        const target = self.children.get(key) orelse null;
+        if (target) |*t| {
+            std.debug.print("found\n", .{});
+            if ((key.len + 1) < scope.len) {
+                const next = scope[key.len + 1 ..];
+                std.debug.print("?--[{s}]\n", .{next});
+                return t.getScope(next) orelse self;
+            } else {
+                return t;
+            }
+        }
+
+        return self;
+    }
+
+    pub fn dump(self: *const Scope, depth: u8) void {
+        var it = self.children.iterator();
+        while (it.next()) |kv| {
+            const k = kv.key_ptr.*;
+            const v = kv.value_ptr.*;
+            for (0..depth) |i| {
+                _ = i;
+                std.debug.print("  ", .{});
+            }
+            std.debug.print("{s} ", .{k});
+            if (v.token) |tk| {
+                if (tk.settings) |ts| {
+                    if (ts.foreground) |fg| {
+                        std.debug.print("fg: {s} ", .{fg});
+                    }
+                }
+            }
+            std.debug.print("\n", .{});
+            v.dump(depth + 1);
         }
     }
 };
@@ -79,6 +106,19 @@ test "test scope addToken" {
 test "test theme" {
     var thm = try Theme.init(std.testing.allocator, "data/dracula.json");
     defer thm.deinit();
+
+    thm.root.dump(0);
+
+    const scope = thm.root.getScope("meta.group.toml");
+    if (scope) |sc| {
+        if (sc.token) |tk| {
+            if (tk.settings) |ss| {
+                if (ss.foreground) |fg| {
+                    std.debug.print("fg: {s}\n", .{fg});
+                }
+            }
+        }
+    }
 }
 
 pub const TokenColor = struct {
@@ -192,6 +232,12 @@ pub const Theme = struct {
             };
 
             tokenColors[i] = TokenColor{ .name = token_name, .settings = settings.value, .scope = scopes };
+            if (scopes) |outer| {
+                for (outer) |sc| {
+                    theme.root.addScope(sc, &tokenColors[i]);
+                    //std.debug.print("{s}\n", .{ sc });
+                }
+            }
             // std.debug.print("{s} {}\n", .{ token_name, i });
         }
 
