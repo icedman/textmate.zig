@@ -1,7 +1,101 @@
 const std = @import("std");
 
+pub const Scope = struct {
+    allocator: std.mem.Allocator,
+    children: std.StringHashMap(Scope),
+    token: ?*TokenColor = null,
+
+    pub fn init(allocator: std.mem.Allocator) Scope {
+        return Scope{
+            .allocator = allocator,
+            .children = std.StringHashMap(Scope).init(allocator),
+        };
+    }
+
+    pub fn deinit(self: *Scope) void {
+        std.debug.print("deinit scope\n", .{});
+        var it = self.children.iterator();
+        while (it.next()) |kv| {
+            const v = kv.value_ptr;
+            v.deinit();
+        }
+        self.children.deinit();
+    }
+
+    pub fn addScope(self: *Scope, scope: []const u8, token: ?*TokenColor) void {
+        // split
+        const dot: []const u8 = ".";
+        var key = scope[0..scope.len];
+        if (std.mem.indexOf(u8, scope, dot)) |idx| {
+            key = scope[0..idx];
+        }
+
+        // insert or get existing
+        const gop = self.children.getOrPut(key) catch return;
+        if (!gop.found_existing) {
+            gop.value_ptr.* = Scope.init(self.allocator);
+        }
+        var target: *Scope = gop.value_ptr;
+
+        std.debug.print("[{s}]\n", .{key});
+        if ((key.len + 1) < scope.len) {
+            const next = scope[key.len + 1 ..];
+            std.debug.print("--[{s}]\n", .{next});
+            target.addScope(next, token);
+        } else {
+            target.token = token;
+            std.debug.print("done\n", .{});
+        }
+    }
+
+    pub fn getScope(self: *Scope, scope: []const u8) ?*Scope {
+        const dot: []const u8 = ".";
+        var key = scope[0..scope.len];
+        if (std.mem.indexOf(u8, scope, dot)) |idx| {
+            key = scope[0..idx];
+        }
+
+        // find child
+        const child_opt = self.children.get(key) orelse return null;
+        var child = @constCast(child_opt);
+
+        // recurse if there's more after the dot
+        if (key.len + 1 < scope.len) {
+            const next = scope[key.len + 1 ..];
+            return child.getScope(next);
+        } else {
+            return child;
+        }
+    }
+};
+
+test "test scope addToken" {
+    var s: Scope = Scope.init(std.testing.allocator);
+    defer s.deinit();
+
+    s.addScope("keyword.include.c", null);
+}
+
+test "test theme" {
+    var thm = try Theme.init(std.testing.allocator, "data/dracula.json");
+    defer thm.deinit();
+}
+
+pub const TokenColor = struct {
+    name: []const u8,
+    scope: ?[][]const u8 = null,
+    settings: ?Settings = null,
+};
+
+pub const Settings = struct {
+    foreground: ?[]const u8 = null,
+    background: ?[]const u8 = null,
+    fontStyle: ?[]const u8 = null,
+};
+
 pub const Theme = struct {
     allocator: std.mem.Allocator,
+    arena: std.heap.ArenaAllocator,
 
     name: []const u8,
     author: ?[]const u8 = null,
@@ -11,17 +105,7 @@ pub const Theme = struct {
 
     parsed: ?std.json.Parsed(std.json.Value) = null,
 
-    pub const TokenColor = struct {
-        name: []const u8,
-        scope: ?[][]const u8 = null,
-        settings: ?Settings = null,
-    };
-
-    pub const Settings = struct {
-        foreground: ?[]const u8 = null,
-        background: ?[]const u8 = null,
-        fontStyle: ?[]const u8 = null,
-    };
+    root: Scope,
 
     pub fn init(allocator: std.mem.Allocator, source_path: []const u8) !Theme {
         const file = try std.fs.cwd().openFile(source_path, .{});
@@ -36,16 +120,27 @@ pub const Theme = struct {
         if (self.colors) |*colors| {
             colors.deinit();
         }
-        if (self.tokenColors) |tokenColors| {
-            self.allocator.free(tokenColors);
-        }
-        if (self.parsed) |*parsed| {
+        if (self.parsed) |parsed| {
             parsed.deinit();
         }
+        self.root.deinit();
+        self.arena.deinit();
     }
 
     pub fn parse(allocator: std.mem.Allocator, source: []const u8) !Theme {
-        const parsed = try std.json.parseFromSlice(std.json.Value, allocator, source, .{ .ignore_unknown_fields = true });
+        var theme = Theme{
+            .allocator = allocator,
+            .arena = std.heap.ArenaAllocator.init(allocator),
+            .name = "",
+            .root = Scope.init(allocator),
+        };
+
+        // anything associated with reading the json
+        const aa = theme.arena.allocator();
+
+        const parsed = try std.json.parseFromSlice(std.json.Value, aa, source, .{ .ignore_unknown_fields = true });
+        errdefer parsed.deinit();
+
         const root = parsed.value;
         const obj = root.object;
 
@@ -55,7 +150,7 @@ pub const Theme = struct {
         const semanticHighlighting = if (obj.get("semanticHighlighting")) |v| v.bool else false;
 
         // colors
-        var colors = std.StringHashMap([]const u8).init(allocator);
+        var colors = std.StringHashMap([]const u8).init(aa);
         if (obj.get("colors")) |colors_val| {
             if (colors_val == .object) {
                 var it = colors_val.object.iterator();
@@ -70,27 +165,25 @@ pub const Theme = struct {
 
         // tokenColors
         const tokenColors_arr = obj.get("tokenColors").?.array;
-        const tokenColors = try allocator.alloc(TokenColor, tokenColors_arr.items.len);
+        const tokenColors = try aa.alloc(TokenColor, tokenColors_arr.items.len);
         for (tokenColors_arr.items, 0..) |item, i| {
             const o = item.object;
             const token_name = if (o.get("name")) |v| v.string else "";
 
             // settings
             const settings_value = o.get("settings").?;
-            const settings = try std.json.parseFromValue(Settings, allocator, settings_value, .{ .ignore_unknown_fields = true });
+            const settings = try std.json.parseFromValue(Settings, aa, settings_value, .{ .ignore_unknown_fields = true });
 
             const scopes: ?[][]const u8 = blk: {
                 const opt = o.get("scope") orelse break :blk null;
                 if (opt == .string) {
-                    const scopes = try allocator.alloc([]const u8, 1);
-                    // scopes[0] = try allocator.dupe(u8, opt.string);
+                    const scopes = try aa.alloc([]const u8, 1);
                     scopes[0] = opt.string;
                     break :blk scopes;
                 }
                 if (opt == .array) {
-                    const scopes = try allocator.alloc([]const u8, opt.array.items.len);
+                    const scopes = try aa.alloc([]const u8, opt.array.items.len);
                     for (opt.array.items, 0..) |scope_item, j| {
-                        // scopes[j] = try allocator.dupe(u8, scope_item.string);
                         scopes[j] = scope_item.string;
                     }
                     break :blk scopes;
@@ -102,14 +195,13 @@ pub const Theme = struct {
             // std.debug.print("{s} {}\n", .{ token_name, i });
         }
 
-        return Theme{
-            .allocator = allocator,
-            .name = name,
-            .author = author,
-            .semanticHighlighting = semanticHighlighting,
-            .colors = colors,
-            .tokenColors = tokenColors,
-            .parsed = parsed,
-        };
+        theme.name = name;
+        theme.author = author;
+        theme.semanticHighlighting = semanticHighlighting;
+        theme.colors = colors;
+        theme.tokenColors = tokenColors;
+        theme.parsed = parsed;
+
+        return theme;
     }
 };

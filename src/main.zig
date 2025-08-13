@@ -92,7 +92,10 @@ pub fn main() !void {
     var par = try parser.Parser.init(allocator, &gmr);
     defer par.deinit();
 
-    var state = try parser.ParseState.init(allocator, gmr.syntax);
+    const syntax = gmr.syntax orelse {
+        return;
+    };
+    var state = try parser.ParseState.init(allocator, syntax);
     defer state.deinit();
 
     par.begin();

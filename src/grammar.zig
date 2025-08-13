@@ -277,12 +277,10 @@ pub const Syntax = struct {
 
 pub const Grammar = struct {
     allocator: std.mem.Allocator,
+    arena: std.heap.ArenaAllocator,
 
     name: []const u8,
-    syntax: *Syntax,
-
-    syntax_id: usize = 0,
-    syntax_map: std.AutoHashMap(u32, *Syntax),
+    syntax: ?*Syntax = null,
 
     parsed: ?std.json.Parsed(std.json.Value) = null,
 
@@ -296,14 +294,26 @@ pub const Grammar = struct {
     }
 
     pub fn deinit(self: *Grammar) void {
-        self.syntax.deinit();
-        if (self.parsed) |*parsed| {
+        if (self.syntax) |syntax| {
+            syntax.deinit();
+        }
+        if (self.parsed) |parsed| {
             parsed.deinit();
         }
+        self.arena.deinit();
     }
 
     pub fn parse(allocator: std.mem.Allocator, source: []const u8) !Grammar {
-        const parsed = try std.json.parseFromSlice(std.json.Value, allocator, source, .{ .ignore_unknown_fields = true });
+        var grammar = Grammar{
+            .allocator = allocator,
+            .arena = std.heap.ArenaAllocator.init(allocator),
+            .name = "",
+        };
+
+        // anything associated with reading the json
+        const aa = grammar.arena.allocator();
+
+        const parsed = try std.json.parseFromSlice(std.json.Value, aa, source, .{ .ignore_unknown_fields = true });
         const root = parsed.value;
 
         if (root != .object) return error.InvalidSyntax;
@@ -311,16 +321,12 @@ pub const Grammar = struct {
 
         // grammar meta
         const name = obj.get("name").?.string;
-        const syntax = try Syntax.init(allocator, root);
+        const syntax = try Syntax.init(aa, root);
 
-        const syntax_map = std.AutoHashMap(u32, *Syntax).init(allocator);
-        return Grammar{
-            .allocator = allocator,
-            .name = name,
-            .syntax = syntax,
-            .syntax_id = 0,
-            .syntax_map = syntax_map,
-            .parsed = parsed,
-        };
+        grammar.name = name;
+        grammar.syntax = syntax;
+        grammar.parsed = parsed;
+
+        return grammar;
     }
 };

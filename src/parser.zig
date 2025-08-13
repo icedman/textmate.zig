@@ -322,13 +322,11 @@ pub const Parser = struct {
         block[buffer.len] = '\n';
 
         self.match_cache.clearRetainingCapacity();
+        self.captures.clearRetainingCapacity();
 
         var start: usize = 0;
         var end = block.len;
         var last_syntax: ?*Syntax = null;
-
-        var matches = std.ArrayList(Match).init(self.allocator);
-        defer matches.deinit();
 
         // handle while
         // todo track while count
@@ -381,7 +379,6 @@ pub const Parser = struct {
                         (pattern_match.count == 0 or
                             (pattern_match.count > 0 and pattern_match.start() >= end_match.start())))
                     {
-                        matches.append(end_match) catch {};
                         start = end_match.start();
                         end = end_match.end();
 
@@ -396,7 +393,6 @@ pub const Parser = struct {
                         state.pop();
                     } else if (pattern_match.count > 0) {
                         if (pattern_match.syntax) |match_syn| {
-                            matches.append(pattern_match) catch {};
                             start = pattern_match.start();
                             end = pattern_match.end();
                             if (match_syn.regex_end != null) {
@@ -455,8 +451,6 @@ pub const Parser = struct {
             std.debug.print("{s} {s}\n", .{ text, m.scope });
         }
         std.debug.print("\n", .{});
-
-        self.captures.clearRetainingCapacity();
     }
 
     pub fn begin(self: *Parser) void {
