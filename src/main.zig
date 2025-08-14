@@ -67,6 +67,24 @@ fn dumpSyntax(syntax: *const grammar.Syntax, block: []const u8) !void {
     //     }
     // }
 }
+/// Set text color from a hex string like "#ffaabb"
+fn setColorHex(stdout: anytype, hex: []const u8) !void {
+    if (hex.len != 7 or hex[0] != '#') {
+        return error.InvalidHexColor;
+    }
+
+    const r = try std.fmt.parseInt(u8, hex[1..3], 16);
+    const g = try std.fmt.parseInt(u8, hex[3..5], 16);
+    const b = try std.fmt.parseInt(u8, hex[5..7], 16);
+
+    // 24-bit ANSI foreground color
+    stdout.print("\x1b[38;2;{d};{d};{d}m", .{ r, g, b });
+}
+
+/// Reset to default color
+fn resetColor(stdout: anytype) !void {
+    stdout.print("\x1b[0m", .{});
+}
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
@@ -97,11 +115,11 @@ pub fn main() !void {
     var state = try parser.ParseState.init(allocator, syntax);
     defer state.deinit();
 
-    par.begin();
-    //par.parseLine(&state, "int x = 123;\n");
-    _ = try par.parseLine(&state, "int main(int argc, char **argv) {\n");
-    _ = try par.parseLine(&state, "return 0;\n");
-    _ = try par.parseLine(&state, "}\n");
+    // par.begin();
+    // _ = par.parseLine(&state, "int x = 123;\n");
+    // _ = try par.parseLine(&state, "int main(int argc, char **argv) {\n");
+    // _ = try par.parseLine(&state, "return 0;\n");
+    // _ = try par.parseLine(&state, "}\n");
 
     if (true) { // Open file
         par.begin();
@@ -125,8 +143,45 @@ pub fn main() !void {
             else
                 line;
 
-            std.debug.print("{} {s}\n", .{ line_no, trimmed });
-            _ = try par.parseLine(&state, trimmed);
+            resetColor(std.debug) catch {};
+            // std.debug.print("{} {s}\n", .{ line_no, trimmed });
+            const captures = try par.parseLine(&state, trimmed);
+            // std.debug.print("captures: {}\n", .{captures.items.len});
+
+            // std.debug.print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n", .{});
+            for (line, 0..) |ch, i| {
+                var cap: parser.Capture = parser.Capture{};
+                for (0..captures.items.len) |ci| {
+                    if (captures.items[ci].start >= i and i < captures.items[ci].end) {
+                        cap = captures.items[ci];
+                        // std.debug.print("?{s} {}-{}\n", .{ cap.scope, cap.start, cap.end });
+                        break;
+                    }
+                }
+                // std.debug.print(">>{s} {}-{}\n", .{cap.scope, cap.start, cap.end});
+
+                var colors = theme.Settings{};
+                const scope = thm.root.getScope(cap.scope[0..cap.scope.len], &colors);
+                if (scope) |sc| {
+                    _ = sc;
+                    // if (sc.token) |tk| {
+                    //     if (tk.settings) |ss| {
+                    //         if (ss.foreground) |fg| {
+                    //             setColorHex(std.debug, fg) catch {};
+                    //             std.debug.print("{s} ", .{fg});
+                    //         }
+                    //     }
+                    // }
+                    if (colors.foreground) |fg| {
+                        setColorHex(std.debug, fg) catch {};
+                        // std.debug.print("{s} ", .{fg});
+                    }
+                }
+
+                std.debug.print("{c}", .{ch});
+            }
+            std.debug.print("\n", .{});
+
             line_no += 1;
         }
         const end = std.time.nanoTimestamp();
@@ -134,6 +189,9 @@ pub fn main() !void {
         std.debug.print("execs: {}\n", .{par.regex_execs});
         std.debug.print("done in {d:.6}s\n", .{elapsed});
     }
+
+    std.debug.print("state depth: {}\n", .{state.size()});
+    std.debug.print("grammar.syntax: {*}\n", .{gmr.syntax});
 
     //
     // std.debug.print("All your {s} are belong to us.\n", .{"codebase"});

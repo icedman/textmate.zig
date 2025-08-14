@@ -75,23 +75,24 @@ pub const Scope = struct {
     }
 
     pub fn dump(self: *const Scope, depth: u8) void {
+        const stdout = std.io.getStdOut().writer();
         var it = self.children.iterator();
         while (it.next()) |kv| {
             const k = kv.key_ptr.*;
             const v = kv.value_ptr.*;
             for (0..depth) |i| {
                 _ = i;
-                std.debug.print("  ", .{});
+                stdout.print("  ", .{}) catch {};
             }
-            std.debug.print("{s} ", .{k});
+            stdout.print("{s} ", .{k}) catch {};
             if (v.token) |tk| {
                 if (tk.settings) |ts| {
                     if (ts.foreground) |fg| {
-                        std.debug.print("fg: {s} ", .{fg});
+                        stdout.print("fg: {s} ", .{fg}) catch {};
                     }
                 }
             }
-            std.debug.print("\n", .{});
+            stdout.print("\n", .{}) catch {};
             v.dump(depth + 1);
         }
     }
@@ -162,12 +163,12 @@ pub const Theme = struct {
     }
 
     pub fn deinit(self: *Theme) void {
-        if (self.colors) |*colors| {
-            colors.deinit();
-        }
-        if (self.parsed) |parsed| {
-            parsed.deinit();
-        }
+        // if (self.colors) |*colors| {
+        //     colors.deinit();
+        // }
+        // if (self.parsed) |*parsed| {
+        //     parsed.deinit();
+        // }
         self.root.deinit();
         self.arena.deinit();
     }

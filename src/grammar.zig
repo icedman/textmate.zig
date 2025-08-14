@@ -128,7 +128,9 @@ pub const Syntax = struct {
                 const res = try allocator.alloc(*Syntax, patterns_arr.array.items.len);
                 errdefer allocator.free(res);
                 for (patterns_arr.array.items, 0..) |item, i| {
-                    res[i] = try Syntax.init(allocator, item);
+                    var syn = try Syntax.init(allocator, item);
+                    syn.parent = syntax;
+                    res[i] = syn;
                 }
                 break :blk res;
             } else {
@@ -136,18 +138,18 @@ pub const Syntax = struct {
             }
         };
 
-        syntax.captures = try parseSyntaxMap(allocator, json, "captures", null);
-        syntax.begin_captures = try parseSyntaxMap(allocator, json, "beginCaptures", null);
-        syntax.while_captures = try parseSyntaxMap(allocator, json, "whileCaptures", null);
-        syntax.end_captures = try parseSyntaxMap(allocator, json, "endCaptures", null);
-        syntax.repository = try parseSyntaxMap(allocator, json, "repository", null);
+        syntax.captures = try parseSyntaxMap(allocator, json, "captures", syntax);
+        syntax.begin_captures = try parseSyntaxMap(allocator, json, "beginCaptures", syntax);
+        syntax.while_captures = try parseSyntaxMap(allocator, json, "whileCaptures", syntax);
+        syntax.end_captures = try parseSyntaxMap(allocator, json, "endCaptures", syntax);
+        syntax.repository = try parseSyntaxMap(allocator, json, "repository", syntax);
 
+        // std.debug.print("syntax address {*}-{*}\n", .{syntax, syntax.parent});
         return syntax;
     }
 
     pub fn deinit(self: *Syntax) void {
-        self.parent = null;
-
+        // std.debug.print("deinit syntax address {*}-{*}\n", .{self, self.parent});
         const Entry = struct {
             string: *const ?[]const u8,
             regex_ptr: *?oni.Regex,
@@ -224,9 +226,8 @@ pub const Syntax = struct {
         for (entries, 0..) |entry, i| {
             if (entry.string.*) |regex| {
                 // deal with back references for while and end
-                if (i > 1 and Syntax.patternHasBackReference(regex)) {
+                if (i > 2 and Syntax.patternHasBackReference(regex)) {
                     self.has_back_references = true;
-                    continue;
                 }
                 const re = try oni.Regex.init(
                     regex,
@@ -241,19 +242,37 @@ pub const Syntax = struct {
         }
     }
 
-    pub fn resolve(self: *Syntax, syntax: *const Syntax) ?*const Syntax {
+    pub fn resolve(self: *Syntax, syntax: *Syntax) ?*const Syntax {
         if (syntax.include_path) |include_path| {
-            if (self.include) |inc_syn| {
+            if (syntax.include) |inc_syn| {
                 return inc_syn;
             }
+
+            if (std.mem.indexOf(u8, include_path, "$self") == 0) {
+                return syntax;
+            }
+
+            if (std.mem.indexOf(u8, include_path, "$base") == 0) {
+                // root
+                var root = self;
+                while (root.parent) |p| {
+                    root = p;
+                }
+                return root;
+            }
+
+            const key_start = 1 + (std.mem.indexOf(u8, include_path, "#") orelse 0);
+
             // std.debug.print("s:{s} find include {s}\n", .{ syntax.name, include_path });
             if (self.repository) |repo| {
-                if (include_path.len > 1) {
-                    const name = include_path[1..];
+                // std.debug.print("check repo\n", .{});
+                if (include_path.len > key_start) {
+                    const name = include_path[key_start..];
+                    // std.debug.print("finding {s}\n", .{name});
                     const ls = repo.get(name);
                     if (ls) |s| {
-                        //std.debug.print("{s} found!\n", .{name});
-                        self.include = s;
+                        // std.debug.print("{s} found!\n", .{name});
+                        syntax.include = ls;
                         return s;
                     }
                     return null;
@@ -261,11 +280,15 @@ pub const Syntax = struct {
                     //std.debug.print("(name too short)\n", .{});
                     return syntax;
                 }
+            } else {
+                // std.debug.print("no repository!\n", .{});
             }
             if (self.parent) |p| {
+                // std.debug.print("check parent\n", .{});
                 return p.resolve(syntax);
             }
         }
+        // std.debug.print("not found!\n", .{});
         return syntax;
     }
 
@@ -330,3 +353,7 @@ pub const Grammar = struct {
         return grammar;
     }
 };
+
+test "test grammar" {
+    std.debug.print("testing grammar\n", .{});
+}
