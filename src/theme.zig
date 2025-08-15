@@ -273,4 +273,8 @@ pub const Theme = struct {
 
         return theme;
     }
+
+    pub fn getScope(self: *Theme, scope: []const u8, colors: ?*Settings) ?*const Scope {
+        return self.root.getScope(scope, colors);
+    }
 };

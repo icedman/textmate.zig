@@ -124,7 +124,8 @@ pub fn main() !void {
     var state = try parser.ParseState.init(allocator, syntax);
     defer state.deinit();
 
-    var proc = try processor.DumpProcessor.init();
+    var proc = try processor.DumpProcessor.init(allocator);
+    // defer proc.deinit();
     par.processor = &proc;
 
     // par.begin();
@@ -178,7 +179,7 @@ pub fn main() !void {
                 // std.debug.print("\n>>> {s} {}-{} [{}]\n", .{ cap.scope, cap.start, cap.end, i });
 
                 var colors = theme.Settings{};
-                const scope = thm.root.getScope(cap.scope[0..cap.scope.len], &colors);
+                const scope = thm.getScope(cap.scope[0..cap.scope.len], &colors);
                 if (scope) |sc| {
                     _ = sc;
                     // if (sc.token) |tk| {
