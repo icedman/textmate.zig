@@ -24,9 +24,12 @@ pub const Scope = struct {
 
     pub fn addScope(self: *Scope, scope: []const u8, token: ?*TokenColor) void {
         // split
+        const space: []const u8 = " ";
         const dot: []const u8 = ".";
         var key = scope[0..scope.len];
-        if (std.mem.indexOf(u8, scope, dot)) |idx| {
+        if (std.mem.indexOf(u8, scope, space)) |idx| {
+            key = scope[0..idx];
+        } else if (std.mem.indexOf(u8, scope, dot)) |idx| {
             key = scope[0..idx];
         }
 
@@ -40,22 +43,27 @@ pub const Scope = struct {
         if ((key.len + 1) < scope.len) {
             const next = scope[key.len + 1 ..];
             target.addScope(next, token);
-        } else {
+        } else if (target.token == null) {
             target.token = token;
         }
     }
 
     pub fn getScope(self: *const Scope, scope: []const u8, colors: ?*Settings) ?*const Scope {
+        // std.debug.print("key: {s}\n", .{scope});
         // split
+        const space: []const u8 = " ";
         const dot: []const u8 = ".";
         var key = scope[0..scope.len];
-        if (std.mem.indexOf(u8, scope, dot)) |idx| {
+        if (std.mem.indexOf(u8, scope, space)) |idx| {
+            key = scope[0..idx];
+        } else if (std.mem.indexOf(u8, scope, dot)) |idx| {
             key = scope[0..idx];
         }
 
         const target = self.children.get(key) orelse null;
         if (target) |*t| {
             if (colors) |clr| {
+                // std.debug.print("match! {s}\n", .{key});
                 if (t.token) |tk| {
                     if (tk.settings) |ss| {
                         clr.foreground = ss.foreground;
@@ -65,10 +73,19 @@ pub const Scope = struct {
             }
             if ((key.len + 1) < scope.len) {
                 const next = scope[key.len + 1 ..];
+                // std.debug.print("continuing: {s}\n", .{next});
                 return t.getScope(next, colors) orelse self;
-            } else {
-                return t;
             }
+            // else {
+            //     std.debug.print("fully found\n", .{});
+            //     return t;
+            // }
+        }
+
+        if ((key.len + 1) < scope.len) {
+            const next = scope[key.len + 1 ..];
+            // std.debug.print("dropping key: {s}\n", .{next});
+            return self.getScope(next, colors) orelse self;
         }
 
         return self;
@@ -191,8 +208,8 @@ pub const Theme = struct {
         const obj = root.object;
 
         // theme meta
-        const name = obj.get("name").?.string;
-        const author = obj.get("author").?.string;
+        const name = if (obj.get("name")) |v| v.string else "";
+        const author = if (obj.get("author")) |v| v.string else "";
         const semanticHighlighting = if (obj.get("semanticHighlighting")) |v| v.bool else false;
 
         // colors

@@ -1,0 +1,37 @@
+./tests/data/extensions/cpp/./syntaxes/c.tmLanguage.json
+grammar loaded at 0.007092secs
+[38;2;0;255;255mint[0m :: [storage.type.built-in.primitive.c] 0 (0-3)
+[38;2;0;255;255mmain(int argc, char **argv) {
+[0m :: [meta.function.c] 0 (4-34)
+[38;2;0;255;255mmain(int argc, char **argv) {
+[0m :: [meta.function.definition.parameters.c] 0 (4-34)
+[38;2;0;255;255mmain(int argc, char **argv)[0m :: [meta.function.definition.parameters.c] 0 (4-31)
+[38;2;0;255;255mmain[0m :: [entity.name.function.c] 1 (4-8)
+[38;2;0;255;255m([0m :: [punctuation.section.parameters.begin.bracket.round.c] 2 (8-9)
+[38;2;0;255;255mint[0m :: [storage.type.built-in.primitive.c] 0 (9-12)
+[38;2;0;255;255margc[0m :: [variable.parameter.probably.c] 1 (13-17)
+[38;2;0;255;255m,[0m :: [punctuation.separator.delimiter.c] 0 (17-18)
+[38;2;0;255;255mchar[0m :: [storage.type.built-in.primitive.c] 0 (19-23)
+[38;2;0;255;255m*[0m :: [keyword.operator.c] 0 (24-25)
+[38;2;0;255;255m*[0m :: [keyword.operator.c] 0 (25-26)
+[38;2;0;255;255margv[0m :: [variable.parameter.probably.c] 1 (26-30)
+[38;2;0;255;255m)[0m :: [punctuation.section.parameters.end.bracket.round.c] 0 (30-31)
+[38;2;0;255;255m{
+[0m :: [meta.block.c] 0 (32-34)
+[38;2;0;255;255m{[0m :: [punctuation.section.block.begin.bracket.curly.c] 0 (32-33)
+[38;2;0;255;255mreturn[0m :: [keyword.control.c] 0 (1-7)
+[38;2;0;255;255m;[0m :: [punctuation.terminator.statement.c] 0 (9-10)
+[38;2;0;255;255m}[0m :: [punctuation.section.block.end.bracket.curly.c] 0 (0-1)
+
+file /home/iceman/Developer/zig/textmate.zig/data/test2.c parsed at 0.002244secs
+-----
+nodes allocated: 4199
+nodes freed: 4199
+-----
+allocated: 9833
+freed: 9833
+parsed lines: 4
+regex matches: 375
+regex skipped: 905
+total parser state size: 0.00MB
+[0

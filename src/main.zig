@@ -6,6 +6,13 @@ const theme = lib.theme;
 const grammar = lib.grammar;
 const parser = lib.parser;
 
+fn isBracketOrPunctuation(ch: u8) bool {
+    return ch == '(' or ch == ')' or
+        ch == '{' or ch == '}' or
+        ch == '[' or ch == ']' or
+        ch == ',' or ch == '.';
+}
+
 fn dumpSyntax(syntax: *const grammar.Syntax, block: []const u8) !void {
     // std.debug.print("===================\nSyntax\n------------\n", .{});
     // std.debug.print("{s}\n", .{syntax.name});
@@ -93,7 +100,8 @@ pub fn main() !void {
     try oni.init(&.{oni.Encoding.utf8});
     try oni.testing.ensureInit();
 
-    var thm = try theme.Theme.init(allocator, "data/dracula.json");
+    // var thm = try theme.Theme.init(allocator, "data/dracula.json");
+    var thm = try theme.Theme.init(allocator, "data/bluloco.json");
     defer thm.deinit();
 
     std.debug.print("{s}\n", .{thm.name});
@@ -125,7 +133,7 @@ pub fn main() !void {
         par.begin();
         var args = std.process.args();
         _ = args.next();
-        const path = args.next() orelse "./data/test.c";
+        const path = args.next() orelse "./data/test2.c";
         var file = try std.fs.cwd().openFile(path, .{});
         defer file.close();
 
@@ -143,22 +151,27 @@ pub fn main() !void {
             else
                 line;
 
-            resetColor(std.debug) catch {};
+            // resetColor(std.debug) catch {};
             // std.debug.print("{} {s}\n", .{ line_no, trimmed });
             const captures = try par.parseLine(&state, trimmed);
             // std.debug.print("captures: {}\n", .{captures.items.len});
 
-            // std.debug.print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n", .{});
+            std.debug.print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n", .{});
+            for (0..captures.items.len) |ci| {
+                const cap = captures.items[ci];
+                std.debug.print("\n{s} {}-{}\n", .{ cap.scope, captures.items[ci].start, captures.items[ci].end });
+            }
+
             for (line, 0..) |ch, i| {
                 var cap: parser.Capture = parser.Capture{};
                 for (0..captures.items.len) |ci| {
-                    if (captures.items[ci].start >= i and i < captures.items[ci].end) {
+                    if (i >= captures.items[ci].start and i < captures.items[ci].end) {
                         cap = captures.items[ci];
-                        // std.debug.print("?{s} {}-{}\n", .{ cap.scope, cap.start, cap.end });
+                        // std.debug.print("\n{s} {}-{} [{}]\n", .{ cap.scope, captures.items[ci].start, captures.items[ci].end, i });
                         break;
                     }
                 }
-                // std.debug.print(">>{s} {}-{}\n", .{cap.scope, cap.start, cap.end});
+                // std.debug.print("\n>>> {s} {}-{} [{}]\n", .{ cap.scope, cap.start, cap.end, i });
 
                 var colors = theme.Settings{};
                 const scope = thm.root.getScope(cap.scope[0..cap.scope.len], &colors);
@@ -179,6 +192,10 @@ pub fn main() !void {
                 }
 
                 std.debug.print("{c}", .{ch});
+
+                // if (std.ascii.isWhitespace(ch) or isBracketOrPunctuation(ch)) {
+                //     resetColor(std.debug) catch {};
+                // }
             }
             std.debug.print("\n", .{});
 
@@ -186,6 +203,11 @@ pub fn main() !void {
         }
         const end = std.time.nanoTimestamp();
         const elapsed = @as(f64, @floatFromInt(end - start)) / 1_000_000_000.0;
+
+        std.debug.print("==================\n", .{});
+        std.debug.print("state stack\n", .{});
+        state.dump();
+
         std.debug.print("execs: {}\n", .{par.regex_execs});
         std.debug.print("done in {d:.6}s\n", .{elapsed});
     }

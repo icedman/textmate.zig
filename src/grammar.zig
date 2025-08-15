@@ -251,11 +251,11 @@ pub const Syntax = struct {
             if (std.mem.indexOf(u8, include_path, "$self") == 0) {
                 return syntax;
             }
-
+            
             if (std.mem.indexOf(u8, include_path, "$base") == 0) {
                 // root
                 var root = self;
-                while (root.parent) |p| {
+                while(root.parent) |p| {
                     root = p;
                 }
                 return root;
@@ -357,3 +357,4 @@ pub const Grammar = struct {
 test "test grammar" {
     std.debug.print("testing grammar\n", .{});
 }
+
