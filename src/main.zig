@@ -5,6 +5,7 @@ const oni = lib.oni;
 const theme = lib.theme;
 const grammar = lib.grammar;
 const parser = lib.parser;
+const processor = lib.processor;
 
 fn isBracketOrPunctuation(ch: u8) bool {
     return ch == '(' or ch == ')' or
@@ -123,6 +124,9 @@ pub fn main() !void {
     var state = try parser.ParseState.init(allocator, syntax);
     defer state.deinit();
 
+    var proc = try processor.DumpProcessor.init();
+    par.processor = &proc;
+
     // par.begin();
     // _ = par.parseLine(&state, "int x = 123;\n");
     // _ = try par.parseLine(&state, "int main(int argc, char **argv) {\n");
@@ -156,11 +160,11 @@ pub fn main() !void {
             const captures = try par.parseLine(&state, trimmed);
             // std.debug.print("captures: {}\n", .{captures.items.len});
 
-            std.debug.print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n", .{});
-            for (0..captures.items.len) |ci| {
-                const cap = captures.items[ci];
-                std.debug.print("\n{s} {}-{}\n", .{ cap.scope, captures.items[ci].start, captures.items[ci].end });
-            }
+            // std.debug.print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n", .{});
+            // for (0..captures.items.len) |ci| {
+            //     const cap = captures.items[ci];
+            //     std.debug.print("\n{s} {}-{}\n", .{ cap.scope, captures.items[ci].start, captures.items[ci].end });
+            // }
 
             for (line, 0..) |ch, i| {
                 var cap: parser.Capture = parser.Capture{};
@@ -186,18 +190,20 @@ pub fn main() !void {
                     //     }
                     // }
                     if (colors.foreground) |fg| {
-                        setColorHex(std.debug, fg) catch {};
+                        _ = fg;
+                        // setColorHex(std.debug, fg) catch {};
                         // std.debug.print("{s} ", .{fg});
                     }
                 }
 
-                std.debug.print("{c}", .{ch});
+                _ = ch;
+                // std.debug.print("{c}", .{ch});
 
                 // if (std.ascii.isWhitespace(ch) or isBracketOrPunctuation(ch)) {
                 //     resetColor(std.debug) catch {};
                 // }
             }
-            std.debug.print("\n", .{});
+            // std.debug.print("\n", .{});
 
             line_no += 1;
         }
@@ -205,8 +211,8 @@ pub fn main() !void {
         const elapsed = @as(f64, @floatFromInt(end - start)) / 1_000_000_000.0;
 
         std.debug.print("==================\n", .{});
-        std.debug.print("state stack\n", .{});
-        state.dump();
+        // std.debug.print("state stack\n", .{});
+        // state.dump();
 
         std.debug.print("execs: {}\n", .{par.regex_execs});
         std.debug.print("done in {d:.6}s\n", .{elapsed});
