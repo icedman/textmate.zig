@@ -14,6 +14,7 @@ pub const Capture = struct {
     start: usize = 0,
     end: usize = 0,
     scope: [MAX_SCOPE_SIZE]u8 = [_]u8{0} ** MAX_SCOPE_SIZE,
+    block: bool = false,
 };
 
 pub const MatchRange = struct {

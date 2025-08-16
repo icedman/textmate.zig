@@ -1,6 +1,7 @@
 const std = @import("std");
 
-fn setColorHex(stdout: anytype, hex: []const u8) !void {
+/// Set text color from a hex string like "#ffaabb"
+pub fn setColorHex(stdout: anytype, hex: []const u8) !void {
     if (hex.len != 7 or hex[0] != '#') {
         return error.InvalidHexColor;
     }
@@ -12,6 +13,11 @@ fn setColorHex(stdout: anytype, hex: []const u8) !void {
     // 24-bit ANSI foreground color
     stdout.print("\x1b[38;2;{d};{d};{d}m", .{ r, g, b });
     // stdout.print("[{d};{d};{d}]\n", .{ r, g, b });
+}
+
+/// Reset to default color
+pub fn resetColor(stdout: anytype) !void {
+    stdout.print("\x1b[0m", .{});
 }
 
 pub const Scope = struct {
@@ -58,12 +64,14 @@ pub const Scope = struct {
         }
         var target: *Scope = gop.value_ptr;
         if (target.token == null) {
-            target.token = token;
+            // target.token = token;
         }
 
         if ((key.len + 1) < scope.len) {
             const next = scope[key.len + 1 ..];
             target.addScope(next, token);
+        } else if (target.token == null) {
+            target.token = token;
         }
     }
 
