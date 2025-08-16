@@ -200,7 +200,6 @@ pub const Parser = struct {
     lang: *grammar.Grammar,
 
     // line parse data
-    captures: std.ArrayList(Capture),
     match_cache: std.AutoHashMap(u32, Match),
 
     // processor
@@ -214,13 +213,11 @@ pub const Parser = struct {
         return Parser{
             .allocator = allocator,
             .lang = lang,
-            .captures = std.ArrayList(Capture).init(allocator),
             .match_cache = std.AutoHashMap(u32, Match).init(allocator),
         };
     }
 
     pub fn deinit(self: *Parser) void {
-        self.captures.deinit();
         self.match_cache.deinit();
     }
 
@@ -516,7 +513,7 @@ pub const Parser = struct {
         }
     }
 
-    pub fn parseLine(self: *Parser, state: *ParseState, buffer: []const u8) !*std.ArrayList(Capture) {
+    pub fn parseLine(self: *Parser, state: *ParseState, buffer: []const u8) !void {
         var block = self.allocator.alloc(u8, buffer.len + 1) catch {
             return error.OutOfMemory;
         };
@@ -524,10 +521,10 @@ pub const Parser = struct {
         @memcpy(block[0..buffer.len], buffer);
         block[buffer.len] = '\n';
 
-        if (self.processor) |proc| proc.startLine(block);
+        // save the buffer, not block - as it is freed when out of scope
+        if (self.processor) |proc| proc.startLine(buffer);
 
         self.match_cache.clearRetainingCapacity();
-        self.captures.clearRetainingCapacity();
 
         var start: usize = 0;
         var end = block.len;
@@ -625,8 +622,6 @@ pub const Parser = struct {
         //     std.debug.print("{s} {s}\n", .{ text, m.scope });
         // }
         // std.debug.print("\n", .{});
-
-        return &self.captures;
     }
 
     pub fn begin(self: *Parser) void {

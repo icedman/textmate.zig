@@ -14,67 +14,6 @@ fn isBracketOrPunctuation(ch: u8) bool {
         ch == ',' or ch == '.';
 }
 
-fn dumpSyntax(syntax: *const grammar.Syntax, block: []const u8) !void {
-    // std.debug.print("===================\nSyntax\n------------\n", .{});
-    // std.debug.print("{s}\n", .{syntax.name});
-    if (syntax.regex_match) |*re| {
-        // std.debug.print("matching\n", .{});
-        const reg = blk: {
-            const result = @constCast(re).search(block, .{}) catch |err| {
-                if (err == error.Mismatch) {
-                    // std.debug.print("no match\n", .{});
-                    break :blk null; // return null instead
-                } else {
-                    return err; // propagate other errors
-                }
-            };
-            break :blk result;
-        };
-
-        if (reg) |r| {
-            std.debug.print("found!<<<<<<<<<<<<<<<<<<<\n", .{});
-            std.debug.print("count: {d}\n", .{r.count()});
-            std.debug.print("starts: {d}\n", .{r.starts()});
-            std.debug.print("ends: {d}\n", .{r.ends()});
-        } else {
-            // std.debug.print("no match, continuing\n", .{});
-        }
-    }
-    // std.debug.print("match:{s}\n", .{syntax.regexs_match orelse "(null)"});
-    // std.debug.print("begin:{s}\n", .{syntax.regexs_begin orelse "(null)"});
-    // std.debug.print("while:{s}\n", .{syntax.regexs_while orelse "(null)"});
-    // std.debug.print("end:{s}\n", .{syntax.regexs_end orelse "(null)"});
-    // std.debug.print("------------\nSyntax::Patterns\n------------\n", .{});
-    if (syntax.patterns) |patterns| {
-        for (patterns) |p| {
-            const ls = p.lookup(&p);
-            if (ls) |s| {
-                try dumpSyntax(s, block);
-            }
-            // if (p.include_path != null) {
-            //     std.debug.print("include:{s}\n", .{p.include_path orelse "(null)"});
-            //     const ls = p.lookup(&p);
-            //     if (ls) |s| {
-            //         try dumpSyntax(s, block);
-            //     } else {
-            //         std.debug.print("include not found:{s}\n", .{p.include_path orelse "(null)"});
-            //     }
-            // }
-            // std.debug.print("{s}\n", .{p.name});
-        }
-    }
-    // std.debug.print("------------\nSyntax::Repository\n------------\n", .{});
-    // if (syntax.repository) |map| {
-    //     var it = map.iterator();
-    //     while (it.next()) |kv| {
-    //         // const k = kv.key_ptr.*;
-    //         // std.debug.print("{s}\n", .{k});
-    //         const v = kv.value_ptr.*;
-    //         const syn = v;
-    //         try dumpSyntax(&syn, block);
-    //     }
-    // }
-}
 /// Set text color from a hex string like "#ffaabb"
 fn setColorHex(stdout: anytype, hex: []const u8) !void {
     if (hex.len != 7 or hex[0] != '#') {
@@ -87,6 +26,7 @@ fn setColorHex(stdout: anytype, hex: []const u8) !void {
 
     // 24-bit ANSI foreground color
     stdout.print("\x1b[38;2;{d};{d};{d}m", .{ r, g, b });
+    // stdout.print("[{d};{d};{d}]\n", .{ r, g, b });
 }
 
 /// Reset to default color
@@ -101,8 +41,8 @@ pub fn main() !void {
     try oni.init(&.{oni.Encoding.utf8});
     try oni.testing.ensureInit();
 
-    // var thm = try theme.Theme.init(allocator, "data/dracula.json");
-    var thm = try theme.Theme.init(allocator, "data/bluloco.json");
+    var thm = try theme.Theme.init(allocator, "data/dracula.json");
+    // var thm = try theme.Theme.init(allocator, "data/bluloco.json");
     defer thm.deinit();
 
     std.debug.print("{s}\n", .{thm.name});
@@ -111,9 +51,6 @@ pub fn main() !void {
     var gmr = try grammar.Grammar.init(allocator, "data/c.tmLanguage.json");
     defer gmr.deinit();
     std.debug.print("{s}\n", .{gmr.name});
-
-    // try dumpSyntax(&gmr.syntax, "int main(int argc, char **argv)");
-    // try dumpSyntax(&gmr.syntax, "typedef");
 
     var par = try parser.Parser.init(allocator, &gmr);
     defer par.deinit();
@@ -124,9 +61,11 @@ pub fn main() !void {
     var state = try parser.ParseState.init(allocator, syntax);
     defer state.deinit();
 
-    var proc = try processor.DumpProcessor.init(allocator);
-    // defer proc.deinit();
+    // var proc = try processor.DumpProcessor.init(allocator);
+    var proc = try processor.RenderProcessor.init(allocator);
+    defer proc.deinit();
     par.processor = &proc;
+    proc.theme = &thm;
 
     // par.begin();
     // _ = par.parseLine(&state, "int x = 123;\n");
@@ -156,56 +95,7 @@ pub fn main() !void {
             else
                 line;
 
-            // resetColor(std.debug) catch {};
-            // std.debug.print("{} {s}\n", .{ line_no, trimmed });
-            const captures = try par.parseLine(&state, trimmed);
-            // std.debug.print("captures: {}\n", .{captures.items.len});
-
-            // std.debug.print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n", .{});
-            // for (0..captures.items.len) |ci| {
-            //     const cap = captures.items[ci];
-            //     std.debug.print("\n{s} {}-{}\n", .{ cap.scope, captures.items[ci].start, captures.items[ci].end });
-            // }
-
-            for (line, 0..) |ch, i| {
-                var cap: parser.Capture = parser.Capture{};
-                for (0..captures.items.len) |ci| {
-                    if (i >= captures.items[ci].start and i < captures.items[ci].end) {
-                        cap = captures.items[ci];
-                        // std.debug.print("\n{s} {}-{} [{}]\n", .{ cap.scope, captures.items[ci].start, captures.items[ci].end, i });
-                        break;
-                    }
-                }
-                // std.debug.print("\n>>> {s} {}-{} [{}]\n", .{ cap.scope, cap.start, cap.end, i });
-
-                var colors = theme.Settings{};
-                const scope = thm.getScope(cap.scope[0..cap.scope.len], &colors);
-                if (scope) |sc| {
-                    _ = sc;
-                    // if (sc.token) |tk| {
-                    //     if (tk.settings) |ss| {
-                    //         if (ss.foreground) |fg| {
-                    //             setColorHex(std.debug, fg) catch {};
-                    //             std.debug.print("{s} ", .{fg});
-                    //         }
-                    //     }
-                    // }
-                    if (colors.foreground) |fg| {
-                        _ = fg;
-                        // setColorHex(std.debug, fg) catch {};
-                        // std.debug.print("{s} ", .{fg});
-                    }
-                }
-
-                _ = ch;
-                // std.debug.print("{c}", .{ch});
-
-                // if (std.ascii.isWhitespace(ch) or isBracketOrPunctuation(ch)) {
-                //     resetColor(std.debug) catch {};
-                // }
-            }
-            // std.debug.print("\n", .{});
-
+            _ = try par.parseLine(&state, trimmed);
             line_no += 1;
         }
         const end = std.time.nanoTimestamp();

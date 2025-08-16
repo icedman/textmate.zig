@@ -1,5 +1,19 @@
 const std = @import("std");
 
+fn setColorHex(stdout: anytype, hex: []const u8) !void {
+    if (hex.len != 7 or hex[0] != '#') {
+        return error.InvalidHexColor;
+    }
+
+    const r = try std.fmt.parseInt(u8, hex[1..3], 16);
+    const g = try std.fmt.parseInt(u8, hex[3..5], 16);
+    const b = try std.fmt.parseInt(u8, hex[5..7], 16);
+
+    // 24-bit ANSI foreground color
+    stdout.print("\x1b[38;2;{d};{d};{d}m", .{ r, g, b });
+    // stdout.print("[{d};{d};{d}]\n", .{ r, g, b });
+}
+
 pub const Scope = struct {
     allocator: std.mem.Allocator,
     children: std.StringHashMap(Scope),
@@ -133,19 +147,35 @@ test "test theme" {
     thm.root.dump(0);
 
     var colors = Settings{};
-    // const scope = thm.root.getScope("meta.group.toml", &colors);
-    const scope = thm.root.getScope("punctuation.section.parameters.begin.bracket.round.c", &colors);
-    if (scope) |sc| {
-        if (sc.token) |tk| {
-            if (tk.settings) |ss| {
-                if (ss.foreground) |fg| {
-                    std.debug.print("fg: {s}\n", .{fg});
-                }
-            }
+    // "meta.group.toml"
+    // "punctuation.section.parameters.begin.bracket.round.c"
+
+    const arr = [_][]const u8{
+        "storage.type.built-in.primitive.c",
+        "meta.function.c",
+        "meta.function.definition.parameters.c",
+        "entity.name.function.c",
+        "punctuation.section.parameters.begin.bracket.round.c",
+        "storage.type.built-in.primitive.c",
+        "variable.parameter.probably.c",
+        "punctuation.separator.delimiter.c",
+        "storage.type.built-in.primitive.c",
+        "keyword.operator.c",
+        "keyword.operator.c",
+        "variable.parameter.probably.c",
+        "meta.function.definition.parameters.c",
+        "punctuation.section.parameters.end.bracket.round.c",
+        "meta.block.c",
+        "punctuation.section.block.begin.bracket.curly.c",
+    };
+
+    for (0..arr.len) |idx| {
+        const scope = thm.getScope(arr[idx], &colors);
+        _ = scope;
+        if (colors.foreground) |fg| {
+            setColorHex(std.debug, fg) catch {};
+            std.debug.print("{s} fg: {s}\n", .{ arr[idx], fg });
         }
-    }
-    if (colors.foreground) |fg| {
-        std.debug.print("fg: {s}\n", .{fg});
     }
 }
 
@@ -280,6 +310,7 @@ pub const Theme = struct {
     }
 
     pub fn getScope(self: *Theme, scope: []const u8, colors: ?*Settings) ?*const Scope {
+        // std.debug.print("key: {s}\n", .{scope});
         return self.root.getScope(scope, colors);
     }
 };
