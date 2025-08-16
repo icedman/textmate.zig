@@ -7,13 +7,6 @@ const grammar = lib.grammar;
 const parser = lib.parser;
 const processor = lib.processor;
 
-fn isBracketOrPunctuation(ch: u8) bool {
-    return ch == '(' or ch == ')' or
-        ch == '{' or ch == '}' or
-        ch == '[' or ch == ']' or
-        ch == ',' or ch == '.';
-}
-
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
 
@@ -41,10 +34,10 @@ pub fn main() !void {
         }
     }
 
-    var thm = try theme.Theme.init(allocator, theme_path orelse "data/dracula.json");
+    var thm = try theme.Theme.init(allocator, theme_path orelse "data/tests/dracula.json");
     defer thm.deinit();
 
-    var gmr = try grammar.Grammar.init(allocator, grammar_path orelse "data/zig.tmLanguage.json");
+    var gmr = try grammar.Grammar.init(allocator, grammar_path orelse "data/tests/zig.tmLanguage.json");
     defer gmr.deinit();
 
     var par = try parser.Parser.init(allocator, &gmr);

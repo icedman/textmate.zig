@@ -38,3 +38,4 @@ skips: 1557716
 done in 88.919690s
 state depth: 2
 
+O(n) ~ time linear to number of lines

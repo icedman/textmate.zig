@@ -159,7 +159,9 @@ pub const DumpProcessor = struct {
     }
 };
 
+const setColorRgb = theme.setColorRgb;
 const setColorHex = theme.setColorHex;
+const setBgColorRgb = theme.setBgColorRgb;
 const setBgColorHex = theme.setBgColorHex;
 const resetColor = theme.resetColor;
 
@@ -180,11 +182,17 @@ pub const RenderProcessor = struct {
                 var colors = theme.Settings{};
                 const scope = thm.getScope(cap.scope[0..cap.scope.len], &colors);
                 _ = scope;
-                if (colors.foreground) |fg| {
-                    setColorHex(std.debug, fg) catch {};
+                // if (colors.foreground) |fg| {
+                //     setColorHex(std.debug, fg) catch {};
+                // }
+                // if (colors.background) |bg| {
+                //     setBgColorHex(std.debug, bg) catch {};
+                // }
+                if (colors.fg_rgb) |fg| {
+                    setColorRgb(std.debug, fg) catch {};
                 }
-                if (colors.background) |bg| {
-                    setBgColorHex(std.debug, bg) catch {};
+                if (colors.bg_rgb) |bg| {
+                    setBgColorRgb(std.debug, bg) catch {};
                 }
 
                 // _ = ch;

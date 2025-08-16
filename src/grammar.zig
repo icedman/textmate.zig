@@ -127,7 +127,7 @@ pub const Syntax = struct {
             }
         }
 
-        syntax.compile_all_regexes() catch {
+        syntax.compileAllRegexes() catch {
             std.debug.print("Failed to compile regex: // TODO which one?\n", .{});
         };
 
@@ -222,7 +222,7 @@ pub const Syntax = struct {
         }
     }
 
-    pub fn compile_all_regexes(self: *Syntax) !void {
+    pub fn compileAllRegexes(self: *Syntax) !void {
         const Entry = struct {
             string: *const ?[]const u8,
             regex_ptr: *?oni.Regex,
@@ -309,6 +309,16 @@ pub const Syntax = struct {
         }
         return syntax;
     }
+
+    pub fn getName(self: *const Syntax) []const u8 {
+        if (self.content_name.len > 0) {
+            return self.content_name;
+        }
+        if (self.scope_name.len > 0) {
+            return self.scope_name;
+        }
+        return self.name;
+    }
 };
 
 pub const Grammar = struct {
@@ -368,7 +378,3 @@ pub const Grammar = struct {
         return grammar;
     }
 };
-
-test "test grammar" {
-    std.debug.print("testing grammar\n", .{});
-}

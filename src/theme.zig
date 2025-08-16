@@ -14,6 +14,12 @@ pub fn setColorHex(stdout: anytype, hex: []const u8) !void {
     // stdout.print("[{d};{d};{d}]\n", .{ r, g, b });
 }
 
+pub fn setColorRgb(stdout: anytype, rgb: Rgb) !void {
+    // 24-bit ANSI foreground color
+    stdout.print("\x1b[38;2;{d};{d};{d}m", .{ rgb.r, rgb.g, rgb.b });
+    // stdout.print("[{d};{d};{d}]\n", .{ rgb.r, rgb.g, rgb.b });
+}
+
 pub fn setBgColorHex(stdout: anytype, hex: []const u8) !void {
     if (hex.len != 7 or hex[0] != '#') {
         return error.InvalidHexColor;
@@ -25,6 +31,12 @@ pub fn setBgColorHex(stdout: anytype, hex: []const u8) !void {
 
     // 24-bit ANSI background color
     stdout.print("\x1b[48;2;{d};{d};{d}m", .{ r, g, b });
+    // stdout.print("[{d};{d};{d}]\n", .{ r, g, b });
+}
+
+pub fn setBgColorRgb(stdout: anytype, rgb: Rgb) !void {
+    // 24-bit ANSI foreground color
+    stdout.print("\x1b[48;2;{d};{d};{d}m", .{ rgb.r, rgb.g, rgb.b });
     // stdout.print("[{d};{d};{d}]\n", .{ r, g, b });
 }
 
@@ -98,8 +110,7 @@ pub const Scope = struct {
             if (colors) |clr| {
                 if (t.token) |tk| {
                     if (tk.settings) |ss| {
-                        clr.foreground = ss.foreground;
-                        clr.background = ss.background;
+                        clr.* = ss;
                     }
                 }
             }
@@ -120,71 +131,27 @@ pub const Scope = struct {
     }
 
     pub fn dump(self: *const Scope, depth: u8) void {
-        const stdout = std.io.getStdOut().writer();
         var it = self.children.iterator();
         while (it.next()) |kv| {
             const k = kv.key_ptr.*;
             const v = kv.value_ptr.*;
             for (0..depth) |i| {
                 _ = i;
-                stdout.print("  ", .{}) catch {};
+                std.debug.print("  ", .{});
             }
-            stdout.print("{s} ", .{k}) catch {};
+            std.debug.print("{s} ", .{k});
             if (v.token) |tk| {
                 if (tk.settings) |ts| {
                     if (ts.foreground) |fg| {
-                        stdout.print("fg: {s} ", .{fg}) catch {};
+                        std.debug.print("fg: {s} ", .{fg});
                     }
                 }
             }
-            stdout.print("\n", .{}) catch {};
+            std.debug.print("\n", .{});
             v.dump(depth + 1);
         }
     }
 };
-
-test "test scope addToken" {
-    var s: Scope = Scope.init(std.testing.allocator);
-    defer s.deinit();
-
-    s.addScope("keyword.include.c", null);
-}
-
-test "test theme" {
-    var thm = try Theme.init(std.testing.allocator, "data/dracula.json");
-    defer thm.deinit();
-
-    thm.root.dump(0);
-
-    var colors = Settings{};
-    const arr = [_][]const u8{
-        "storage.type.built-in.primitive.c",
-        "meta.function.c",
-        "meta.function.definition.parameters.c",
-        "entity.name.function.c",
-        "punctuation.section.parameters.begin.bracket.round.c",
-        "storage.type.built-in.primitive.c",
-        "variable.parameter.probably.c",
-        "punctuation.separator.delimiter.c",
-        "storage.type.built-in.primitive.c",
-        "keyword.operator.c",
-        "keyword.operator.c",
-        "variable.parameter.probably.c",
-        "meta.function.definition.parameters.c",
-        "punctuation.section.parameters.end.bracket.round.c",
-        "meta.block.c",
-        "punctuation.section.block.begin.bracket.curly.c",
-    };
-
-    for (0..arr.len) |idx| {
-        const scope = thm.getScope(arr[idx], &colors);
-        _ = scope;
-        if (colors.foreground) |fg| {
-            setColorHex(std.debug, fg) catch {};
-            std.debug.print("{s} fg: {s}\n", .{ arr[idx], fg });
-        }
-    }
-}
 
 pub const TokenColor = struct {
     name: []const u8,
@@ -192,10 +159,43 @@ pub const TokenColor = struct {
     settings: ?Settings = null,
 };
 
+pub const Rgb = struct {
+    r: u8 = 0,
+    g: u8 = 0,
+    b: u8 = 0,
+
+    pub fn fromHex(hex: []const u8) Rgb {
+        if (hex.len != 7 or hex[0] != '#') {
+            return Rgb{};
+        }
+        const r = std.fmt.parseInt(u8, hex[1..3], 16) catch {
+            return Rgb{};
+        };
+        const g = std.fmt.parseInt(u8, hex[3..5], 16) catch {
+            return Rgb{};
+        };
+        const b = std.fmt.parseInt(u8, hex[5..7], 16) catch {
+            return Rgb{};
+        };
+        return Rgb{ .r = r, .g = g, .b = b };
+    }
+};
+
 pub const Settings = struct {
     foreground: ?[]const u8 = null,
     background: ?[]const u8 = null,
     fontStyle: ?[]const u8 = null,
+    fg_rgb: ?Rgb = null,
+    bg_rgb: ?Rgb = null,
+
+    pub fn compute(self: *Settings) void {
+        if (self.foreground) |fg| {
+            self.fg_rgb = Rgb.fromHex(fg);
+        }
+        if (self.background) |bg| {
+            self.bg_rgb = Rgb.fromHex(bg);
+        }
+    }
 };
 
 pub const Theme = struct {
@@ -298,6 +298,8 @@ pub const Theme = struct {
             };
 
             tokenColors[i] = TokenColor{ .name = token_name, .settings = settings.value, .scope = scopes };
+            tokenColors[i].settings.?.compute();
+
             if (scopes) |outer| {
                 for (outer) |sc| {
                     theme.root.addScope(sc, &tokenColors[i]);
