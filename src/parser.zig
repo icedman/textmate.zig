@@ -10,11 +10,13 @@ const TEMP_BUFFER_SIZE = 128;
 const MAX_STATE_STACK_DEPTH = 200;
 const STATE_STACK_PRUNE = 120;
 
+// capture is like Match.. but atomic
 pub const Capture = struct {
     start: usize = 0,
     end: usize = 0,
     scope: [MAX_SCOPE_SIZE]u8 = [_]u8{0} ** MAX_SCOPE_SIZE,
-    block: bool = false,
+    syntax_id: u32 = 0,
+    retain: bool = false,
 };
 
 pub const MatchRange = struct {
@@ -189,6 +191,7 @@ pub const ParseState = struct {
                     }
                     if (syn.regexs_begin) |r| {
                         std.debug.print("  begin: {s}\n", .{r});
+                        std.debug.print("  end: {s}\n", .{syn.regexs_end orelse ""});
                     }
                 }
             }
@@ -227,6 +230,9 @@ pub const Parser = struct {
         if (regex) |*re| {
             self.regex_execs += 1;
             const hard_start: usize = start;
+            // if (syntax.has_back_references) {
+            // hard_start = 0;
+            // }
             const hard_end: usize = end;
             const reg = blk: {
                 var result: oni.Region = .{};
@@ -565,9 +571,33 @@ pub const Parser = struct {
                             if (end_syn.end_captures) |end_cap| {
                                 self.collectCaptures(&end_match, &end_cap, block);
                             }
+
+                            // if (self.processor) |proc| proc.closeTag(&end_match);
+
+                            if (self.processor) |proc| {
+                                const name = blk: {
+                                    if (end_syn.content_name.len > 0) {
+                                        break :blk end_syn.content_name;
+                                    }
+                                    if (end_syn.scope_name.len > 0) {
+                                        break :blk end_syn.scope_name;
+                                    }
+                                    break :blk end_syn.name;
+                                };
+                                var scope_name: [MAX_SCOPE_SIZE]u8 = [_]u8{0} ** MAX_SCOPE_SIZE;
+                                for (0..name.len) |i| {
+                                    scope_name[i] = name[i];
+                                }
+
+                                proc.closeTag(Capture{
+                                    .start = end_match.start,
+                                    .end = end_match.end,
+                                    .scope = scope_name,
+                                    .syntax_id = end_syn.id,
+                                });
+                            }
                         }
 
-                        if (self.processor) |proc| proc.closeTag(&end_match);
                         // std.debug.print("pop {s} {}\n", .{ syn.name, state.size() });
                         state.pop();
                     } else if (pattern_match.count > 0) {
@@ -582,7 +612,28 @@ pub const Parser = struct {
                                     // fail silently?
                                 };
                                 // std.debug.print("push {s} {}\n", .{ match_syn.name, state.size() });
-                                if (self.processor) |proc| proc.openTag(&pattern_match);
+                                if (self.processor) |proc| {
+                                    const name = blk: {
+                                        if (match_syn.content_name.len > 0) {
+                                            break :blk match_syn.content_name;
+                                        }
+                                        if (match_syn.scope_name.len > 0) {
+                                            break :blk match_syn.scope_name;
+                                        }
+                                        break :blk match_syn.name;
+                                    };
+                                    var scope_name: [MAX_SCOPE_SIZE]u8 = [_]u8{0} ** MAX_SCOPE_SIZE;
+                                    for (0..name.len) |i| {
+                                        scope_name[i] = name[i];
+                                    }
+
+                                    proc.openTag(Capture{
+                                        .start = pattern_match.start,
+                                        .end = pattern_match.end,
+                                        .scope = scope_name,
+                                        .syntax_id = match_syn.id,
+                                    });
+                                }
 
                                 // collect begin captures
                                 if (match_syn.begin_captures) |beg_cap| {

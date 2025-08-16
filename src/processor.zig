@@ -8,16 +8,25 @@ pub const Processor = struct {
     theme: ?*theme.Theme = null,
 
     captures: std.ArrayList(parser.Capture),
+    retained_captures: std.ArrayList(parser.Capture),
 
     start_line_fn: ?*const fn (*Processor, block: []const u8) void = null,
     end_line_fn: ?*const fn (*Processor) void = null,
-    open_tag_fn: ?*const fn (*Processor, *const parser.Match) void = null,
-    close_tag_fn: ?*const fn (*Processor, *const parser.Match) void = null,
+    open_tag_fn: ?*const fn (*Processor, parser.Capture) void = null,
+    close_tag_fn: ?*const fn (*Processor, parser.Capture) void = null,
     capture_fn: ?*const fn (*Processor, parser.Capture) void = null,
 
     pub fn startLine(self: *Processor, block: []const u8) void {
         self.block = block;
         self.captures.clearRetainingCapacity();
+        for (0..self.retained_captures.items.len) |i| {
+            var cap = self.retained_captures.items[i];
+            cap.start = 0;
+            if (self.block) |b| {
+                cap.end = b.len;
+            }
+            self.captures.append(cap) catch {};
+        }
         if (self.start_line_fn) |f| {
             f(self, block);
         }
@@ -27,47 +36,38 @@ pub const Processor = struct {
         if (self.end_line_fn) |f| {
             f(self);
         }
-    }
-
-    // TODO push Capture instead of Match
-    pub fn openTag(self: *Processor, match: *const parser.Match) void {
-        // TODO add this to captures!
-        var end = match.end;
-        if (self.block) |b| {
-            end = b.len;
-        }
-        const name = blk: {
-            if (match.syntax) |syn| {
-                if (syn.content_name.len > 0) {
-                    break :blk syn.content_name;
-                }
-                if (syn.scope_name.len > 0) {
-                    break :blk syn.scope_name;
-                }
-                break :blk syn.name;
+        self.retained_captures.clearRetainingCapacity();
+        for (0..self.captures.items.len) |i| {
+            const cap = self.captures.items[i];
+            if (cap.retain) {
+                self.retained_captures.append(cap) catch {};
             }
-            break :blk "";
-        };
-        var scope_name: [128]u8 = [_]u8{0} ** 128;
-        for (0..name.len) |i| {
-            scope_name[i] = name[i];
-        }
-
-        self.captures.append(parser.Capture{
-            .start = match.start,
-            .end = end,
-            .scope = scope_name,
-            .block = true,
-        }) catch {};
-        if (self.open_tag_fn) |f| {
-            f(self, match);
         }
     }
 
-    // close the Capture (properly set the end pos)
-    pub fn closeTag(self: *Processor, match: *const parser.Match) void {
+    pub fn openTag(self: *Processor, cap: parser.Capture) void {
+        var c = cap;
+        if (self.block) |b| {
+            c.end = b.len;
+            c.retain = true;
+        }
+        self.captures.append(c) catch {};
+        if (self.open_tag_fn) |f| {
+            f(self, c);
+        }
+    }
+
+    pub fn closeTag(self: *Processor, cap: parser.Capture) void {
+        // close the Capture (properly set the end pos)
+        for (0..self.captures.items.len) |i| {
+            if (self.captures.items[i].syntax_id == cap.syntax_id) {
+                self.captures.items[i].end = cap.end;
+                self.captures.items[i].retain = false;
+            }
+        }
+
         if (self.close_tag_fn) |f| {
-            f(self, match);
+            f(self, cap);
         }
     }
 
@@ -96,41 +96,17 @@ pub const DumpProcessor = struct {
         std.debug.print("----------------------------------]]\n\n", .{});
     }
 
-    pub fn openTag(self: *Processor, match: *const parser.Match) void {
+    pub fn openTag(self: *Processor, cap: parser.Capture) void {
         if (self.block) |b| {
-            const text = b[match.start..match.end];
-            const name = blk: {
-                if (match.syntax) |syn| {
-                    if (syn.content_name.len > 0) {
-                        break :blk syn.content_name;
-                    }
-                    if (syn.scope_name.len > 0) {
-                        break :blk syn.scope_name;
-                    }
-                    break :blk syn.name;
-                }
-                break :blk "";
-            };
-            std.debug.print("open: {s} {}-{} {s}\n", .{ text, match.start, match.end, name });
+            const text = b[cap.start..cap.end];
+            std.debug.print("open: {s} {}-{} {s}\n", .{ text, cap.start, cap.end, cap.scope });
         }
     }
 
-    pub fn closeTag(self: *Processor, match: *const parser.Match) void {
+    pub fn closeTag(self: *Processor, cap: parser.Capture) void {
         if (self.block) |b| {
-            const text = b[match.start..match.end];
-            const name = blk: {
-                if (match.syntax) |syn| {
-                    if (syn.content_name.len > 0) {
-                        break :blk syn.content_name;
-                    }
-                    if (syn.scope_name.len > 0) {
-                        break :blk syn.scope_name;
-                    }
-                    break :blk syn.name;
-                }
-                break :blk "";
-            };
-            std.debug.print("close: {s} {}-{} {s}\n", .{ text, match.start, match.end, name });
+            const text = b[cap.start..cap.end];
+            std.debug.print("close: {s} {}-{} {s}\n", .{ text, cap.start, cap.end, cap.scope });
         }
     }
 
@@ -151,11 +127,13 @@ pub const DumpProcessor = struct {
             .close_tag_fn = self.closeTag,
             .capture_fn = self.capture,
             .captures = std.ArrayList(parser.Capture).init(allocator),
+            .retained_captures = std.ArrayList(parser.Capture).init(allocator),
         };
     }
 };
 
 const setColorHex = theme.setColorHex;
+const setBgColorHex = theme.setBgColorHex;
 const resetColor = theme.resetColor;
 
 pub const RenderProcessor = struct {
@@ -169,7 +147,6 @@ pub const RenderProcessor = struct {
                     if (i >= captures.items[ci].start and i < captures.items[ci].end) {
                         cap = captures.items[ci];
                         // std.debug.print("\n{s} {}-{} [{}]\n", .{ cap.scope, captures.items[ci].start, captures.items[ci].end, i });
-                        break;
                     }
                 }
 
@@ -178,7 +155,9 @@ pub const RenderProcessor = struct {
                 _ = scope;
                 if (colors.foreground) |fg| {
                     setColorHex(std.debug, fg) catch {};
-                    // std.debug.print("{s} fg: {s}\n", .{ cap.scope, fg });
+                }
+                if (colors.background) |bg| {
+                    setBgColorHex(std.debug, bg) catch {};
                 }
 
                 // _ = ch;
@@ -204,6 +183,7 @@ pub const RenderProcessor = struct {
             .allocator = allocator,
             .end_line_fn = self.endLine,
             .captures = std.ArrayList(parser.Capture).init(allocator),
+            .retained_captures = std.ArrayList(parser.Capture).init(allocator),
         };
     }
 };

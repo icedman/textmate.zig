@@ -36,6 +36,8 @@ pub const Syntax = struct {
     // other internals
     parent: ?*Syntax = null,
     is_anchored: bool = false,
+    is_comment_block: bool = false,
+    is_string_block: bool = false,
     has_back_references: bool = false,
 
     pub fn patternHasBackReference(ptrn: []const u8) bool {
@@ -114,6 +116,16 @@ pub const Syntax = struct {
             .regexs_while = if (obj.get("while")) |v| v.string else null,
             .regexs_end = if (obj.get("end")) |v| v.string else null,
         };
+
+        // special case for retaining capture across lines
+        if (syntax.regexs_begin) |regexs| {
+            if (std.mem.indexOf(u8, regexs, "string")) |_| {
+                syntax.is_string_block = true;
+            }
+            if (std.mem.indexOf(u8, regexs, "comment")) |_| {
+                syntax.is_comment_block = true;
+            }
+        }
 
         syntax.compile_all_regexes() catch {
             std.debug.print("Failed to compile regex: // TODO which one?\n", .{});
