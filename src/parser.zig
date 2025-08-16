@@ -15,6 +15,7 @@ pub const Capture = struct {
     start: usize = 0,
     end: usize = 0,
     scope: [MAX_SCOPE_SIZE]u8 = [_]u8{0} ** MAX_SCOPE_SIZE,
+    // open block and strings will be retained across line parsing
     syntax_id: u32 = 0,
     retain: bool = false,
 };
@@ -28,6 +29,7 @@ pub const MatchRange = struct {
 pub const Match = struct {
     syntax: ?*Syntax = null,
     count: u8 = 0,
+    // TODO change to regions or ranges for to avoid confusion
     captures: [MAX_CAPTURES]MatchRange = [_]MatchRange{MatchRange{ .group = 0, .start = 0, .end = 0 }} ** MAX_CAPTURES,
     begin: bool = false,
 

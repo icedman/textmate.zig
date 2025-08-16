@@ -24,7 +24,7 @@ pub fn setBgColorHex(stdout: anytype, hex: []const u8) !void {
     const g = try std.fmt.parseInt(u8, hex[3..5], 16);
     const b = try std.fmt.parseInt(u8, hex[5..7], 16);
 
-    // 24-bit ANSI foreground color
+    // 24-bit ANSI background color
     stdout.print("\x1b[48;2;{d};{d};{d}m", .{ r, g, b });
     // stdout.print("[{d};{d};{d}]\n", .{ r, g, b });
 }
@@ -223,9 +223,10 @@ pub const Theme = struct {
     tokenColors: ?[]TokenColor = null,
     semanticHighlighting: bool = false,
 
-    parsed: ?std.json.Parsed(std.json.Value) = null,
-
     root: Scope,
+
+    // TODO release this after parse (requires that all string values by allocated and copied)
+    parsed: ?std.json.Parsed(std.json.Value) = null,
 
     pub fn init(allocator: std.mem.Allocator, source_path: []const u8) !Theme {
         const file = try std.fs.cwd().openFile(source_path, .{});

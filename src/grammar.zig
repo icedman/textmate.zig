@@ -317,6 +317,7 @@ pub const Grammar = struct {
     name: []const u8,
     syntax: ?*Syntax = null,
 
+    // TODO release this after parse (requires that all strings values by allocated and copied)
     parsed: ?std.json.Parsed(std.json.Value) = null,
 
     pub fn init(allocator: std.mem.Allocator, source_path: []const u8) !Grammar {

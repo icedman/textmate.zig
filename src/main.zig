@@ -21,8 +21,10 @@ pub fn main() !void {
     try oni.init(&.{oni.Encoding.utf8});
     try oni.testing.ensureInit();
 
-    var thm = try theme.Theme.init(allocator, "data/dracula.json");
+    // var thm = try theme.Theme.init(allocator, "data/dracula.json");
     // var thm = try theme.Theme.init(allocator, "data/bluloco.json");
+    var thm = try theme.Theme.init(allocator, "data/OneDark.json");
+    // var thm = try theme.Theme.init(allocator, "data/OneMonokai-color-theme.json");
     defer thm.deinit();
 
     std.debug.print("{s}\n", .{thm.name});
