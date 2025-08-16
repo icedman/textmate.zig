@@ -237,9 +237,11 @@ pub const Syntax = struct {
 
         for (entries, 0..) |entry, i| {
             if (entry.string.*) |regex| {
-                // deal with back references for while and end
                 if (i > 2 and Syntax.patternHasBackReference(regex)) {
+                    // deal with back references for while and end
+                    // do not compile now, this has to be recompiled at every matched begin (applying one or more captures to the pattern)
                     self.has_back_references = true;
+                    continue;
                 }
                 const re = try oni.Regex.init(
                     regex,
@@ -256,14 +258,16 @@ pub const Syntax = struct {
 
     pub fn resolve(self: *Syntax, syntax: *Syntax) ?*const Syntax {
         if (syntax.include_path) |include_path| {
+            // syntax having include_path will be resolved by finding the name on appropriate repositories
+            // TODO handle external grammar repositories (source.md could require loading source.js)
             if (syntax.include) |inc_syn| {
                 return inc_syn;
             }
 
+            // TODO understand $self, $base 
             if (std.mem.indexOf(u8, include_path, "$self") == 0) {
                 return syntax;
             }
-
             if (std.mem.indexOf(u8, include_path, "$base") == 0) {
                 // root
                 var root = self;
@@ -274,6 +278,7 @@ pub const Syntax = struct {
             }
 
             const key_start = 1 + (std.mem.indexOf(u8, include_path, "#") orelse 0);
+            // this is where other grammar reference is checked.. ie source.js or source.js#pattern-name
 
             // std.debug.print("s:{s} find include {s}\n", .{ syntax.name, include_path });
             if (self.repository) |repo| {
@@ -299,14 +304,10 @@ pub const Syntax = struct {
                 // std.debug.print("check parent\n", .{});
                 return p.resolve(syntax);
             }
-        }
-        // std.debug.print("not found!\n", .{});
-        return syntax;
-    }
 
-    pub fn setId(self: *Syntax, id: u32) u32 {
-        self.id = id;
-        return self.id;
+            // std.debug.print("not found!\n", .{});
+        }
+        return syntax;
     }
 };
 
@@ -317,7 +318,7 @@ pub const Grammar = struct {
     name: []const u8,
     syntax: ?*Syntax = null,
 
-    // TODO release this after parse (requires that all strings values by allocated and copied)
+    // TODO release this after parse (requires that all string values by allocated and copied)
     parsed: ?std.json.Parsed(std.json.Value) = null,
 
     pub fn init(allocator: std.mem.Allocator, source_path: []const u8) !Grammar {
@@ -347,6 +348,7 @@ pub const Grammar = struct {
         };
 
         // anything associated with reading the json
+        // TODO reconsider arena
         const aa = grammar.arena.allocator();
 
         const parsed = try std.json.parseFromSlice(std.json.Value, aa, source, .{ .ignore_unknown_fields = true });

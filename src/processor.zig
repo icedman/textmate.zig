@@ -7,6 +7,9 @@ pub const Processor = struct {
     block: ?[]const u8 = null,
     theme: ?*theme.Theme = null,
 
+    // TODO add writer here
+    // writer: std.debug
+
     captures: std.ArrayList(parser.Capture),
     retained_captures: std.ArrayList(parser.Capture),
 
@@ -48,6 +51,9 @@ pub const Processor = struct {
     pub fn openTag(self: *Processor, cap: parser.Capture) void {
         var c = cap;
         if (self.block) |b| {
+            if (c.start > b.len and b.len > 0) {
+                c.start = b.len;
+            }
             c.end = b.len;
             c.retain = true;
         }
@@ -58,23 +64,44 @@ pub const Processor = struct {
     }
 
     pub fn closeTag(self: *Processor, cap: parser.Capture) void {
+        var c = cap;
+        if (self.block) |b| {
+            // this happens because parser adds '\n' at every parse
+            if (c.start > b.len and b.len > 0) {
+                c.start = b.len;
+            }
+            if (c.end >= b.len and b.len > 0) {
+                c.end = b.len;
+            }
+        }
         // close the Capture (properly set the end pos)
         for (0..self.captures.items.len) |i| {
-            if (self.captures.items[i].syntax_id == cap.syntax_id) {
-                self.captures.items[i].end = cap.end;
+            if (self.captures.items[i].syntax_id == c.syntax_id) {
+                self.captures.items[i].end = c.end;
                 self.captures.items[i].retain = false;
             }
         }
-
+        
         if (self.close_tag_fn) |f| {
-            f(self, cap);
+            f(self, c);
         }
     }
 
     pub fn capture(self: *Processor, cap: parser.Capture) void {
-        self.captures.append(cap) catch {};
+        var c = cap;
+        if (self.block) |b| {
+            // this happens because parser adds '\n' at every parse
+            if (c.start > b.len and b.len > 0) {
+                c.start = b.len;
+            }
+            if (c.end > b.len and b.len > 0) {
+                c.end = b.len;
+            }
+        }
+
+        self.captures.append(c) catch {};
         if (self.capture_fn) |f| {
-            f(self, cap);
+            f(self, c);
         }
     }
 

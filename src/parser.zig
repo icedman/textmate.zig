@@ -5,12 +5,12 @@ const processor = @import("processor.zig");
 const Syntax = grammar.Syntax;
 
 const MAX_CAPTURES = 100;
-const MAX_SCOPE_SIZE = 128;
-const TEMP_BUFFER_SIZE = 128;
-const MAX_STATE_STACK_DEPTH = 200;
-const STATE_STACK_PRUNE = 120;
+const MAX_SCOPE_SIZE = 128;         // scope name's max len (TODO overflow checks)
+const TEMP_BUFFER_SIZE = 128;       // used in end_pattern and scope name resolution (when references have been applied)
+const MAX_STATE_STACK_DEPTH = 200;  // if the state depth is too deep .. just prune
+const STATE_STACK_PRUNE = 120;      // prune off states from the stack
 
-// capture is like Match.. but atomic
+// capture is like Match.. but atomic and should be serializable
 pub const Capture = struct {
     start: usize = 0,
     end: usize = 0,
@@ -20,6 +20,7 @@ pub const Capture = struct {
     retain: bool = false,
 };
 
+// this is actually onig.Region. TODO rename to region
 pub const MatchRange = struct {
     group: u16 = 0,
     start: usize = 0,
@@ -29,14 +30,16 @@ pub const MatchRange = struct {
 pub const Match = struct {
     syntax: ?*Syntax = null,
     count: u8 = 0,
-    // TODO change to regions or ranges for to avoid confusion
+    // TODO change to region to avoid confusion
     captures: [MAX_CAPTURES]MatchRange = [_]MatchRange{MatchRange{ .group = 0, .start = 0, .end = 0 }} ** MAX_CAPTURES,
+   
+    // begin matches would cause a push to the state stack
     begin: bool = false,
 
     start: usize = 0,
     end: usize = 0,
 
-    //
+    // some matches 
     anchor_start: usize = 0,
     anchor_end: usize = 0,
 
@@ -96,6 +99,7 @@ pub const Match = struct {
     }
 };
 
+// this should be serializable as this is what the parse state stack contains 
 pub const StateContext = struct {
     syntax: *Syntax,
     end_regex: ?oni.Regex = null,
@@ -179,6 +183,7 @@ pub const ParseState = struct {
         return self.stack.items.len;
     }
 
+    // TODO isn't there something like toString for fmt?
     pub fn dump(self: *ParseState) void {
         const state_depth = self.size();
         for (0..state_depth) |i| {
@@ -231,10 +236,11 @@ pub const Parser = struct {
         // std.debug.print("execRegex {s}\n", .{regexs orelse ""});
         if (regex) |*re| {
             self.regex_execs += 1;
-            const hard_start: usize = start;
-            // if (syntax.has_back_references) {
-            // hard_start = 0;
-            // }
+            var hard_start: usize = start;
+            if (syntax.is_anchored) {
+                // TODO is this correct?
+                hard_start = 0;
+            }
             const hard_end: usize = end;
             const reg = blk: {
                 var result: oni.Region = .{};
@@ -297,10 +303,15 @@ pub const Parser = struct {
     }
 
     fn matchBegin(self: *Parser, syntax: *Syntax, block: []const u8, start: usize, end: usize) Match {
-        // std.debug.print("matchBegin\n", .{});
+        // if all this syntax has are patterns.. check patterns
+        if (syntax.regex_match == null and syntax.regex_begin == null) {
+            return self.matchPatterns(syntax, syntax.patterns, block, start, end);
+        }
+
         // match
         if (syntax.regex_match != null) {
             if (syntax.regex_match) |regex| {
+                // check of matching has been previously cached (for the same position in the buffer)
                 const m = blk: {
                     const mm = self.match_cache.get(syntax.id) orelse break :blk null;
                     if (mm.anchor_start < start and mm.anchor_end == end and mm.start >= start) {
@@ -309,19 +320,18 @@ pub const Parser = struct {
                     }
                     break :blk null;
                 } orelse self.execRegex(syntax, regex, syntax.regexs_match, block, start, end);
-                // const m = self.execRegex(syntax, regex, syntax.regexs_match, block, start, end);
                 _ = self.match_cache.put(syntax.id, m) catch {};
                 if (m.count > 0) {
-                    // std.debug.print("match {s} {}-{}\n", .{syntax.regexs_match orelse "??", m.start, m.end});
                     return m;
                 }
             }
         }
+
         // begin
         if (syntax.regex_begin != null) {
             if (syntax.regex_begin) |regex| {
+                // check of matching has been previously cached (for the same position in the buffer)
                 var m = blk: {
-                    // check if previously failed
                     const mm = self.match_cache.get(syntax.id) orelse break :blk null;
                     if (mm.anchor_start < start and mm.anchor_end == end and mm.start >= start) {
                         self.regex_skips += 1;
@@ -329,26 +339,18 @@ pub const Parser = struct {
                     }
                     break :blk null;
                 } orelse self.execRegex(syntax, regex, syntax.regexs_begin, block, start, end);
-                // cache failure
-                // var m = self.execRegex(syntax, regex, syntax.regexs_begin, block, start, end);
                 _ = self.match_cache.put(syntax.id, m) catch {};
                 if (m.count > 0) {
                     m.begin = true;
-                    // std.debug.print("begin {s} {}-{}\n", .{syntax.regexs_begin orelse "??", m.start, m.end});
                     return m;
                 }
             }
         }
 
-        // check patterns
-        if (syntax.regex_match == null and syntax.regex_begin == null) {
-            // std.debug.print("descending into more patterns matchPatterns\n", .{});
-            return self.matchPatterns(syntax, syntax.patterns, block, start, end);
-        }
         return Match{};
     }
 
-    // todo while could have captures
+    // TODO while matches could have captures
     pub fn matchWhile(self: *Parser, state: *ParseState, block: []const u8) void {
         var state_depth = state.size();
         const start: usize = 0;
@@ -372,9 +374,8 @@ pub const Parser = struct {
         }
     }
 
-    // end match checking is against the  state stack to pop-out as much as possible
     pub fn matchEnd(self: *Parser, state: *ParseState, block: []const u8, start: usize, end: usize) Match {
-        // prune
+        // prune if the stac is already too deep
         if (state.size() > MAX_STATE_STACK_DEPTH) {
             if (state.stack.items.len >= MAX_STATE_STACK_DEPTH) {
                 const new_len = state.stack.items.len - STATE_STACK_PRUNE;
@@ -411,16 +412,14 @@ pub const Parser = struct {
 
     fn matchPatterns(self: *Parser, syntax: *const Syntax, patterns: ?[]*Syntax, block: []const u8, start: usize, end: usize) Match {
         _ = syntax;
-        // std.debug.print("matchPatterns {s} {s}\n", .{ syntax.name, syntax.include_path orelse "." });
         var earliest_match = Match{};
         if (patterns) |pats| {
             for (pats) |p| {
-                // std.debug.print("..pattern\n", .{});
                 const ls = p.resolve(p);
                 if (ls) |syn| {
-                    // std.debug.print(">{s} {s}\n", .{ syn.name, syn.include_path orelse "." });
                     const m = self.matchBegin(@constCast(syn), block, start, end);
                     if (m.count > 0) {
+                        // if matched correctly at the current position, no need to scan further, we have our match
                         if (m.start == start) {
                             earliest_match = m;
                             break;
@@ -428,6 +427,7 @@ pub const Parser = struct {
                         if (earliest_match.count == 0) {
                             earliest_match = m;
                         } else if (earliest_match.start > m.start) {
+                            // nearer to current position is the earlier match
                             earliest_match = m;
                         }
                     }
@@ -447,9 +447,9 @@ pub const Parser = struct {
             }
             break :blk syntax.name;
         };
-        var output: [TEMP_BUFFER_SIZE]u8 = [_]u8{0} ** TEMP_BUFFER_SIZE;
-        _ = match.applyCaptures(block, name, &output);
         if (self.processor) |proc| {
+            var output: [TEMP_BUFFER_SIZE]u8 = [_]u8{0} ** TEMP_BUFFER_SIZE;
+            _ = match.applyCaptures(block, name, &output);
             proc.capture(Capture{
                 .start = match.start,
                 .end = match.end,
@@ -459,25 +459,19 @@ pub const Parser = struct {
     }
 
     fn collectCaptures(self: *Parser, match: *const Match, captures: *const std.StringHashMap(*Syntax), block: []const u8) void {
-        // std.debug.print("captures\n", .{});
         for (0..match.count) |i| {
-            var buf: [32]u8 = undefined; // enough to hold any int as string
+            var buf: [32]u8 = undefined; // is this enough to hold any int as string?
             const range = match.captures[i];
             if (range.start == 0 and range.end == 0) continue;
             const key = std.fmt.bufPrint(&buf, "{}", .{range.group}) catch {
                 continue;
             };
 
-            // std.debug.print("captures key {s}\n", .{key});
-
             const capture: ?*Syntax = captures.get(key);
             if (capture) |syn| {
-                // std.debug.print("capture {} {s}\n", .{ range.group, syn.name });
-                var output: [TEMP_BUFFER_SIZE]u8 = [_]u8{0} ** TEMP_BUFFER_SIZE;
-                _ = match.applyCaptures(block, syn.name, &output);
-                // std.debug.print("{s}\n", .{output});
-
                 if (self.processor) |proc| {
+                    var output: [TEMP_BUFFER_SIZE]u8 = [_]u8{0} ** TEMP_BUFFER_SIZE;
+                    _ = match.applyCaptures(block, syn.name, &output);
                     proc.capture(Capture{
                         .start = range.start,
                         .end = range.end,
@@ -490,7 +484,6 @@ pub const Parser = struct {
                 if (syn.patterns) |pats| {
                     const ps = match.start; // should be range.start and range.end?
                     const pe = match.end;
-                    // std.debug.print("has uncollected patterns\n", .{});
                     for (pats) |p| {
                         if (p.regex_match) |regex| {
                             // std.debug.print(">> {s} <<\n", .{p.regexs_match orelse ""});
@@ -504,7 +497,6 @@ pub const Parser = struct {
                                 } else if (p.name.len > 0) {
                                     var sname: [TEMP_BUFFER_SIZE]u8 = [_]u8{0} ** TEMP_BUFFER_SIZE;
                                     _ = m.applyCaptures(block, p.name, &sname);
-
                                     if (self.processor) |proc| {
                                         proc.capture(Capture{
                                             .start = range.start,
@@ -512,7 +504,6 @@ pub const Parser = struct {
                                             .scope = sname,
                                         });
                                     }
-                                    // std.debug.print("captured_name: {s}<??\n", .{p.name});
                                 }
                             }
                         }
@@ -530,13 +521,14 @@ pub const Parser = struct {
         @memcpy(block[0..buffer.len], buffer);
         block[buffer.len] = '\n';
 
-        // save the buffer, not block - as it is freed when out of scope
+        // save the buffer, not block - as block is freed at the end of scope
         if (self.processor) |proc| proc.startLine(buffer);
 
         self.match_cache.clearRetainingCapacity();
 
         var start: usize = 0;
         var end = block.len;
+        var last_start: usize = 0;
         var last_syntax: ?*Syntax = null;
 
         // handle while
@@ -564,6 +556,7 @@ pub const Parser = struct {
                         (pattern_match.count == 0 or
                             (pattern_match.count > 0 and pattern_match.start >= end_match.start)))
                     {
+                        // end pattern has been matched
                         start = end_match.start;
                         end = end_match.end;
 
@@ -574,9 +567,8 @@ pub const Parser = struct {
                                 self.collectCaptures(&end_match, &end_cap, block);
                             }
 
-                            // if (self.processor) |proc| proc.closeTag(&end_match);
-
                             if (self.processor) |proc| {
+                                // TODO move this verbose code to Syntax.getName();
                                 const name = blk: {
                                     if (end_syn.content_name.len > 0) {
                                         break :blk end_syn.content_name;
@@ -600,21 +592,25 @@ pub const Parser = struct {
                             }
                         }
 
-                        // std.debug.print("pop {s} {}\n", .{ syn.name, state.size() });
+                        // pop!
                         state.pop();
                     } else if (pattern_match.count > 0) {
                         if (pattern_match.syntax) |match_syn| {
+                            // pattern has been matched
+                            //
                             start = pattern_match.start;
                             end = pattern_match.end;
 
                             self.collectMatch(match_syn, &pattern_match, block);
 
                             if (pattern_match.begin or match_syn.regexs_end != null) {
+                                // TODO .. if it has a regexs_end.. it is a begin and should cause a push
                                 state.push(match_syn, block, pattern_match) catch {
                                     // fail silently?
                                 };
-                                // std.debug.print("push {s} {}\n", .{ match_syn.name, state.size() });
+                              
                                 if (self.processor) |proc| {
+                                    // TODO move this verbose code to Syntax.getName();
                                     const name = blk: {
                                         if (match_syn.content_name.len > 0) {
                                             break :blk match_syn.content_name;
@@ -639,7 +635,6 @@ pub const Parser = struct {
 
                                 // collect begin captures
                                 if (match_syn.begin_captures) |beg_cap| {
-                                    // std.debug.print("beginCaptures\n", .{});
                                     self.collectCaptures(&pattern_match, &beg_cap, block);
                                 }
                             } else {
@@ -660,7 +655,13 @@ pub const Parser = struct {
                     break;
                 }
 
+                // endless loop?
+                if (last_start == start and last_syntax == ts) {
+                    break;
+                }
+
                 last_syntax = ts;
+                last_start = start;
                 start = end;
             } else {
                 // no top

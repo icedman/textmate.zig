@@ -1,6 +1,5 @@
 const std = @import("std");
 
-/// Set text color from a hex string like "#ffaabb"
 pub fn setColorHex(stdout: anytype, hex: []const u8) !void {
     if (hex.len != 7 or hex[0] != '#') {
         return error.InvalidHexColor;
@@ -29,7 +28,6 @@ pub fn setBgColorHex(stdout: anytype, hex: []const u8) !void {
     // stdout.print("[{d};{d};{d}]\n", .{ r, g, b });
 }
 
-/// Reset to default color
 pub fn resetColor(stdout: anytype) !void {
     stdout.print("\x1b[0m", .{});
 }
@@ -58,6 +56,7 @@ pub const Scope = struct {
 
     pub fn addScope(self: *Scope, scope: []const u8, token: ?*TokenColor) void {
         // split
+        // TODO " " denotes nesting (currently unimplemented)
         const space: []const u8 = " ";
         if (std.mem.indexOf(u8, scope, space)) |idx| {
             self.addScope(scope[0..idx], token);
@@ -77,9 +76,6 @@ pub const Scope = struct {
             gop.value_ptr.* = Scope.init(self.allocator);
         }
         var target: *Scope = gop.value_ptr;
-        if (target.token == null) {
-            // target.token = token;
-        }
 
         if ((key.len + 1) < scope.len) {
             const next = scope[key.len + 1 ..];
@@ -90,7 +86,6 @@ pub const Scope = struct {
     }
 
     pub fn getScope(self: *const Scope, scope: []const u8, colors: ?*Settings) ?*const Scope {
-        // std.debug.print("key: {s}\n", .{scope});
         // split
         const dot: []const u8 = ".";
         var key = scope[0..scope.len];
@@ -98,15 +93,11 @@ pub const Scope = struct {
             key = scope[0..idx];
         }
 
-        // std.debug.print("checking key: {s}\n", .{key});
-
         const target = self.children.get(key) orelse null;
         if (target) |*t| {
-            // std.debug.print("--- match {s}\n", .{key});
             if (colors) |clr| {
                 if (t.token) |tk| {
                     if (tk.settings) |ss| {
-                        // std.debug.print("--- {s}\n", .{ss.foreground orelse ""});
                         clr.foreground = ss.foreground;
                         clr.background = ss.background;
                     }
@@ -114,17 +105,14 @@ pub const Scope = struct {
             }
             if ((key.len + 1) < scope.len) {
                 const next = scope[key.len + 1 ..];
-                // std.debug.print("continuing: {s}\n", .{next});
                 return t.getScope(next, colors) orelse self;
             } else {
-                // std.debug.print("fully found\n", .{});
                 return t;
             }
         }
 
         if ((key.len + 1) < scope.len) {
             const next = scope[key.len + 1 ..];
-            // std.debug.print("dropping key: {s}\n", .{next});
             return self.getScope(next, colors) orelse self;
         }
 
@@ -169,9 +157,6 @@ test "test theme" {
     thm.root.dump(0);
 
     var colors = Settings{};
-    // "meta.group.toml"
-    // "punctuation.section.parameters.begin.bracket.round.c"
-
     const arr = [_][]const u8{
         "storage.type.built-in.primitive.c",
         "meta.function.c",
@@ -238,6 +223,7 @@ pub const Theme = struct {
     }
 
     pub fn deinit(self: *Theme) void {
+        // TODO properly free up memory
         // if (self.colors) |*colors| {
         //     colors.deinit();
         // }
@@ -279,7 +265,6 @@ pub const Theme = struct {
                     const k = entry.key_ptr.*;
                     const v = entry.value_ptr.*.string;
                     try colors.put(k, v);
-                    // std.debug.print("{s} {s}\n", .{k, v});
                 }
             }
         }
@@ -316,10 +301,8 @@ pub const Theme = struct {
             if (scopes) |outer| {
                 for (outer) |sc| {
                     theme.root.addScope(sc, &tokenColors[i]);
-                    //std.debug.print("{s}\n", .{ sc });
                 }
             }
-            // std.debug.print("{s} {}\n", .{ token_name, i });
         }
 
         theme.name = name;
@@ -333,7 +316,7 @@ pub const Theme = struct {
     }
 
     pub fn getScope(self: *Theme, scope: []const u8, colors: ?*Settings) ?*const Scope {
-        // std.debug.print("key: {s}\n", .{scope});
+        // TODO pass parse state for nesting checks
         return self.root.getScope(scope, colors);
     }
 };
