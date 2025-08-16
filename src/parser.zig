@@ -7,6 +7,8 @@ const Syntax = grammar.Syntax;
 const MAX_CAPTURES = 100;
 const MAX_SCOPE_SIZE = 128;
 const TEMP_BUFFER_SIZE = 128;
+const MAX_STATE_STACK_DEPTH = 200;
+const STATE_STACK_PRUNE = 120;
 
 pub const Capture = struct {
     start: usize = 0,
@@ -199,20 +201,21 @@ pub const Parser = struct {
 
     // line parse data
     captures: std.ArrayList(Capture),
-    match_cache: std.AutoHashMap(*const oni.Regex, Match),
+    match_cache: std.AutoHashMap(u32, Match),
 
     // processor
     processor: ?*processor.Processor = null,
 
     // stats
     regex_execs: usize = 0,
+    regex_skips: usize = 0,
 
     pub fn init(allocator: std.mem.Allocator, lang: *grammar.Grammar) !Parser {
         return Parser{
             .allocator = allocator,
             .lang = lang,
             .captures = std.ArrayList(Capture).init(allocator),
-            .match_cache = std.AutoHashMap(*const oni.Regex, Match).init(allocator),
+            .match_cache = std.AutoHashMap(u32, Match).init(allocator),
         };
     }
 
@@ -262,12 +265,10 @@ pub const Parser = struct {
                         m.captures[count].group = i;
                         m.captures[count].start = s;
                         m.captures[count].end = e;
-
                         if (count == 0) {
                             m.start = s;
                             m.end = e;
                         }
-
                         // std.debug.print("{}-{}: {s}\n", .{ s, e, block[m.captures[count].start..m.captures[count].end] });
                         count += 1;
                     }
@@ -295,15 +296,16 @@ pub const Parser = struct {
         if (syntax.regex_match != null) {
             if (syntax.regex_match) |regex| {
                 const m = blk: {
-                    const mm = self.match_cache.get(&regex) orelse break :blk null;
-                    if (mm.anchor_start == start and mm.anchor_end == end) {
+                    const mm = self.match_cache.get(syntax.id) orelse break :blk null;
+                    if (mm.anchor_start < start and mm.anchor_end == end and mm.start >= start) {
+                        self.regex_skips += 1;
                         break :blk mm;
                     }
                     break :blk null;
                 } orelse self.execRegex(syntax, regex, syntax.regexs_match, block, start, end);
                 // const m = self.execRegex(syntax, regex, syntax.regexs_match, block, start, end);
+                _ = self.match_cache.put(syntax.id, m) catch {};
                 if (m.count > 0) {
-                    // _ = self.match_cache.put(&regex, m) catch {};
                     // std.debug.print("match {s} {}-{}\n", .{syntax.regexs_match orelse "??", m.start, m.end});
                     return m;
                 }
@@ -314,16 +316,17 @@ pub const Parser = struct {
             if (syntax.regex_begin) |regex| {
                 var m = blk: {
                     // check if previously failed
-                    const mm = self.match_cache.get(&regex) orelse break :blk null;
-                    if (mm.anchor_start == start and mm.anchor_end == end) {
+                    const mm = self.match_cache.get(syntax.id) orelse break :blk null;
+                    if (mm.anchor_start < start and mm.anchor_end == end and mm.start >= start) {
+                        self.regex_skips += 1;
                         break :blk mm;
                     }
                     break :blk null;
                 } orelse self.execRegex(syntax, regex, syntax.regexs_begin, block, start, end);
                 // cache failure
                 // var m = self.execRegex(syntax, regex, syntax.regexs_begin, block, start, end);
+                _ = self.match_cache.put(syntax.id, m) catch {};
                 if (m.count > 0) {
-                    // _ = self.match_cache.put(&regex, m) catch {};
                     m.begin = true;
                     // std.debug.print("begin {s} {}-{}\n", .{syntax.regexs_begin orelse "??", m.start, m.end});
                     return m;
@@ -366,12 +369,12 @@ pub const Parser = struct {
     // end match checking is against the  state stack to pop-out as much as possible
     pub fn matchEnd(self: *Parser, state: *ParseState, block: []const u8, start: usize, end: usize) Match {
         // prune
-        if (state.size() > 200) {
-            if (state.stack.items.len >= 200) {
-                const new_len = state.stack.items.len - 120;
+        if (state.size() > MAX_STATE_STACK_DEPTH) {
+            if (state.stack.items.len >= MAX_STATE_STACK_DEPTH) {
+                const new_len = state.stack.items.len - STATE_STACK_PRUNE;
                 @memcpy(
                     state.stack.items[0..new_len],
-                    state.stack.items[120..state.stack.items.len],
+                    state.stack.items[STATE_STACK_PRUNE..state.stack.items.len],
                 );
                 state.stack.items.len = new_len;
             }
@@ -412,35 +415,19 @@ pub const Parser = struct {
                     // std.debug.print(">{s} {s}\n", .{ syn.name, syn.include_path orelse "." });
                     const m = self.matchBegin(@constCast(syn), block, start, end);
                     if (m.count > 0) {
+                        if (m.start == start) {
+                            earliest_match = m;
+                            break;
+                        }
                         if (earliest_match.count == 0) {
                             earliest_match = m;
                         } else if (earliest_match.start > m.start) {
                             earliest_match = m;
-                        } else if (earliest_match.start == m.start and m.end > earliest_match.end) {
-                            // if (earliest_match.syntax) |end_syn| {
-                            //     if (end_syn.regexs_end == null) {
-                            //         earliest_match = m;
-                            //     }
-                            // } else {
-                            earliest_match = m;
-                            // }
-                        }
-                        if (m.start == start) {
-                            earliest_match = m;
-                            break;
                         }
                     }
                 }
             }
         }
-
-        // if (earliest_match.syntax) |syn| {
-        //     if (earliest_match.begin) {
-        //         std.debug.print("final begin: {s}\n", .{syn.regexs_begin orelse ""});
-        //     } else {
-        //         std.debug.print("final match: {s}\n", .{syn.regexs_match orelse ""});
-        //     }
-        // }
         return earliest_match;
     }
 
@@ -456,15 +443,12 @@ pub const Parser = struct {
         };
         var output: [TEMP_BUFFER_SIZE]u8 = [_]u8{0} ** TEMP_BUFFER_SIZE;
         _ = match.applyCaptures(block, name, &output);
-        self.captures.append(Capture{
-            .start = match.start,
-            .end = match.end,
-            .scope = output,
-        }) catch {};
-
         if (self.processor) |proc| {
-            const cap = self.captures.items[self.captures.items.len - 1];
-            proc.capture(&cap);
+            proc.capture(Capture{
+                .start = match.start,
+                .end = match.end,
+                .scope = output,
+            });
         }
     }
 
@@ -485,16 +469,14 @@ pub const Parser = struct {
                 // std.debug.print("capture {} {s}\n", .{ range.group, syn.name });
                 var output: [TEMP_BUFFER_SIZE]u8 = [_]u8{0} ** TEMP_BUFFER_SIZE;
                 _ = match.applyCaptures(block, syn.name, &output);
-                self.captures.append(Capture{
-                    .start = range.start,
-                    .end = range.end,
-                    .scope = output,
-                }) catch {};
                 // std.debug.print("{s}\n", .{output});
 
                 if (self.processor) |proc| {
-                    const cap = self.captures.items[self.captures.items.len - 1];
-                    proc.capture(&cap);
+                    proc.capture(Capture{
+                        .start = range.start,
+                        .end = range.end,
+                        .scope = output,
+                    });
                 }
 
                 // some captures have themselves some patterns
@@ -516,15 +498,13 @@ pub const Parser = struct {
                                 } else if (p.name.len > 0) {
                                     var sname: [TEMP_BUFFER_SIZE]u8 = [_]u8{0} ** TEMP_BUFFER_SIZE;
                                     _ = m.applyCaptures(block, p.name, &sname);
-                                    self.captures.append(Capture{
-                                        .start = range.start,
-                                        .end = range.end,
-                                        .scope = sname,
-                                    }) catch {};
 
                                     if (self.processor) |proc| {
-                                        const cap = self.captures.items[self.captures.items.len - 1];
-                                        proc.capture(&cap);
+                                        proc.capture(Capture{
+                                            .start = range.start,
+                                            .end = range.end,
+                                            .scope = sname,
+                                        });
                                     }
                                     // std.debug.print("captured_name: {s}<??\n", .{p.name});
                                 }
@@ -651,6 +631,7 @@ pub const Parser = struct {
 
     pub fn begin(self: *Parser) void {
         self.regex_execs = 0;
+        self.regex_skips = 0;
     }
 };
 

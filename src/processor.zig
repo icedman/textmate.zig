@@ -9,7 +9,7 @@ pub const Processor = struct {
     end_line_fn: ?*const fn (*Processor) void = null,
     open_tag_fn: ?*const fn (*Processor, *const parser.Match) void = null,
     close_tag_fn: ?*const fn (*Processor, *const parser.Match) void = null,
-    capture_fn: ?*const fn (*Processor, *const parser.Capture) void = null,
+    capture_fn: ?*const fn (*Processor, parser.Capture) void = null,
 
     pub fn startLine(self: *Processor, block: []const u8) void {
         self.block = block;
@@ -36,7 +36,7 @@ pub const Processor = struct {
         }
     }
 
-    pub fn capture(self: *Processor, cap: *const parser.Capture) void {
+    pub fn capture(self: *Processor, cap: parser.Capture) void {
         if (self.capture_fn) |f| {
             f(self, cap);
         }
@@ -94,7 +94,7 @@ pub const DumpProcessor = struct {
         }
     }
 
-    pub fn capture(self: *Processor, cap: *const parser.Capture) void {
+    pub fn capture(self: *Processor, cap: parser.Capture) void {
         if (self.block) |b| {
             const text = b[cap.start..cap.end];
             std.debug.print("capture: {s} {}-{} {s}\n", .{ text, cap.start, cap.end, cap.scope });

@@ -25,11 +25,15 @@ pub const Scope = struct {
     pub fn addScope(self: *Scope, scope: []const u8, token: ?*TokenColor) void {
         // split
         const space: []const u8 = " ";
+        if (std.mem.indexOf(u8, scope, space)) |idx| {
+            self.addScope(scope[0..idx], token);
+            self.addScope(scope[idx + 1 ..], token);
+            return;
+        }
+
         const dot: []const u8 = ".";
         var key = scope[0..scope.len];
-        if (std.mem.indexOf(u8, scope, space)) |idx| {
-            key = scope[0..idx];
-        } else if (std.mem.indexOf(u8, scope, dot)) |idx| {
+        if (std.mem.indexOf(u8, scope, dot)) |idx| {
             key = scope[0..idx];
         }
 
@@ -39,33 +43,34 @@ pub const Scope = struct {
             gop.value_ptr.* = Scope.init(self.allocator);
         }
         var target: *Scope = gop.value_ptr;
+        if (target.token == null) {
+            target.token = token;
+        }
 
         if ((key.len + 1) < scope.len) {
             const next = scope[key.len + 1 ..];
             target.addScope(next, token);
-        } else if (target.token == null) {
-            target.token = token;
         }
     }
 
     pub fn getScope(self: *const Scope, scope: []const u8, colors: ?*Settings) ?*const Scope {
         // std.debug.print("key: {s}\n", .{scope});
         // split
-        const space: []const u8 = " ";
         const dot: []const u8 = ".";
         var key = scope[0..scope.len];
-        if (std.mem.indexOf(u8, scope, space)) |idx| {
-            key = scope[0..idx];
-        } else if (std.mem.indexOf(u8, scope, dot)) |idx| {
+        if (std.mem.indexOf(u8, scope, dot)) |idx| {
             key = scope[0..idx];
         }
 
+        // std.debug.print("checking key: {s}\n", .{key});
+
         const target = self.children.get(key) orelse null;
         if (target) |*t| {
+            // std.debug.print("--- match {s}\n", .{key});
             if (colors) |clr| {
-                // std.debug.print("match! {s}\n", .{key});
                 if (t.token) |tk| {
                     if (tk.settings) |ss| {
+                        // std.debug.print("--- {s}\n", .{ss.foreground orelse ""});
                         clr.foreground = ss.foreground;
                         clr.background = ss.background;
                     }
@@ -75,11 +80,10 @@ pub const Scope = struct {
                 const next = scope[key.len + 1 ..];
                 // std.debug.print("continuing: {s}\n", .{next});
                 return t.getScope(next, colors) orelse self;
+            } else {
+                // std.debug.print("fully found\n", .{});
+                return t;
             }
-            // else {
-            //     std.debug.print("fully found\n", .{});
-            //     return t;
-            // }
         }
 
         if ((key.len + 1) < scope.len) {
@@ -129,7 +133,8 @@ test "test theme" {
     thm.root.dump(0);
 
     var colors = Settings{};
-    const scope = thm.root.getScope("meta.group.toml", &colors);
+    // const scope = thm.root.getScope("meta.group.toml", &colors);
+    const scope = thm.root.getScope("punctuation.section.parameters.begin.bracket.round.c", &colors);
     if (scope) |sc| {
         if (sc.token) |tk| {
             if (tk.settings) |ss| {

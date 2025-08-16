@@ -216,6 +216,7 @@ pub fn main() !void {
         // state.dump();
 
         std.debug.print("execs: {}\n", .{par.regex_execs});
+        std.debug.print("skips: {}\n", .{par.regex_skips});
         std.debug.print("done in {d:.6}s\n", .{elapsed});
     }
 
