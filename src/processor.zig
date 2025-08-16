@@ -81,7 +81,7 @@ pub const Processor = struct {
                 self.captures.items[i].retain = false;
             }
         }
-        
+
         if (self.close_tag_fn) |f| {
             f(self, c);
         }

@@ -5,10 +5,10 @@ const processor = @import("processor.zig");
 const Syntax = grammar.Syntax;
 
 const MAX_CAPTURES = 100;
-const MAX_SCOPE_SIZE = 128;         // scope name's max len (TODO overflow checks)
-const TEMP_BUFFER_SIZE = 128;       // used in end_pattern and scope name resolution (when references have been applied)
-const MAX_STATE_STACK_DEPTH = 200;  // if the state depth is too deep .. just prune
-const STATE_STACK_PRUNE = 120;      // prune off states from the stack
+const MAX_SCOPE_SIZE = 128; // scope name's max len (TODO overflow checks)
+const TEMP_BUFFER_SIZE = 128; // used in end_pattern and scope name resolution (when references have been applied)
+const MAX_STATE_STACK_DEPTH = 200; // if the state depth is too deep .. just prune
+const STATE_STACK_PRUNE = 120; // prune off states from the stack
 
 // capture is like Match.. but atomic and should be serializable
 pub const Capture = struct {
@@ -32,14 +32,14 @@ pub const Match = struct {
     count: u8 = 0,
     // TODO change to region to avoid confusion
     captures: [MAX_CAPTURES]MatchRange = [_]MatchRange{MatchRange{ .group = 0, .start = 0, .end = 0 }} ** MAX_CAPTURES,
-   
+
     // begin matches would cause a push to the state stack
     begin: bool = false,
 
     start: usize = 0,
     end: usize = 0,
 
-    // some matches 
+    // some matches
     anchor_start: usize = 0,
     anchor_end: usize = 0,
 
@@ -99,7 +99,7 @@ pub const Match = struct {
     }
 };
 
-// this should be serializable as this is what the parse state stack contains 
+// this should be serializable as this is what the parse state stack contains
 pub const StateContext = struct {
     syntax: *Syntax,
     end_regex: ?oni.Regex = null,
@@ -608,7 +608,7 @@ pub const Parser = struct {
                                 state.push(match_syn, block, pattern_match) catch {
                                     // fail silently?
                                 };
-                              
+
                                 if (self.processor) |proc| {
                                     // TODO move this verbose code to Syntax.getName();
                                     const name = blk: {

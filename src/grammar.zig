@@ -264,7 +264,7 @@ pub const Syntax = struct {
                 return inc_syn;
             }
 
-            // TODO understand $self, $base 
+            // TODO understand $self, $base
             if (std.mem.indexOf(u8, include_path, "$self") == 0) {
                 return syntax;
             }

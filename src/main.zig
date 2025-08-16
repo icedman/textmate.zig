@@ -44,7 +44,7 @@ pub fn main() !void {
     var thm = try theme.Theme.init(allocator, theme_path orelse "data/dracula.json");
     defer thm.deinit();
 
-    var gmr = try grammar.Grammar.init(allocator, grammar_path orelse "data/c.tmLanguage.json");
+    var gmr = try grammar.Grammar.init(allocator, grammar_path orelse "data/zig.tmLanguage.json");
     defer gmr.deinit();
 
     var par = try parser.Parser.init(allocator, &gmr);
@@ -69,7 +69,7 @@ pub fn main() !void {
     proc.theme = &thm;
 
     par.begin();
-    const path = file_path orelse "./data/test2.c";
+    const path = file_path orelse "./src/grammar.zig";
     var file = try std.fs.cwd().openFile(path, .{});
     defer file.close();
 
