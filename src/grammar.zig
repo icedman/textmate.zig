@@ -9,6 +9,8 @@ pub const Syntax = struct {
     content_name: []const u8,
     scope_name: []const u8,
 
+    parent: ?*Syntax = null,
+
     // regex strings
     regexs_match: ?[]const u8 = null,
     regexs_begin: ?[]const u8 = null,
@@ -34,11 +36,13 @@ pub const Syntax = struct {
     include: ?*Syntax = null,
 
     // other internals
-    parent: ?*Syntax = null,
     is_anchored: bool = false,
     is_comment_block: bool = false,
     is_string_block: bool = false,
     has_back_references: bool = false,
+
+    // stats
+    execs: u32 = 0,
 
     pub fn patternHasBackReference(ptrn: []const u8) bool {
         var escape = false;
@@ -51,7 +55,7 @@ pub const Syntax = struct {
         return false;
     }
 
-    // todo make use of anchors
+    // TODO make use of anchors
     pub fn patternHasAnchor(ptrn: []const u8) bool {
         var escape = false;
         for (ptrn) |ch| {
@@ -117,7 +121,7 @@ pub const Syntax = struct {
             .regexs_end = if (obj.get("end")) |v| v.string else null,
         };
 
-        // special case for retaining capture across lines
+        // special cases for retaining captures across lines
         if (syntax.regexs_begin) |regexs| {
             if (std.mem.indexOf(u8, regexs, "string")) |_| {
                 syntax.is_string_block = true;
@@ -319,6 +323,41 @@ pub const Syntax = struct {
         }
         return self.name;
     }
+
+    pub fn dump(self: *const Syntax, depth: u32, stats: bool) void {
+        for (0..depth) |i| {
+            _ = i;
+            std.debug.print("  ", .{});
+        }
+
+        if (self.include_path) |p| {
+            std.debug.print("include {s}\n", .{p});
+        } else {
+            if (stats) {
+                std.debug.print("{s} {}\n", .{ self.getName(), self.execs });
+            } else {
+                std.debug.print("{s}\n", .{self.getName()});
+            }
+        }
+
+        if (self.patterns) |pats| {
+            for (pats) |*p| {
+                const v = p.*;
+                v.dump(depth + 1, stats);
+            }
+        }
+
+        // free repository
+        if (self.repository) |repo| {
+            var it = repo.iterator();
+            while (it.next()) |kv| {
+                const k = kv.key_ptr.*;
+                const v = kv.value_ptr.*;
+                std.debug.print("{s} ", .{k});
+                v.dump(depth + 1, stats);
+            }
+        }
+    }
 };
 
 pub const Grammar = struct {
@@ -378,3 +417,11 @@ pub const Grammar = struct {
         return grammar;
     }
 };
+
+pub fn runTests(comptime testing: anytype, verbosely: bool) !void {
+    var gmr = try Grammar.init(testing.allocator, "data/tests/c.tmLanguage.json");
+    defer gmr.deinit();
+    _ = verbosely;
+
+    gmr.syntax.?.dump(0, false);
+}

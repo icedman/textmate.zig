@@ -2,6 +2,10 @@
 
 This is textmate parser implementation in Zig based on my tiny-textmate parser (in C).
 
+# themes and grammars compiled by shikijs
+
+git clone https://github.com/shikijs/textmate-grammars-themes
+
 # build
 
 ```sh

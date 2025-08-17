@@ -7,6 +7,8 @@ const grammar = lib.grammar;
 const parser = lib.parser;
 const processor = lib.processor;
 
+const TEST_VERBOSELY = false;
+
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
 
@@ -14,6 +16,7 @@ pub fn main() !void {
     try oni.testing.ensureInit();
 
     var dump: bool = false;
+    var stats: bool = false;
     var grammar_path: ?[]const u8 = null;
     var theme_path: ?[]const u8 = null;
     var file_path: ?[]const u8 = null;
@@ -23,7 +26,9 @@ pub fn main() !void {
     while (arg != null) {
         arg = args.next();
         if (arg == null) break;
-        if (std.mem.eql(u8, arg.?, "-d")) {
+        if (std.mem.eql(u8, arg.?, "-s")) {
+            stats = true;
+        } else if (std.mem.eql(u8, arg.?, "-d")) {
             dump = true;
         } else if (std.mem.eql(u8, arg.?, "-g")) {
             grammar_path = args.next();
@@ -34,10 +39,16 @@ pub fn main() !void {
         }
     }
 
-    var thm = try theme.Theme.init(allocator, theme_path orelse "data/tests/dracula.json");
+    var thm = theme.Theme.init(allocator, theme_path orelse "data/tests/dracula.json") catch {
+        std.debug.print("unable to open theme {s}\n", .{theme_path orelse ""});
+        return;
+    };
     defer thm.deinit();
 
-    var gmr = try grammar.Grammar.init(allocator, grammar_path orelse "data/tests/zig.tmLanguage.json");
+    var gmr = grammar.Grammar.init(allocator, grammar_path orelse "data/tests/zig.tmLanguage.json") catch {
+        std.debug.print("unable to open grammar {s}\n", .{grammar_path orelse ""});
+        return;
+    };
     defer gmr.deinit();
 
     var par = try parser.Parser.init(allocator, &gmr);
@@ -63,7 +74,10 @@ pub fn main() !void {
 
     par.begin();
     const path = file_path orelse "./src/grammar.zig";
-    var file = try std.fs.cwd().openFile(path, .{});
+    var file = std.fs.cwd().openFile(path, .{}) catch {
+        std.debug.print("unable to open file {s}\n", .{file_path orelse ""});
+        return;
+    };
     defer file.close();
 
     var reader = file.reader();
@@ -84,12 +98,23 @@ pub fn main() !void {
     const end = std.time.nanoTimestamp();
     const elapsed = @as(f64, @floatFromInt(end - start)) / 1_000_000_000.0;
 
-    std.debug.print("==================\n", .{});
-    // state.dump();
-    std.debug.print("execs: {}\n", .{par.regex_execs});
-    std.debug.print("skips: {}\n", .{par.regex_skips});
-    std.debug.print("done in {d:.6}s\n", .{elapsed});
-    std.debug.print("state depth: {}\n", .{state.size()});
+    if (stats) {
+        std.debug.print("==================\n", .{});
+        std.debug.print("execs: {}\n", .{par.regex_execs});
+        std.debug.print("skips: {}\n", .{par.regex_skips});
+        std.debug.print("done in {d:.6}s\n", .{elapsed});
+        std.debug.print("state depth: {}\n", .{state.size()});
+        // state.dump();
+        // gmr.syntax.?.dump(0, true);
+    }
+}
+
+test "themes" {
+    try theme.runTests(std.testing, TEST_VERBOSELY);
+}
+
+test "grammar" {
+    try grammar.runTests(std.testing, TEST_VERBOSELY);
 }
 
 const std = @import("std");

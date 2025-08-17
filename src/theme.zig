@@ -130,7 +130,7 @@ pub const Scope = struct {
         return self;
     }
 
-    pub fn dump(self: *const Scope, depth: u8) void {
+    pub fn dump(self: *const Scope, depth: u32) void {
         var it = self.children.iterator();
         while (it.next()) |kv| {
             const k = kv.key_ptr.*;
@@ -185,15 +185,15 @@ pub const Settings = struct {
     foreground: ?[]const u8 = null,
     background: ?[]const u8 = null,
     fontStyle: ?[]const u8 = null,
-    fg_rgb: ?Rgb = null,
-    bg_rgb: ?Rgb = null,
+    foreground_rgb: ?Rgb = null,
+    background_rgb: ?Rgb = null,
 
     pub fn compute(self: *Settings) void {
         if (self.foreground) |fg| {
-            self.fg_rgb = Rgb.fromHex(fg);
+            self.foreground_rgb = Rgb.fromHex(fg);
         }
         if (self.background) |bg| {
-            self.bg_rgb = Rgb.fromHex(bg);
+            self.background_rgb = Rgb.fromHex(bg);
         }
     }
 };
@@ -322,3 +322,40 @@ pub const Theme = struct {
         return self.root.getScope(scope, colors);
     }
 };
+
+pub fn runTests(comptime testing: anytype, verbosely: bool) !void {
+    var thm = try Theme.init(testing.allocator, "data/tests/dracula.json");
+    defer thm.deinit();
+
+    // thm.root.dump(0);
+
+    const Entry = struct {
+        key: []const u8,
+        value: []const u8,
+    };
+
+    // these values are currently as resolved - which is lacking in features. TODO get tests from vscode
+    const entries = [_]Entry{
+        .{ .key = "storage.type.built-in.primitive.c", .value = "#8BE9FD" },
+        .{ .key = "meta.function.c", .value = "#8BE9FD" },
+        .{ .key = "meta.function.definition.parameters.c", .value = "#8BE9FD" },
+        .{ .key = "entity.name.function.c", .value = "#50FA7B" },
+        .{ .key = "punctuation.section.parameters.begin.backet.round.c", .value = "#FF79C6" },
+        .{ .key = "variable.parameter.probably.c", .value = "#FFB86C" },
+        .{ .key = "punctuation.separator.delimiter.c", .value = "#FF79C6" },
+        .{ .key = "keyword.operator.c", .value = "#FF79C6" },
+        .{ .key = "punctuation.section.parameters.end.bracket.round.c", .value = "#FF79C6" },
+    };
+
+    for (entries) |entry| {
+        var colors = Settings{};
+        _ = thm.getScope(entry.key, &colors);
+        if (colors.foreground) |fg| {
+            if (verbosely) {
+                setColorHex(std.debug, fg) catch {};
+                std.debug.print("{s} fg: {s}\n", .{ entry.key, fg });
+            }
+            try testing.expectEqualStrings(fg, entry.value);
+        }
+    }
+}

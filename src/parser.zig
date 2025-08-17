@@ -212,8 +212,8 @@ pub const Parser = struct {
     processor: ?*processor.Processor = null,
 
     // stats
-    regex_execs: usize = 0,
-    regex_skips: usize = 0,
+    regex_execs: u32 = 0,
+    regex_skips: u32 = 0,
 
     pub fn init(allocator: std.mem.Allocator, lang: *grammar.Grammar) !Parser {
         return Parser{
@@ -230,6 +230,7 @@ pub const Parser = struct {
     fn execRegex(self: *Parser, syntax: *Syntax, regex: ?oni.Regex, regexs: ?[]const u8, block: []const u8, start: usize, end: usize) Match {
         // std.debug.print("execRegex {s}\n", .{regexs orelse ""});
         if (regex) |*re| {
+            syntax.execs += 1;
             self.regex_execs += 1;
             var hard_start: usize = start;
             if (syntax.is_anchored) {

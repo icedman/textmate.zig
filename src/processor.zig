@@ -7,9 +7,6 @@ pub const Processor = struct {
     block: ?[]const u8 = null,
     theme: ?*theme.Theme = null,
 
-    // TODO add writer here
-    // writer: std.debug
-
     captures: std.ArrayList(parser.Capture),
     retained_captures: std.ArrayList(parser.Capture),
 
@@ -56,6 +53,8 @@ pub const Processor = struct {
             }
             c.end = b.len;
             c.retain = true;
+            // TODO retain only string and comment blocks?
+            // set retention at Parser, since capture only has syntax_id
         }
         self.captures.append(c) catch {};
         if (self.open_tag_fn) |f| {
@@ -188,10 +187,10 @@ pub const RenderProcessor = struct {
                 // if (colors.background) |bg| {
                 //     setBgColorHex(std.debug, bg) catch {};
                 // }
-                if (colors.fg_rgb) |fg| {
+                if (colors.foreground_rgb) |fg| {
                     setColorRgb(std.debug, fg) catch {};
                 }
-                if (colors.bg_rgb) |bg| {
+                if (colors.background_rgb) |bg| {
                     setBgColorRgb(std.debug, bg) catch {};
                 }
 
