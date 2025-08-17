@@ -16,6 +16,7 @@ pub fn main() !void {
     try oni.testing.ensureInit();
 
     var dump: bool = false;
+    var html: bool = false;
     var stats: bool = false;
     var grammar_path: ?[]const u8 = null;
     var theme_path: ?[]const u8 = null;
@@ -28,6 +29,8 @@ pub fn main() !void {
         if (arg == null) break;
         if (std.mem.eql(u8, arg.?, "-s")) {
             stats = true;
+        } else if (std.mem.eql(u8, arg.?, "-h")) {
+            html = true;
         } else if (std.mem.eql(u8, arg.?, "-d")) {
             dump = true;
         } else if (std.mem.eql(u8, arg.?, "-g")) {
@@ -63,6 +66,8 @@ pub fn main() !void {
     var proc = blk: {
         if (dump) {
             break :blk try processor.DumpProcessor.init(allocator);
+        } else if (html) {
+            break :blk try processor.RenderHtmlProcessor.init(allocator);
         } else {
             break :blk try processor.RenderProcessor.init(allocator);
         }
@@ -86,6 +91,7 @@ pub fn main() !void {
     var line_no: usize = 1;
 
     const start = std.time.nanoTimestamp();
+    proc.startDocument();
     while (try reader.readUntilDelimiterOrEof(&buf, '\n')) |line| {
         const trimmed = if (line.len > 0 and line[line.len - 1] == '\r')
             line[0 .. line.len - 1]
@@ -95,11 +101,13 @@ pub fn main() !void {
         _ = try par.parseLine(&state, trimmed);
         line_no += 1;
     }
+    proc.endDocument();
     const end = std.time.nanoTimestamp();
     const elapsed = @as(f64, @floatFromInt(end - start)) / 1_000_000_000.0;
 
     if (stats) {
         std.debug.print("==================\n", .{});
+        std.debug.print("lines: {}\n", .{line_no - 1});
         std.debug.print("execs: {}\n", .{par.regex_execs});
         std.debug.print("skips: {}\n", .{par.regex_skips});
         std.debug.print("done in {d:.6}s\n", .{elapsed});

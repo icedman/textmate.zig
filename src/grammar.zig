@@ -270,10 +270,15 @@ pub const Syntax = struct {
 
             // TODO understand $self, $base
             if (std.mem.indexOf(u8, include_path, "$self") == 0) {
-                return syntax;
+                // root?
+                var root = self;
+                while (root.parent) |p| {
+                    root = p;
+                }
+                return root;
             }
             if (std.mem.indexOf(u8, include_path, "$base") == 0) {
-                // root
+                // base grammar?
                 var root = self;
                 while (root.parent) |p| {
                     root = p;
@@ -367,7 +372,7 @@ pub const Grammar = struct {
     name: []const u8,
     syntax: ?*Syntax = null,
 
-    // TODO release this after parse (requires that all string values by allocated and copied)
+    // TODO release this after parse (requires that all string values be allocated and copied)
     parsed: ?std.json.Parsed(std.json.Value) = null,
 
     pub fn init(allocator: std.mem.Allocator, source_path: []const u8) !Grammar {

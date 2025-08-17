@@ -4,18 +4,18 @@ const grammar = @import("grammar.zig");
 const processor = @import("processor.zig");
 const Syntax = grammar.Syntax;
 
-const MAX_MATCH_RANGES = 100;
-const MAX_SCOPE_SIZE = 128; // scope name's max len (TODO overflow checks)
-const TEMP_BUFFER_SIZE = 128; // used in end_pattern and scope name resolution (when references have been applied)
-const MAX_STATE_STACK_DEPTH = 200; // if the state depth is too deep .. just prune
+const MAX_MATCH_RANGES = 10; // max $1 in grammar files is just 8
+const MAX_SCOPE_LEN = 128;
+const MAX_STATE_STACK_DEPTH = 200; // if the state depth is too deep .. just prune (this shouldn't happen though)
 const STATE_STACK_PRUNE = 120; // prune off states from the stack
 
 // capture is like MatchRange.. but atomic and should be serializable
 pub const Capture = struct {
     start: usize = 0,
     end: usize = 0,
-    scope: [MAX_SCOPE_SIZE]u8 = [_]u8{0} ** MAX_SCOPE_SIZE,
+    scope: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN,
     // open block and strings will be retained across line parsing
+    // syntax_id will be the identifier (not pointers)
     syntax_id: u32 = 0,
     retain: bool = false,
 };
@@ -38,7 +38,7 @@ pub const Match = struct {
     anchor_start: usize = 0,
     anchor_end: usize = 0,
 
-    fn applyRef(self: *const Match, block: []const u8, target: []const u8, escape_character: u8, output: *[TEMP_BUFFER_SIZE]u8) []const u8 {
+    fn applyRef(self: *const Match, block: []const u8, target: []const u8, escape_character: u8, output: *[MAX_SCOPE_LEN]u8) []const u8 {
         var output_idx: usize = 0;
         var escape = false;
         var skip: usize = 0;
@@ -69,6 +69,7 @@ pub const Match = struct {
                         for (r.start..r.end) |bi| {
                             output[output_idx] = block[bi];
                             output_idx += 1;
+                            // this cuts off any overflow
                             if (output_idx >= output.len) return output;
                         }
                     }
@@ -85,11 +86,11 @@ pub const Match = struct {
         return output;
     }
 
-    pub fn applyReferences(self: *const Match, block: []const u8, target: []const u8, output: *[TEMP_BUFFER_SIZE]u8) []const u8 {
+    pub fn applyReferences(self: *const Match, block: []const u8, target: []const u8, output: *[MAX_SCOPE_LEN]u8) []const u8 {
         return self.applyRef(block, target, '\\', output);
     }
 
-    pub fn applyCaptures(self: *const Match, block: []const u8, target: []const u8, output: *[TEMP_BUFFER_SIZE]u8) []const u8 {
+    pub fn applyCaptures(self: *const Match, block: []const u8, target: []const u8, output: *[MAX_SCOPE_LEN]u8) []const u8 {
         return self.applyRef(block, target, '$', output);
     }
 };
@@ -156,7 +157,7 @@ pub const ParseState = struct {
             // compile regex_end
             if (match) |m| {
                 if (syntax.regexs_end) |regexs| {
-                    var output: [TEMP_BUFFER_SIZE]u8 = [_]u8{0} ** TEMP_BUFFER_SIZE;
+                    var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
                     _ = m.applyReferences(block, regexs, &output);
                     {
                         sc.end_regex = try oni.Regex.init(
@@ -261,7 +262,7 @@ pub const Parser = struct {
                 var i: u16 = 0;
                 const starts = r.starts();
                 const ends = r.ends();
-                while (i < r.count()) : (i += 1) {
+                while (i < r.count() and i < 10) : (i += 1) {
                     if (starts[i] < 0) {
                         // -1 could happen in oniguruma when an optional capture group didn't match
                         // case: when no newline '\n' is present (c.tmLanguage)
@@ -443,7 +444,7 @@ pub const Parser = struct {
             break :blk syntax.name;
         };
         if (self.processor) |proc| {
-            var output: [TEMP_BUFFER_SIZE]u8 = [_]u8{0} ** TEMP_BUFFER_SIZE;
+            var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
             _ = match.applyCaptures(block, name, &output);
             proc.capture(Capture{
                 .start = match.start,
@@ -465,7 +466,7 @@ pub const Parser = struct {
             const capture: ?*Syntax = captures.get(key);
             if (capture) |syn| {
                 if (self.processor) |proc| {
-                    var output: [TEMP_BUFFER_SIZE]u8 = [_]u8{0} ** TEMP_BUFFER_SIZE;
+                    var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
                     _ = match.applyCaptures(block, syn.name, &output);
                     proc.capture(Capture{
                         .start = range.start,
@@ -475,7 +476,7 @@ pub const Parser = struct {
                 }
 
                 // some captures have themselves some patterns
-                // TODO needs verification
+                // TODO needs verification and tests
                 if (syn.patterns) |pats| {
                     const ps = match.start; // should be range.start and range.end?
                     const pe = match.end;
@@ -490,7 +491,7 @@ pub const Parser = struct {
                                     // descend into captures
                                     self.collectCaptures(&m, pc, block);
                                 } else if (p.name.len > 0) {
-                                    var sname: [TEMP_BUFFER_SIZE]u8 = [_]u8{0} ** TEMP_BUFFER_SIZE;
+                                    var sname: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
                                     _ = m.applyCaptures(block, p.name, &sname);
                                     if (self.processor) |proc| {
                                         proc.capture(Capture{
@@ -545,6 +546,13 @@ pub const Parser = struct {
                 const ts = t.syntax;
                 const ls = ts.resolve(ts);
                 if (ls) |syn| {
+                    if (state.size() > 1 and syn.parent == null) {
+                        // $self was included? clear the stack in this situation?
+                        while (state.size() > 1) {
+                            state.pop();
+                        }
+                    }
+
                     const pattern_match: Match = self.matchPatterns(syn, syn.patterns, block, start, end);
                     const end_match: Match = self.matchEnd(state, block, start, end);
                     if (end_match.count > 0 and
@@ -564,7 +572,7 @@ pub const Parser = struct {
 
                             if (self.processor) |proc| {
                                 const name = end_syn.getName();
-                                var scope_name: [MAX_SCOPE_SIZE]u8 = [_]u8{0} ** MAX_SCOPE_SIZE;
+                                var scope_name: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
                                 @memcpy(scope_name[0..name.len], name);
                                 proc.closeTag(Capture{
                                     .start = end_match.start,
@@ -594,7 +602,7 @@ pub const Parser = struct {
 
                                 if (self.processor) |proc| {
                                     const name = match_syn.getName();
-                                    var scope_name: [MAX_SCOPE_SIZE]u8 = [_]u8{0} ** MAX_SCOPE_SIZE;
+                                    var scope_name: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
                                     @memcpy(scope_name[0..name.len], name);
                                     proc.openTag(Capture{
                                         .start = pattern_match.start,
@@ -660,7 +668,7 @@ test "test references" {
     m.ranges[1].group = 2;
     m.ranges[1].start = 3;
     m.ranges[1].end = 5;
-    var output: [TEMP_BUFFER_SIZE]u8 = [_]u8{0} ** TEMP_BUFFER_SIZE;
+    var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
     _ = m.applyReferences(block, "hello \\1 world \\2.", &output);
 
     const expectedOutput = "hello ab world de.";

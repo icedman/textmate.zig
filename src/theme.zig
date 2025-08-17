@@ -21,7 +21,7 @@ pub fn setColorRgb(stdout: anytype, rgb: Rgb) !void {
 }
 
 pub fn setBgColorHex(stdout: anytype, hex: []const u8) !void {
-    if (hex.len != 7 or hex[0] != '#') {
+    if (hex.len < 7 or hex[0] != '#') {
         return error.InvalidHexColor;
     }
 
@@ -165,7 +165,7 @@ pub const Rgb = struct {
     b: u8 = 0,
 
     pub fn fromHex(hex: []const u8) Rgb {
-        if (hex.len != 7 or hex[0] != '#') {
+        if (hex.len < 7 or hex[0] != '#') {
             return Rgb{};
         }
         const r = std.fmt.parseInt(u8, hex[1..3], 16) catch {
@@ -204,13 +204,14 @@ pub const Theme = struct {
 
     name: []const u8,
     author: ?[]const u8 = null,
-    colors: ?std.StringHashMap([]const u8) = null,
+    colors: ?std.StringHashMap(Settings) = null,
     tokenColors: ?[]TokenColor = null,
     semanticHighlighting: bool = false,
 
     root: Scope,
+    scope_cache: ?std.StringHashMap(Settings) = null,
 
-    // TODO release this after parse (requires that all string values by allocated and copied)
+    // TODO release this after parse (requires that all string values be allocated and copied)
     parsed: ?std.json.Parsed(std.json.Value) = null,
 
     pub fn init(allocator: std.mem.Allocator, source_path: []const u8) !Theme {
@@ -257,14 +258,19 @@ pub const Theme = struct {
         const semanticHighlighting = if (obj.get("semanticHighlighting")) |v| v.bool else false;
 
         // colors
-        var colors = std.StringHashMap([]const u8).init(aa);
+        var colors = std.StringHashMap(Settings).init(aa);
         if (obj.get("colors")) |colors_val| {
             if (colors_val == .object) {
                 var it = colors_val.object.iterator();
                 while (it.next()) |entry| {
                     const k = entry.key_ptr.*;
                     const v = entry.value_ptr.*.string;
-                    try colors.put(k, v);
+                    // TODO value should be settings
+                    var settings = Settings{
+                        .foreground = v,
+                    };
+                    settings.compute();
+                    try colors.put(k, settings);
                 }
             }
         }
@@ -319,7 +325,15 @@ pub const Theme = struct {
 
     pub fn getScope(self: *Theme, scope: []const u8, colors: ?*Settings) ?*const Scope {
         // TODO pass parse state for nesting checks
+        //
         return self.root.getScope(scope, colors);
+    }
+
+    pub fn getColor(self: *Theme, name: []const u8) ?Settings {
+        if (self.colors.?.get(name)) |c| {
+            return c;
+        }
+        return null;
     }
 };
 

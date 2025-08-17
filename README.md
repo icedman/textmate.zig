@@ -24,6 +24,23 @@ or
 
 # progress
 
+tinywl.c
+==================
+lines: 1002
+execs: 368243
+skips: 6020
+done in 0.476562s
+state depth: 10
+
+sqlite3.c
+==================
+lines: 222905
+execs: 76223680
+skips: 1707167
+done in 203.368550s
+state depth: 105
+
+
 commit 08b5493bd89bcc100e07956be9a5e7a8efe8beb5 
 * some regex match caching
 * scope - style resolution (very primitive, no nesting)
@@ -43,3 +60,5 @@ done in 88.919690s
 state depth: 2
 
 O(n) ~ time linear to number of lines
+
+

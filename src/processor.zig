@@ -10,11 +10,25 @@ pub const Processor = struct {
     captures: std.ArrayList(parser.Capture),
     retained_captures: std.ArrayList(parser.Capture),
 
+    start_document_fn: ?*const fn (*Processor) void = null,
+    end_document_fn: ?*const fn (*Processor) void = null,
     start_line_fn: ?*const fn (*Processor, block: []const u8) void = null,
     end_line_fn: ?*const fn (*Processor) void = null,
     open_tag_fn: ?*const fn (*Processor, parser.Capture) void = null,
     close_tag_fn: ?*const fn (*Processor, parser.Capture) void = null,
     capture_fn: ?*const fn (*Processor, parser.Capture) void = null,
+
+    pub fn startDocument(self: *Processor) void {
+        if (self.start_document_fn) |f| {
+            f(self);
+        }
+    }
+
+    pub fn endDocument(self: *Processor) void {
+        if (self.end_document_fn) |f| {
+            f(self);
+        }
+    }
 
     pub fn startLine(self: *Processor, block: []const u8) void {
         self.block = block;
@@ -74,10 +88,19 @@ pub const Processor = struct {
             }
         }
         // close the Capture (properly set the end pos)
-        for (0..self.captures.items.len) |i| {
-            if (self.captures.items[i].syntax_id == c.syntax_id) {
-                self.captures.items[i].end = c.end;
-                self.captures.items[i].retain = false;
+        // for (0..self.captures.items.len) |i| {
+        //     if (self.captures.items[i].syntax_id == c.syntax_id) {
+        //         self.captures.items[i].end = c.end;
+        //         self.captures.items[i].retain = false;
+        //     }
+        // }
+
+        var i = self.captures.items.len;
+        while (i > 0) : (i -= 1) {
+            if (self.captures.items[i - 1].syntax_id == c.syntax_id) {
+                self.captures.items[i - 1].end = c.end;
+                self.captures.items[i - 1].retain = false;
+                break;
             }
         }
 
@@ -167,8 +190,20 @@ const resetColor = theme.resetColor;
 pub const RenderProcessor = struct {
     pub fn endLine(self: *Processor) void {
         if (self.theme) |thm| {
+            // const defaultColor: ?theme.Settings = theme.Settings{.foreground_rgb = theme.Rgb {.r = 255 }};
+            const default_color = thm.getColor("editor.foreground") orelse
+                thm.getColor("foreground");
             const captures = self.captures;
             const block = self.block orelse "";
+
+            if (default_color) |c| {
+                if (c.foreground_rgb) |fg| {
+                    setColorRgb(std.debug, fg) catch {};
+                }
+            } else {
+                resetColor(std.debug) catch {};
+            }
+
             for (block, 0..) |ch, i| {
                 var cap: parser.Capture = parser.Capture{};
                 for (0..captures.items.len) |ci| {
@@ -202,7 +237,13 @@ pub const RenderProcessor = struct {
                 }
 
                 if (i + 1 >= cap.end) {
-                    resetColor(std.debug) catch {};
+                    if (default_color) |c| {
+                        if (c.foreground_rgb) |fg| {
+                            setColorRgb(std.debug, fg) catch {};
+                        }
+                    } else {
+                        resetColor(std.debug) catch {};
+                    }
                 }
             }
             std.debug.print("\n", .{});
@@ -215,6 +256,79 @@ pub const RenderProcessor = struct {
         const self = RenderProcessor;
         return Processor{
             .allocator = allocator,
+            .end_line_fn = self.endLine,
+            .captures = std.ArrayList(parser.Capture).init(allocator),
+            .retained_captures = std.ArrayList(parser.Capture).init(allocator),
+        };
+    }
+};
+
+pub const RenderHtmlProcessor = struct {
+    pub fn startDocument(self: *Processor) void {
+        const stdout = std.io.getStdOut().writer();
+        stdout.print("<html><body style=\"background: black;\"><span>", .{}) catch {};
+        _ = self;
+    }
+
+    pub fn endDocument(self: *Processor) void {
+        const stdout = std.io.getStdOut().writer();
+        stdout.print("</body></html>", .{}) catch {};
+        _ = self;
+    }
+
+    pub fn endLine(self: *Processor) void {
+        const stdout = std.io.getStdOut().writer();
+        if (self.theme) |thm| {
+            // const defaultColor: ?theme.Settings = theme.Settings{.foreground_rgb = theme.Rgb {.r = 255 }};
+            // const default_color = (thm.getColor("editor.foreground") orelse
+            //     thm.getColor("foreground") orelse theme.Settings{.foreground = "#FFFFFF"}).foreground.?;
+            var current_color: [32]u8 = [_]u8{0} ** 32;
+
+            const captures = self.captures;
+            const block = self.block orelse "";
+
+            for (block, 0..) |ch, i| {
+                var cap: parser.Capture = parser.Capture{};
+                for (0..captures.items.len) |ci| {
+                    if (i >= captures.items[ci].start and i < captures.items[ci].end) {
+                        cap = captures.items[ci];
+                        // std.debug.print("\n{s} {}-{} [{}]\n", .{ cap.scope, captures.items[ci].start, captures.items[ci].end, i });
+                    }
+                }
+
+                var colors = theme.Settings{};
+                const scope = thm.getScope(cap.scope[0..cap.scope.len], &colors);
+                _ = scope;
+                if (colors.foreground) |fg| {
+                    if (!std.mem.eql(u8, fg, current_color[0..8])) {
+                        @memcpy(current_color[0..fg.len], fg);
+                        stdout.print("</span><span style=\"color:{s};\">", .{current_color[0..7]}) catch {};
+                    }
+                }
+
+                // _ = ch;
+                if (ch == '\t') {
+                    stdout.print("  ", .{}) catch {};
+                } else {
+                    stdout.print("{c}", .{ch}) catch {};
+                }
+
+                if (i + 1 >= cap.end) {
+                    current_color = [_]u8{0} ** 32;
+                }
+            }
+            stdout.print("<span><br/>\n", .{}) catch {};
+        } else {
+            stdout.print("theme is not set\n", .{}) catch {};
+        }
+    }
+
+    pub fn init(allocator: std.mem.Allocator) !Processor {
+        const self = RenderHtmlProcessor;
+        return Processor{
+            .allocator = allocator,
+            .start_document_fn = self.startDocument,
+            .end_document_fn = self.endDocument,
             .end_line_fn = self.endLine,
             .captures = std.ArrayList(parser.Capture).init(allocator),
             .retained_captures = std.ArrayList(parser.Capture).init(allocator),
