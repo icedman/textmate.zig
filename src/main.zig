@@ -114,8 +114,7 @@ pub fn main() !void {
         std.debug.print("skips: {}\n", .{par.regex_skips});
         std.debug.print("done in {d:.6}s\n", .{elapsed});
         std.debug.print("state depth: {}\n", .{state.size()});
-        // state.dump();
-        // gmr.syntax.?.dump(0, true);
+        state.dump();
     }
 }
 

@@ -58,11 +58,12 @@ pub const Syntax = struct {
     // TODO make use of anchors
     pub fn patternHasAnchor(ptrn: []const u8) bool {
         var escape = false;
-        for (ptrn) |ch| {
+        for (ptrn, 0..) |ch, i| {
             if (escape and ch == 'G') {
                 return true;
             }
             escape = (!escape) and (ch == '\\');
+            if (i > 8) break;
         }
         return false;
     }
@@ -233,10 +234,10 @@ pub const Syntax = struct {
         };
 
         const entries = [_]Entry{
-            .{ .string = &self.regexs_match, .regex_ptr = &self.regex_match },
-            .{ .string = &self.regexs_begin, .regex_ptr = &self.regex_begin },
-            .{ .string = &self.regexs_while, .regex_ptr = &self.regex_while },
-            .{ .string = &self.regexs_end, .regex_ptr = &self.regex_end },
+            .{ .string = &self.regexs_match, .regex_ptr = &self.regex_match, },
+            .{ .string = &self.regexs_begin, .regex_ptr = &self.regex_begin, },
+            .{ .string = &self.regexs_while, .regex_ptr = &self.regex_while, },
+            .{ .string = &self.regexs_end, .regex_ptr = &self.regex_end, },
         };
 
         for (entries, 0..) |entry, i| {
@@ -246,6 +247,9 @@ pub const Syntax = struct {
                     // do not compile now, this has to be recompiled at every matched begin (applying one or more captures to the pattern)
                     self.has_back_references = true;
                     continue;
+                }
+                if (Syntax.patternHasAnchor(regex)) {
+                    self.is_anchored = true;
                 }
                 const re = try oni.Regex.init(
                     regex,

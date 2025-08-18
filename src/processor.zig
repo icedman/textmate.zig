@@ -161,6 +161,7 @@ pub const DumpProcessor = struct {
 
     pub fn capture(self: *Processor, cap: parser.Capture) void {
         if (self.block) |b| {
+            if (cap.start >= b.len) return;
             const text = b[cap.start..cap.end];
             std.debug.print("capture: {s} {}-{} {s}\n", .{ text, cap.start, cap.end, cap.scope });
         }

@@ -16,10 +16,11 @@ enum tinywl_cursor_mode {
 
 int main(int argc, char **argv) {
 	for(int i=0; i<100; i++) {
-	switch(i) {
-		case 1:
-			break;
-	}
+		switch(i) {
+			case 1: {
+				break;
+			}
+		}
 	}
 	return 0;
 }

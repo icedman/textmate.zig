@@ -4,8 +4,11 @@ const grammar = @import("grammar.zig");
 const processor = @import("processor.zig");
 const Syntax = grammar.Syntax;
 
+const ENABLE_MATCH_CACHING = true;
+const ENABLE_END_MATCH_CACHING = true;
+
 const MAX_LINE_LEN = 1024; // and line longer will not be parsed
-const MAX_MATCH_RANGES = 9; // max $1 in grammar files is just 8
+const MAX_MATCH_RANGES = 10; // max $1 in grammar files is just 8
 const MAX_SCOPE_LEN = 64;
 const MAX_STATE_STACK_DEPTH = 200; // if the state depth is too deep .. just prune (this shouldn't happen though)
 const STATE_STACK_PRUNE = 120; // prune off states from the stack
@@ -103,6 +106,7 @@ pub const Match = struct {
 // this should be serializable as this is what the parse state stack contains
 pub const StateContext = struct {
     syntax: *Syntax,
+    anchor: usize = 0,
     end_regex: ?oni.Regex = null,
 };
 
@@ -155,8 +159,10 @@ pub const ParseState = struct {
     }
 
     pub fn push(self: *ParseState, syntax: *Syntax, block: []const u8, match: ?Match) !void {
+        const anchor = (match orelse Match{.start = 0 }).start;
         var sc = StateContext{
             .syntax = syntax,
+            .anchor = anchor,
         };
         if (syntax.has_back_references) {
             // compile regex_end
@@ -193,7 +199,7 @@ pub const ParseState = struct {
                 const ts = t.syntax;
                 const ls = ts.resolve(ts);
                 if (ls) |syn| {
-                    std.debug.print("{} {*} {s} {s} {s}\n", .{ i, syn, syn.name, syn.content_name, syn.scope_name });
+                    std.debug.print("{} {*} {s}\n", .{ i, syn, syn.getName() });
                     if (syn.regexs_match) |r| {
                         std.debug.print("  match: {s}\n", .{r});
                     }
@@ -221,6 +227,7 @@ pub const Parser = struct {
     // stats
     regex_execs: u32 = 0,
     regex_skips: u32 = 0,
+    current_state: ?*ParseState = null,
 
     pub fn init(allocator: std.mem.Allocator, lang: *grammar.Grammar) !Parser {
         return Parser{
@@ -236,15 +243,32 @@ pub const Parser = struct {
         self.end_match_cache.deinit();
     }
 
+    fn getCurrentAnchor(self: *Parser) usize {
+        if (self.current_state) |state| {
+            const top = state.top();
+            if (top) |t| {
+                return t.anchor;
+            }
+        }
+        return 0;
+    }
+
     fn execRegex(self: *Parser, syntax: *Syntax, regex: ?oni.Regex, regexs: ?[]const u8, block: []const u8, start: usize, end: usize) Match {
         // std.debug.print("execRegex {s}\n", .{regexs orelse ""});
         if (regex) |*re| {
             syntax.execs += 1;
             self.regex_execs += 1;
             var hard_start: usize = start;
+            var is_anchored = false;
             if (syntax.is_anchored) {
+                if (regexs) |rs| {
+                    is_anchored = grammar.Syntax.patternHasAnchor(rs);
+                }
+            }
+            if (is_anchored) {
                 // TODO is this correct?
-                hard_start = 0;
+                // \G in oniguruma means start of previous match
+                hard_start = self.getCurrentAnchor();  
             }
             const hard_end: usize = end;
             const reg = blk: {
@@ -270,8 +294,12 @@ pub const Parser = struct {
                 var i: u16 = 0;
                 const starts = r.starts();
                 const ends = r.ends();
-                while (i < r.count() and i < 10) : (i += 1) {
+                while (i < r.count() and i < MAX_MATCH_RANGES) : (i += 1) {
                     if (starts[i] < 0) {
+                        // m.ranges[count].group = i;
+                        // m.ranges[count].start = start;
+                        // m.ranges[count].end = start;
+                        // count += 1;
                         // -1 could happen in oniguruma when an optional capture group didn't match
                         // case: when no newline '\n' is present (c.tmLanguage)
                         continue;
@@ -336,7 +364,7 @@ pub const Parser = struct {
                     }
                     break :blk null;
                 } orelse self.execRegex(syntax, regex, syntax.regexs_match, block, start, end);
-                if (should_cache) {
+                if (should_cache and ENABLE_MATCH_CACHING) {
                     _ = self.match_cache.put(syntax.id, m) catch {};
                 }
                 if (m.count > 0) {
@@ -361,7 +389,7 @@ pub const Parser = struct {
                     }
                     break :blk null;
                 } orelse self.execRegex(syntax, regex, syntax.regexs_begin, block, start, end);
-                if (should_cache) {
+                if (should_cache and ENABLE_MATCH_CACHING) {
                     _ = self.match_cache.put(syntax.id, m) catch {};
                 }
                 if (m.count > 0) {
@@ -401,16 +429,16 @@ pub const Parser = struct {
     pub fn matchEnd(self: *Parser, state: *ParseState, block: []const u8, start: usize, end: usize) Match {
         // prune if the stack is already too deep like deeply nested blocks
         // TODO investigate why this happens -- (dump end unmatched blocks, some patterns may be negatively unmatched)
-        if (state.size() > MAX_STATE_STACK_DEPTH) {
-            if (state.stack.items.len >= MAX_STATE_STACK_DEPTH) {
-                const new_len = state.stack.items.len - STATE_STACK_PRUNE;
-                @memcpy(
-                    state.stack.items[0..new_len],
-                    state.stack.items[STATE_STACK_PRUNE..state.stack.items.len],
-                );
-                state.stack.items.len = new_len;
-            }
-        }
+        // if (state.size() > MAX_STATE_STACK_DEPTH) {
+        //     if (state.stack.items.len >= MAX_STATE_STACK_DEPTH) {
+        //         const new_len = state.stack.items.len - STATE_STACK_PRUNE;
+        //         @memcpy(
+        //             state.stack.items[0..new_len],
+        //             state.stack.items[STATE_STACK_PRUNE..state.stack.items.len],
+        //         );
+        //         state.stack.items.len = new_len;
+        //     }
+        // }
 
         const top = state.top();
         if (top) |t| {
@@ -426,24 +454,24 @@ pub const Parser = struct {
                     }
 
                     // end_match without caching
-                    const m = self.execRegex(@constCast(syn), syn.regex_end, syn.regexs_end, block, start, end);
+                    // const m = self.execRegex(@constCast(syn), syn.regex_end, syn.regexs_end, block, start, end);
 
                     // end_match with caching
-                    // var should_cache = false;
-                    // const m = inner_blk: {
-                    //     const mm = self.end_match_cache.get(syn.id) orelse {
-                    //         should_cache = true;
-                    //         break :inner_blk null;
-                    //     };
-                    //     if (mm.anchor_start <= start and mm.anchor_end <= end and mm.start > start) {
-                    //         self.regex_skips += 1;
-                    //         break :inner_blk mm;
-                    //     }
-                    //     break :inner_blk null;
-                    // } orelse self.execRegex(@constCast(syn), syn.regex_end, syn.regexs_end, block, start, end);
-                    // if (should_cache) {
-                    //     _ = self.end_match_cache.put(syn.id, m) catch {};
-                    // }
+                    var should_cache = false;
+                    const m = inner_blk: {
+                        const mm = self.end_match_cache.get(syn.id) orelse {
+                            should_cache = true;
+                            break :inner_blk null;
+                        };
+                        if (mm.anchor_start <= start and mm.anchor_end <= end and mm.start >= start) {
+                            self.regex_skips += 1;
+                            break :inner_blk mm;
+                        }
+                        break :inner_blk null;
+                    } orelse self.execRegex(@constCast(syn), syn.regex_end, syn.regexs_end, block, start, end);
+                    if (should_cache and ENABLE_END_MATCH_CACHING) {
+                        _ = self.end_match_cache.put(syn.id, m) catch {};
+                    }
 
                     break :blk m;
                 };
@@ -572,6 +600,7 @@ pub const Parser = struct {
             return;
         }
 
+        self.current_state = state;
         self.match_cache.clearRetainingCapacity();
         self.end_match_cache.clearRetainingCapacity();
 
@@ -599,13 +628,6 @@ pub const Parser = struct {
                 const ts = t.syntax;
                 const ls = ts.resolve(ts);
                 if (ls) |syn| {
-                    if (state.size() > 1 and syn.parent == null) {
-                        // $self was included? clear the stack in this situation?
-                        while (state.size() > 1) {
-                            state.pop();
-                        }
-                    }
-
                     const pattern_match: Match = self.matchPatterns(syn, syn.patterns, block, start, end);
                     const end_match: Match = self.matchEnd(state, block, start, end);
                     if (end_match.count > 0 and
@@ -613,8 +635,12 @@ pub const Parser = struct {
                             (pattern_match.count > 0 and pattern_match.start >= end_match.start)))
                     {
                         // end pattern has been matched
-                        start = end_match.start;
-                        end = end_match.end;
+                        // if (end_match.end > start) {
+                            start = end_match.start;
+                            end = end_match.end;
+                        // } else {
+                            // end = start + 1;
+                        // }
 
                         // collect endCaptures
                         if (end_match.syntax) |end_syn| {
@@ -633,6 +659,8 @@ pub const Parser = struct {
                                 @memcpy(c.scope[0..name.len], name);
                                 proc.closeTag(c);
                             }
+                            
+                            // std.debug.print("pop {s}\n", .{end_syn.getName()});
                         }
 
                         // pop!
@@ -641,13 +669,18 @@ pub const Parser = struct {
                         if (pattern_match.syntax) |match_syn| {
                             // pattern has been matched
                             //
-                            start = pattern_match.start;
-                            end = pattern_match.end;
+                            if (pattern_match.end > start) {
+                                start = pattern_match.start;
+                                end = pattern_match.end;
+                            } else {
+                                end = start + 1;
+                            }
 
                             self.collectMatch(match_syn, &pattern_match, block);
 
                             if (match_syn.regexs_end != null) {
                                 // if it has a regexs_end.. it is a begin and should cause a push
+                                // std.debug.print("push {s}\n", .{match_syn.getName()});
                                 state.push(match_syn, block, pattern_match) catch {
                                     // fail silently?
                                 };
@@ -701,6 +734,7 @@ pub const Parser = struct {
         }
 
         if (self.processor) |proc| proc.endLine();
+        self.current_state = null;
     }
 
     // begin merely resets all stats
