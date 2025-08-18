@@ -100,6 +100,8 @@ pub fn main() !void {
 
         _ = try par.parseLine(&state, trimmed);
         line_no += 1;
+
+        // if (line_no > 50_000) break;
     }
     proc.endDocument();
     const end = std.time.nanoTimestamp();

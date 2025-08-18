@@ -23,6 +23,23 @@ or
 ```
 
 # progress
+
+* with scope cache
+Intel(R) Core(TM) i5-6200U (4) @ 2.80 GHz
+sqlite3.c
+lines: 222905
+execs: 74863391
+skips: 3067456
+done in 1060.909353s
+state depth: 105
+
+==================
+lines: 222905
+execs: 74951684
+skips: 2979163
+done in 1161.408925s
+state depth: 105
+
 commit 23d0eb1c32efbf341ea22050bd47865aaed5c69d
 * fixed include resolution .. more patterns have to be checked now 
 
@@ -40,6 +57,12 @@ skips: 1707167
 done in 203.368550s
 state depth: 105
 
+==================
+lines: 222905
+execs: 74951684
+skips: 2979163
+done in 1161.408925s
+state depth: 105
 
 commit 08b5493bd89bcc100e07956be9a5e7a8efe8beb5 
 * some regex match caching

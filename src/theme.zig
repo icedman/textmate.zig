@@ -198,6 +198,11 @@ pub const Settings = struct {
     }
 };
 
+const ScopeCache = struct {
+    scope: *const Scope,
+    settings: Settings,
+};
+
 pub const Theme = struct {
     allocator: std.mem.Allocator,
     arena: std.heap.ArenaAllocator,
@@ -209,7 +214,8 @@ pub const Theme = struct {
     semantic_highlighting: bool = false,
 
     root: Scope,
-    scope_cache: ?std.StringHashMap(?*const Scope) = null,
+
+    cache: std.StringHashMap(ScopeCache),
 
     // TODO release this after parse (requires that all string values be allocated and copied)
     parsed: ?std.json.Parsed(std.json.Value) = null,
@@ -224,11 +230,8 @@ pub const Theme = struct {
     }
 
     pub fn deinit(self: *Theme) void {
-        // TODO properly free up memory
-        if (self.scope_cache) |*cache| {
-            cache.deinit();
-        }
         self.root.deinit();
+        self.cache.deinit();
         self.arena.deinit();
     }
 
@@ -238,6 +241,7 @@ pub const Theme = struct {
             .arena = std.heap.ArenaAllocator.init(allocator),
             .name = "",
             .root = Scope.init(allocator),
+            .cache = std.StringHashMap(ScopeCache).init(allocator),
         };
 
         // anything associated with reading the json
@@ -316,7 +320,6 @@ pub const Theme = struct {
         theme.colors = colors;
         theme.tokenColors = tokenColors;
         theme.parsed = parsed;
-        theme.scope_cache = std.StringHashMap(?*const Scope).init(allocator);
 
         return theme;
     }
@@ -326,7 +329,48 @@ pub const Theme = struct {
         if (scope.len == 0) {
             return null;
         }
-        return self.root.getScope(scope, colors);
+
+        var enable_cache = scope.len > 16;
+        if (!enable_cache) {
+            if (std.mem.indexOf(u8, scope, " ")) |idx| {
+                enable_cache = true;
+                _ = idx;
+            }
+        }
+
+        if (enable_cache) {
+            if (self.cache.get(scope)) |cached| {
+                if (colors) |c| {
+                    c.foreground = cached.settings.foreground;
+                    c.foreground_rgb = cached.settings.foreground_rgb;
+                }
+                return cached.scope;
+            }
+        }
+
+        const res = self.root.getScope(scope, colors);
+
+        if (enable_cache) {
+            if (res) |item| {
+                if (colors) |c| {
+                    // why the need to allocate? isn;t hash computed from string content?
+                    const key = self.arena.allocator().dupe(u8, scope) catch {
+                        return item;
+                    };
+                    _ = self.cache.put(key, ScopeCache{
+                        .scope = item,
+                        .settings = Settings{
+                            .foreground = c.foreground,
+                            .foreground_rgb = c.foreground_rgb,
+                        },
+                    }) catch {
+                        return item;
+                    };
+                }
+            }
+        }
+
+        return res;
     }
 
     pub fn getColor(self: *Theme, name: []const u8) ?Settings {
