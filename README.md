@@ -23,9 +23,10 @@ or
 ```
 
 # progress
+commit 23d0eb1c32efbf341ea22050bd47865aaed5c69d
+* fixed include resolution .. more patterns have to be checked now 
 
 tinywl.c
-==================
 lines: 1002
 execs: 368243
 skips: 6020
@@ -33,7 +34,6 @@ done in 0.476562s
 state depth: 10
 
 sqlite3.c
-==================
 lines: 222905
 execs: 76223680
 skips: 1707167

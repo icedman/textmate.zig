@@ -206,10 +206,10 @@ pub const Theme = struct {
     author: ?[]const u8 = null,
     colors: ?std.StringHashMap(Settings) = null,
     tokenColors: ?[]TokenColor = null,
-    semanticHighlighting: bool = false,
+    semantic_highlighting: bool = false,
 
     root: Scope,
-    scope_cache: ?std.StringHashMap(Settings) = null,
+    scope_cache: ?std.StringHashMap(?*const Scope) = null,
 
     // TODO release this after parse (requires that all string values be allocated and copied)
     parsed: ?std.json.Parsed(std.json.Value) = null,
@@ -225,12 +225,9 @@ pub const Theme = struct {
 
     pub fn deinit(self: *Theme) void {
         // TODO properly free up memory
-        // if (self.colors) |*colors| {
-        //     colors.deinit();
-        // }
-        // if (self.parsed) |*parsed| {
-        //     parsed.deinit();
-        // }
+        if (self.scope_cache) |*cache| {
+            cache.deinit();
+        }
         self.root.deinit();
         self.arena.deinit();
     }
@@ -255,7 +252,7 @@ pub const Theme = struct {
         // theme meta
         const name = if (obj.get("name")) |v| v.string else "";
         const author = if (obj.get("author")) |v| v.string else "";
-        const semanticHighlighting = if (obj.get("semanticHighlighting")) |v| v.bool else false;
+        const semantic_highlighting = if (obj.get("semanticHighlighting")) |v| v.bool else false;
 
         // colors
         var colors = std.StringHashMap(Settings).init(aa);
@@ -315,17 +312,20 @@ pub const Theme = struct {
 
         theme.name = name;
         theme.author = author;
-        theme.semanticHighlighting = semanticHighlighting;
+        theme.semantic_highlighting = semantic_highlighting;
         theme.colors = colors;
         theme.tokenColors = tokenColors;
         theme.parsed = parsed;
+        theme.scope_cache = std.StringHashMap(?*const Scope).init(allocator);
 
         return theme;
     }
 
     pub fn getScope(self: *Theme, scope: []const u8, colors: ?*Settings) ?*const Scope {
         // TODO pass parse state for nesting checks
-        //
+        if (scope.len == 0) {
+            return null;
+        }
         return self.root.getScope(scope, colors);
     }
 

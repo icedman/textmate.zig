@@ -13,7 +13,7 @@ const STATE_STACK_PRUNE = 120; // prune off states from the stack
 pub const Capture = struct {
     start: usize = 0,
     end: usize = 0,
-    scope: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN,
+    scope: [MAX_SCOPE_LEN:0]u8 = [_:0]u8{0} ** MAX_SCOPE_LEN,
     // open block and strings will be retained across line parsing
     // syntax_id will be the identifier (not pointers)
     syntax_id: u32 = 0,
@@ -311,7 +311,7 @@ pub const Parser = struct {
                 // check of matching has been previously cached (for the same position in the buffer)
                 const m = blk: {
                     const mm = self.match_cache.get(syntax.id) orelse break :blk null;
-                    if (mm.anchor_start < start and mm.anchor_end == end and mm.start >= start) {
+                    if (mm.anchor_start <= start and mm.anchor_end <= end and mm.start >= start) {
                         self.regex_skips += 1;
                         break :blk mm;
                     }
@@ -330,7 +330,7 @@ pub const Parser = struct {
                 // check of matching has been previously cached (for the same position in the buffer)
                 const m = blk: {
                     const mm = self.match_cache.get(syntax.id) orelse break :blk null;
-                    if (mm.anchor_start < start and mm.anchor_end == end and mm.start >= start) {
+                    if (mm.anchor_start <= start and mm.anchor_end <= end and mm.start >= start) {
                         self.regex_skips += 1;
                         break :blk mm;
                     }
@@ -371,7 +371,8 @@ pub const Parser = struct {
     }
 
     pub fn matchEnd(self: *Parser, state: *ParseState, block: []const u8, start: usize, end: usize) Match {
-        // prune if the stac is already too deep
+        // prune if the stack is already too deep like deeply nested blocks
+        // TODO investigate why this happens -- (dump end blocks unmatched)
         if (state.size() > MAX_STATE_STACK_DEPTH) {
             if (state.stack.items.len >= MAX_STATE_STACK_DEPTH) {
                 const new_len = state.stack.items.len - STATE_STACK_PRUNE;
@@ -444,7 +445,7 @@ pub const Parser = struct {
             break :blk syntax.name;
         };
         if (self.processor) |proc| {
-            var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
+            var output: [MAX_SCOPE_LEN:0]u8 = [_:0]u8{0} ** MAX_SCOPE_LEN;
             _ = match.applyCaptures(block, name, &output);
             proc.capture(Capture{
                 .start = match.start,
@@ -466,7 +467,7 @@ pub const Parser = struct {
             const capture: ?*Syntax = captures.get(key);
             if (capture) |syn| {
                 if (self.processor) |proc| {
-                    var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
+                    var output: [MAX_SCOPE_LEN:0]u8 = [_:0]u8{0} ** MAX_SCOPE_LEN;
                     _ = match.applyCaptures(block, syn.name, &output);
                     proc.capture(Capture{
                         .start = range.start,
@@ -491,7 +492,7 @@ pub const Parser = struct {
                                     // descend into captures
                                     self.collectCaptures(&m, pc, block);
                                 } else if (p.name.len > 0) {
-                                    var sname: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
+                                    var sname: [MAX_SCOPE_LEN:0]u8 = [_:0]u8{0} ** MAX_SCOPE_LEN;
                                     _ = m.applyCaptures(block, p.name, &sname);
                                     if (self.processor) |proc| {
                                         proc.capture(Capture{
@@ -572,7 +573,7 @@ pub const Parser = struct {
 
                             if (self.processor) |proc| {
                                 const name = end_syn.getName();
-                                var scope_name: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
+                                var scope_name: [MAX_SCOPE_LEN:0]u8 = [_:0]u8{0} ** MAX_SCOPE_LEN;
                                 @memcpy(scope_name[0..name.len], name);
                                 proc.closeTag(Capture{
                                     .start = end_match.start,
@@ -602,7 +603,7 @@ pub const Parser = struct {
 
                                 if (self.processor) |proc| {
                                     const name = match_syn.getName();
-                                    var scope_name: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
+                                    var scope_name: [MAX_SCOPE_LEN:0]u8 = [_:0]u8{0} ** MAX_SCOPE_LEN;
                                     @memcpy(scope_name[0..name.len], name);
                                     proc.openTag(Capture{
                                         .start = pattern_match.start,

@@ -214,7 +214,9 @@ pub const RenderProcessor = struct {
                 }
 
                 var colors = theme.Settings{};
-                const scope = thm.getScope(cap.scope[0..cap.scope.len], &colors);
+                const p: [*:0]u8 = &cap.scope; // coerce to sentinel pointer
+                const scope_len = std.mem.len(p);
+                const scope = thm.getScope(cap.scope[0..scope_len], &colors);
                 _ = scope;
                 // if (colors.foreground) |fg| {
                 //     setColorHex(std.debug, fg) catch {};
