@@ -358,7 +358,11 @@ pub const Parser = struct {
                         should_cache = true;
                         break :blk null;
                     };
-                    if (mm.anchor_start <= start and mm.anchor_end <= end and mm.start >= start) {
+                    if (mm.anchor_start <= start and mm.start >= start) {
+                        self.regex_skips += 1;
+                        break :blk mm;
+                    }
+                    if (mm.anchor_start <= start and mm.count == 0) {
                         self.regex_skips += 1;
                         break :blk mm;
                     }
@@ -383,7 +387,11 @@ pub const Parser = struct {
                         should_cache = true;
                         break :blk null;
                     };
-                    if (mm.anchor_start <= start and mm.anchor_end <= end and mm.start >= start) {
+                    if (mm.anchor_start <= start and mm.start >= start) {
+                        self.regex_skips += 1;
+                        break :blk mm;
+                    }
+                    if (mm.anchor_start <= start and mm.count == 0) {
                         self.regex_skips += 1;
                         break :blk mm;
                     }
@@ -463,7 +471,11 @@ pub const Parser = struct {
                             should_cache = true;
                             break :inner_blk null;
                         };
-                        if (mm.anchor_start <= start and mm.anchor_end <= end and mm.start >= start) {
+                        if (mm.anchor_start <= start and mm.start >= start) {
+                            self.regex_skips += 1;
+                            break :inner_blk mm;
+                        }
+                        if (mm.anchor_start <= start and mm.count == 0) {
                             self.regex_skips += 1;
                             break :inner_blk mm;
                         }

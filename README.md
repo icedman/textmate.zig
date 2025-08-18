@@ -24,8 +24,24 @@ or
 
 # progress
 
+CPU: AMD Ryzen AI 9 HX 370 (24) @ 5.16 GHz
+
+* aggressive caching
+lines: 222905
+execs: 16398602
+skips: 51936514
+done in 158.582904s
+state depth: 1
+
+lines: 222905
+execs: 66425451
+skips: 1878126
+done in 181.834465s
+state depth: 1
+
 * with scope cache
-Intel(R) Core(TM) i5-6200U (4) @ 2.80 GHz
+
+CPU: Intel(R) Core(TM) i5-6200U (4) @ 2.80 GHz
 sqlite3.c
 lines: 222905
 execs: 74863391
@@ -33,7 +49,6 @@ skips: 3067456
 done in 1060.909353s
 state depth: 105
 
-==================
 lines: 222905
 execs: 74951684
 skips: 2979163
