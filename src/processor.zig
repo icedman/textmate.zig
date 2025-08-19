@@ -212,7 +212,7 @@ pub const RenderProcessor = struct {
                         }
                         // std.debug.print("\n{s} {}-{} [{}]\n", .{ cap.scope, captures.items[ci].start, captures.items[ci].end, i });
                     } else if (hit) {
-                        break;
+                        // break;
                     }
                 }
 
@@ -221,12 +221,7 @@ pub const RenderProcessor = struct {
                 const scope_len = std.mem.len(p);
                 const scope = thm.getScope(cap.scope[0..scope_len], &colors);
                 _ = scope;
-                // if (colors.foreground) |fg| {
-                //     setColorHex(std.debug, fg) catch {};
-                // }
-                // if (colors.background) |bg| {
-                //     setBgColorHex(std.debug, bg) catch {};
-                // }
+
                 if (colors.foreground_rgb) |fg| {
                     setColorRgb(std.debug, fg) catch {};
                 }
