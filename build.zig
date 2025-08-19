@@ -1,4 +1,5 @@
 const std = @import("std");
+const res = @import("src/resources.zig");
 
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
@@ -16,8 +17,20 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     // generate assets
-    // const gen_dir = b.cache_root.join(b.allocator, &.{"data/grammars"}) catch unreachable;
-    // _ = gen_dir;
+    // const embed_path = b.cache_root.join(b.allocator, &.{"embed.zig"}) catch unreachable;
+
+    // var assets_buffer = std.ArrayList(u8).init(b.allocator);
+    // defer assets_buffer.deinit();
+
+    // var grammars = std.ArrayList(res.GrammarInfo).init(b.allocator);
+    // defer grammars.deinit();
+    // const grammars_path = b.build_root.join(b.allocator, &.{"/data/grammars"}) catch unreachable;
+    // defer b.allocator.free(grammars_path);
+    // res.listGrammars(b.allocator, grammars_path, &grammars) catch unreachable;
+
+    // assets_buffer.writer().print("whoa!\n", .{}) catch unreachable;
+    // const w: []const u8 = assets_buffer.toOwnedSlice() catch unreachable;
+    // std.debug.print("?{s}\n", .{w});
 
     // This creates a "module", which represents a collection of source files alongside
     // some compilation options, such as optimization mode and linked system libraries.
