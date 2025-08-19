@@ -18,7 +18,7 @@ const STATE_STACK_PRUNE = 120; // prune off states from the stack
 pub const Capture = struct {
     start: usize = 0,
     end: usize = 0,
-    scope: [MAX_SCOPE_LEN:0]u8 = [_:0]u8{0} ** MAX_SCOPE_LEN,
+    scope: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN,
 
     // open block and strings will be retained across line parsing
     // syntax_id will be the identifier (not pointers)

@@ -7,18 +7,18 @@ const MAX_EXT_LENGTH = 16;
 
 // fixed length strings for embedded resources
 pub const GrammarInfo = struct {
-    name: [MAX_NAME_LENGTH:0]u8 = [_:0]u8{0} ** MAX_NAME_LENGTH,
-    scope_name: [MAX_NAME_LENGTH:0]u8 = [_:0]u8{0} ** MAX_NAME_LENGTH,
-    full_path: [std.fs.max_path_bytes:0]u8 = [_:0]u8{0} ** std.fs.max_path_bytes,
-    file_types: [MAX_FILE_TYPES][MAX_EXT_LENGTH:0]u8 = [_][MAX_EXT_LENGTH:0]u8{[_:0]u8{0} ** MAX_EXT_LENGTH} ** MAX_FILE_TYPES,
+    name: [MAX_NAME_LENGTH]u8 = [_]u8{0} ** MAX_NAME_LENGTH,
+    scope_name: [MAX_NAME_LENGTH]u8 = [_]u8{0} ** MAX_NAME_LENGTH,
+    full_path: [std.fs.max_path_bytes]u8 = [_]u8{0} ** std.fs.max_path_bytes,
+    file_types: [MAX_FILE_TYPES][MAX_EXT_LENGTH]u8 = [_][MAX_EXT_LENGTH]u8{[_]u8{0} ** MAX_EXT_LENGTH} ** MAX_FILE_TYPES,
     file_types_count: u8 = 0,
     embedded: bool = false,
 };
 
 pub const ThemeInfo = struct {
-    name: [MAX_NAME_LENGTH:0]u8 = [_:0]u8{0} ** MAX_NAME_LENGTH,
-    author: [MAX_NAME_LENGTH:0]u8 = [_:0]u8{0} ** MAX_NAME_LENGTH,
-    full_path: [std.fs.max_path_bytes:0]u8 = [_:0]u8{0} ** std.fs.max_path_bytes,
+    name: [MAX_NAME_LENGTH]u8 = [_]u8{0} ** MAX_NAME_LENGTH,
+    author: [MAX_NAME_LENGTH]u8 = [_]u8{0} ** MAX_NAME_LENGTH,
+    full_path: [std.fs.max_path_bytes]u8 = [_]u8{0} ** std.fs.max_path_bytes,
     embedded: bool = false,
 };
 
