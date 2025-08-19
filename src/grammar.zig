@@ -434,6 +434,9 @@ pub const GrammarLibrary = struct {
 
     pub fn grammarFromExtension(self: *GrammarLibrary, name: []const u8) !Grammar {
         const dot_ext = std.fs.path.extension(name);
+        if (dot_ext.len == 0) {
+            return error.NotFound;
+        }
         const ext = dot_ext[1..];
         if (ext.len >= 16) return error.NotFound;
 
