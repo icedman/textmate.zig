@@ -262,7 +262,7 @@ pub const Syntax = struct {
 
         for (entries, 0..) |entry, i| {
             if (entry.string.*) |regex| {
-                if (i > 2 and Syntax.patternHasBackReference(regex)) {
+                if (i > 1 and Syntax.patternHasBackReference(regex)) {
                     // deal with back references for while and end
                     // do not compile now, this has to be recompiled at every matched begin (applying one or more captures to the pattern)
                     self.has_back_references = true;
@@ -278,7 +278,7 @@ pub const Syntax = struct {
                     oni.Syntax.default,
                     null,
                 ) catch |err| {
-                    std.debug.print("regex compile error {s}\n", .{regex});
+                    std.debug.print("{} regex compile error {s}\n", .{ i, regex });
                     return err;
                 };
                 errdefer re.deinit();

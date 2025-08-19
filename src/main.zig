@@ -42,6 +42,11 @@ pub fn main() !void {
         }
     }
 
+    if (file_path == null) {
+        std.debug.print("provide a file to parse \n", .{});
+        return;
+    }
+
     theme.initThemeLibrary(allocator) catch {
         return;
     };
@@ -119,7 +124,7 @@ pub fn main() !void {
     proc.theme = &thm;
 
     par.begin();
-    const path = file_path orelse "./src/grammar.zig";
+    const path = file_path orelse "";
     var file = std.fs.cwd().openFile(path, .{}) catch {
         std.debug.print("unable to open file {s}\n", .{file_path orelse ""});
         return;

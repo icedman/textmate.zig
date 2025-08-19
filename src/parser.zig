@@ -27,13 +27,13 @@ pub const Capture = struct {
     retain: bool = false,
 };
 
-pub const MatchRange = struct {
+const MatchRange = struct {
     group: u16 = 0,
     start: usize = 0,
     end: usize = 0,
 };
 
-pub const Match = struct {
+const Match = struct {
     syntax: ?*Syntax = null,
 
     ranges: [MAX_MATCH_RANGES]MatchRange = [_]MatchRange{MatchRange{ .group = 0, .start = 0, .end = 0 }} ** MAX_MATCH_RANGES,
@@ -105,9 +105,10 @@ pub const Match = struct {
 };
 
 // this should be serializable as this is what the parse state stack contains
-pub const StateContext = struct {
+const StateContext = struct {
     syntax: *Syntax,
     anchor: usize = 0,
+    while_regex: ?oni.Regex = null,
     end_regex: ?oni.Regex = null,
 };
 
@@ -168,18 +169,36 @@ pub const ParseState = struct {
         if (syntax.has_back_references) {
             // compile regex_end
             if (match) |m| {
-                if (syntax.regexs_end) |regexs| {
-                    var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
-                    _ = m.applyReferences(block, regexs, &output);
-                    {
-                        sc.end_regex = try oni.Regex.init(
-                            &output,
-                            .{},
-                            oni.Encoding.utf8,
-                            oni.Syntax.default,
-                            null,
-                        );
-                        errdefer sc.end_regex.deinit();
+                if (syntax.regex_end == null) {
+                    if (syntax.regexs_end) |regexs| {
+                        var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
+                        _ = m.applyReferences(block, regexs, &output);
+                        {
+                            sc.end_regex = try oni.Regex.init(
+                                &output,
+                                .{},
+                                oni.Encoding.utf8,
+                                oni.Syntax.default,
+                                null,
+                            );
+                            errdefer sc.end_regex.deinit();
+                        }
+                    }
+                }
+                if (syntax.regex_while == null) {
+                    if (syntax.regexs_while) |regexs| {
+                        var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
+                        _ = m.applyReferences(block, regexs, &output);
+                        {
+                            sc.while_regex = try oni.Regex.init(
+                                &output,
+                                .{},
+                                oni.Encoding.utf8,
+                                oni.Syntax.default,
+                                null,
+                            );
+                            errdefer sc.while_regex.deinit();
+                        }
                     }
                 }
             }
@@ -430,14 +449,33 @@ pub const Parser = struct {
                 const ts = t.syntax;
                 const ls = ts.resolve(ts);
                 if (ls) |syn| {
-                    if (syn.regex_while) |regex| {
-                        const m = self.execRegex(@constCast(syn), regex, syn.regexs_while, block, start, end);
-                        if (m.count == 0) {
-                            while (state.size() >= state_depth) {
-                                state.pop();
-                            }
+                    const m: Match = blk: {
+                        if (t.while_regex) |r| {
+                            // use dynamic while_regex here if one was compiled
+                            // not caching or result in this case
+                            const m = self.execRegex(@constCast(syn), r, syn.regexs_while, block, start, end);
+                            break :blk m;
+                        }
+
+                        // while_match without caching
+                        const m = self.execRegex(@constCast(syn), syn.regex_while, syn.regexs_while, block, start, end);
+                        break :blk m;
+                    };
+
+                    if (m.count == 0) {
+                        while (state.size() >= state_depth) {
+                            state.pop();
                         }
                     }
+
+                    // if (syn.regex_while) |regex| {
+                    //     const m = self.execRegex(@constCast(syn), regex, syn.regexs_while, block, start, end);
+                    //     if (m.count == 0) {
+                    //         while (state.size() >= state_depth) {
+                    //             state.pop();
+                    //         }
+                    //     }
+                    // }
                 }
             }
         }
