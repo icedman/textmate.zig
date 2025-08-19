@@ -3,6 +3,12 @@ const oni = @import("oniguruma");
 
 var syntax_id: u32 = 1;
 
+const NullSyntax = Syntax{
+    .name = "",
+    .content_name = "",
+    .scope_name = "",
+};
+
 pub const Syntax = struct {
     id: u32 = 0,
     name: []const u8,
@@ -234,10 +240,22 @@ pub const Syntax = struct {
         };
 
         const entries = [_]Entry{
-            .{ .string = &self.regexs_match, .regex_ptr = &self.regex_match, },
-            .{ .string = &self.regexs_begin, .regex_ptr = &self.regex_begin, },
-            .{ .string = &self.regexs_while, .regex_ptr = &self.regex_while, },
-            .{ .string = &self.regexs_end, .regex_ptr = &self.regex_end, },
+            .{
+                .string = &self.regexs_match,
+                .regex_ptr = &self.regex_match,
+            },
+            .{
+                .string = &self.regexs_begin,
+                .regex_ptr = &self.regex_begin,
+            },
+            .{
+                .string = &self.regexs_while,
+                .regex_ptr = &self.regex_while,
+            },
+            .{
+                .string = &self.regexs_end,
+                .regex_ptr = &self.regex_end,
+            },
         };
 
         for (entries, 0..) |entry, i| {
@@ -268,6 +286,8 @@ pub const Syntax = struct {
         if (syntax.include_path) |include_path| {
             // syntax having include_path will be resolved by finding the name on appropriate repositories
             // TODO handle external grammar repositories (source.md could require loading source.js)
+
+            // this one has previously been resolved
             if (syntax.include) |inc_syn| {
                 return inc_syn;
             }
@@ -279,6 +299,7 @@ pub const Syntax = struct {
                 while (root.parent) |p| {
                     root = p;
                 }
+                syntax.include = root;
                 return root;
             }
             if (std.mem.indexOf(u8, include_path, "$base") == 0) {
@@ -287,6 +308,7 @@ pub const Syntax = struct {
                 while (root.parent) |p| {
                     root = p;
                 }
+                syntax.include = root;
                 return root;
             }
 
@@ -316,6 +338,8 @@ pub const Syntax = struct {
             if (self.parent) |p| {
                 // std.debug.print("check parent\n", .{});
                 return p.resolve(syntax);
+            } else {
+                return null;
             }
 
             // std.debug.print("not found!\n", .{});

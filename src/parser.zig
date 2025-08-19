@@ -159,7 +159,7 @@ pub const ParseState = struct {
     }
 
     pub fn push(self: *ParseState, syntax: *Syntax, block: []const u8, match: ?Match) !void {
-        const anchor = (match orelse Match{.start = 0 }).start;
+        const anchor = (match orelse Match{ .start = 0 }).start;
         var sc = StateContext{
             .syntax = syntax,
             .anchor = anchor,
@@ -254,6 +254,10 @@ pub const Parser = struct {
     }
 
     fn execRegex(self: *Parser, syntax: *Syntax, regex: ?oni.Regex, regexs: ?[]const u8, block: []const u8, start: usize, end: usize) Match {
+        if (block.len == 0) {
+            return Match{};
+        }
+
         // std.debug.print("execRegex {s}\n", .{regexs orelse ""});
         if (regex) |*re| {
             syntax.execs += 1;
@@ -268,7 +272,7 @@ pub const Parser = struct {
             if (is_anchored) {
                 // TODO is this correct?
                 // \G in oniguruma means start of previous match
-                hard_start = self.getCurrentAnchor();  
+                hard_start = self.getCurrentAnchor();
             }
             const hard_end: usize = end;
             const reg = blk: {
@@ -327,6 +331,7 @@ pub const Parser = struct {
                     // std.debug.print("{s}\n", .{syntax.scope_name});
                     // std.debug.print("{s}\n", .{syntax.content_name});
                 }
+
                 return m;
             }
         }
@@ -343,6 +348,10 @@ pub const Parser = struct {
     ///     - Cache also matches with match position ahead of current position
     ///     - Matched expression may be defeated by earlier matches but it may be usefyl as current position moves forward
     fn matchBegin(self: *Parser, syntax: *Syntax, block: []const u8, start: usize, end: usize) Match {
+        if (block.len == 0) {
+            return Match{};
+        }
+
         // if all this syntax has are patterns.. check patterns
         if (syntax.regex_match == null and syntax.regex_begin == null) {
             return self.matchPatterns(syntax, syntax.patterns, block, start, end);
@@ -596,16 +605,16 @@ pub const Parser = struct {
         }
     }
 
-    pub fn parseLine(self: *Parser, state: *ParseState, buffer: []const u8) !void {
-        var block = self.allocator.alloc(u8, buffer.len + 1) catch {
-            return error.OutOfMemory;
-        };
-        defer self.allocator.free(block);
-        @memcpy(block[0..buffer.len], buffer);
-        block[buffer.len] = '\n';
+    pub fn parseLine(self: *Parser, state: *ParseState, block: []const u8) !void {
+        // var block = self.allocator.alloc(u8, buffer.len + 1) catch {
+        //     return error.OutOfMemory;
+        // };
+        // defer self.allocator.free(block);
+        // @memcpy(block[0..buffer.len], buffer);
+        // block[buffer.len] = '\n';
 
         // save the buffer, not block - as block is freed at the end of scope
-        if (self.processor) |proc| proc.startLine(buffer);
+        if (self.processor) |proc| proc.startLine(block);
 
         if (block.len > MAX_LINE_LEN) {
             if (self.processor) |proc| proc.endLine();
@@ -640,19 +649,22 @@ pub const Parser = struct {
                 const ts = t.syntax;
                 const ls = ts.resolve(ts);
                 if (ls) |syn| {
-                    const pattern_match: Match = self.matchPatterns(syn, syn.patterns, block, start, end);
                     const end_match: Match = self.matchEnd(state, block, start, end);
+                    var pattern_match: Match = Match{};
+
+                    if (end_match.count > 0 and end_match.end + 1 >= end) {
+                        // this is the end of the block.. don't bother with patterns
+                    } else {
+                        pattern_match = self.matchPatterns(syn, syn.patterns, block, start, end);
+                    }
+
                     if (end_match.count > 0 and
                         (pattern_match.count == 0 or
                             (pattern_match.count > 0 and pattern_match.start >= end_match.start)))
                     {
                         // end pattern has been matched
-                        // if (end_match.end > start) {
-                            start = end_match.start;
-                            end = end_match.end;
-                        // } else {
-                            // end = start + 1;
-                        // }
+                        start = end_match.start;
+                        end = end_match.end;
 
                         // collect endCaptures
                         if (end_match.syntax) |end_syn| {
@@ -671,7 +683,7 @@ pub const Parser = struct {
                                 @memcpy(c.scope[0..name.len], name);
                                 proc.closeTag(c);
                             }
-                            
+
                             // std.debug.print("pop {s}\n", .{end_syn.getName()});
                         }
 
@@ -680,13 +692,8 @@ pub const Parser = struct {
                     } else if (pattern_match.count > 0) {
                         if (pattern_match.syntax) |match_syn| {
                             // pattern has been matched
-                            //
-                            if (pattern_match.end > start) {
-                                start = pattern_match.start;
-                                end = pattern_match.end;
-                            } else {
-                                end = start + 1;
-                            }
+                            start = pattern_match.start;
+                            end = pattern_match.end;
 
                             self.collectMatch(match_syn, &pattern_match, block);
 

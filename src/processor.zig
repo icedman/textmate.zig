@@ -79,7 +79,7 @@ pub const Processor = struct {
     pub fn closeTag(self: *Processor, cap: parser.Capture) void {
         var c = cap;
         if (self.block) |b| {
-            // this happens because parser adds '\n' at every parse
+            // this happens if parser adds '\n' at every parse
             if (c.start > b.len and b.len > 0) {
                 c.start = b.len;
             }
@@ -88,13 +88,6 @@ pub const Processor = struct {
             }
         }
         // close the Capture (properly set the end pos)
-        // for (0..self.captures.items.len) |i| {
-        //     if (self.captures.items[i].syntax_id == c.syntax_id) {
-        //         self.captures.items[i].end = c.end;
-        //         self.captures.items[i].retain = false;
-        //     }
-        // }
-
         var i = self.captures.items.len;
         while (i > 0) : (i -= 1) {
             if (self.captures.items[i - 1].syntax_id == c.syntax_id) {
@@ -112,7 +105,7 @@ pub const Processor = struct {
     pub fn capture(self: *Processor, cap: parser.Capture) void {
         var c = cap;
         if (self.block) |b| {
-            // this happens because parser adds '\n' at every parse
+            // this happens if parser adds '\n' at every parse
             if (c.start > b.len and b.len > 0) {
                 c.start = b.len;
             }
@@ -205,12 +198,21 @@ pub const RenderProcessor = struct {
                 resetColor(std.debug) catch {};
             }
 
+            var cap_start: usize = 0;
             for (block, 0..) |ch, i| {
+                if (ch == '\n') break;
                 var cap: parser.Capture = parser.Capture{};
-                for (0..captures.items.len) |ci| {
+                var hit = false;
+                for (cap_start..captures.items.len) |ci| {
                     if (i >= captures.items[ci].start and i < captures.items[ci].end) {
                         cap = captures.items[ci];
+                        if (!hit) {
+                            cap_start = ci;
+                            hit = true;
+                        }
                         // std.debug.print("\n{s} {}-{} [{}]\n", .{ cap.scope, captures.items[ci].start, captures.items[ci].end, i });
+                    } else if (hit) {
+                        break;
                     }
                 }
 
@@ -291,6 +293,7 @@ pub const RenderHtmlProcessor = struct {
             const block = self.block orelse "";
 
             for (block, 0..) |ch, i| {
+                if (ch == '\n') break;
                 var cap: parser.Capture = parser.Capture{};
                 for (0..captures.items.len) |ci| {
                     if (i >= captures.items[ci].start and i < captures.items[ci].end) {

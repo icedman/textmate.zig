@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const ENABLE_SCOPE_CACHING = true;
+
 pub fn setColorHex(stdout: anytype, hex: []const u8) !void {
     if (hex.len != 7 or hex[0] != '#') {
         return error.InvalidHexColor;
@@ -264,6 +266,10 @@ pub const Theme = struct {
             if (colors_val == .object) {
                 var it = colors_val.object.iterator();
                 while (it.next()) |entry| {
+                    if (entry.value_ptr.* == .array) {
+                        std.debug.print(">>{s}\n", .{entry.key_ptr.*});
+                        continue;
+                    }
                     const k = entry.key_ptr.*;
                     const v = entry.value_ptr.*.string;
                     // TODO value should be settings
@@ -330,14 +336,7 @@ pub const Theme = struct {
             return null;
         }
 
-        var enable_cache = scope.len > 16;
-        if (!enable_cache) {
-            if (std.mem.indexOf(u8, scope, " ")) |idx| {
-                enable_cache = true;
-                _ = idx;
-            }
-        }
-
+        const enable_cache = ENABLE_SCOPE_CACHING and scope.len > 16;
         if (enable_cache) {
             if (self.cache.get(scope)) |cached| {
                 if (colors) |c| {
@@ -353,7 +352,7 @@ pub const Theme = struct {
         if (enable_cache) {
             if (res) |item| {
                 if (colors) |c| {
-                    // why the need to allocate? isn;t hash computed from string content?
+                    // why the need to allocate? isn't hash computed from string content?
                     const key = self.arena.allocator().dupe(u8, scope) catch {
                         return item;
                     };

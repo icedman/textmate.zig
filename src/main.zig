@@ -92,16 +92,24 @@ pub fn main() !void {
 
     const start = std.time.nanoTimestamp();
     proc.startDocument();
+
     while (try reader.readUntilDelimiterOrEof(&buf, '\n')) |line| {
-        const trimmed = if (line.len > 0 and line[line.len - 1] == '\r')
-            line[0 .. line.len - 1]
-        else
-            line;
+        var slice = line;
 
-        _ = try par.parseLine(&state, trimmed);
+        // Trim trailing \r if present
+        if (slice.len > 0 and slice[slice.len - 1] == '\r') {
+            slice = slice[0 .. slice.len - 1];
+        }
+
+        // Ensure it ends with '\n'
+        if (slice.len == 0 or slice[slice.len - 1] != '\n') {
+            // safe since readUntilDelimiterOrEof strips the delimiter, leaving room
+            slice = buf[0 .. slice.len + 1];
+            slice[slice.len - 1] = '\n';
+        }
+
+        _ = try par.parseLine(&state, slice);
         line_no += 1;
-
-        // if (line_no > 50_000) break;
     }
     proc.endDocument();
     const end = std.time.nanoTimestamp();
