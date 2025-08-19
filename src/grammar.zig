@@ -271,13 +271,16 @@ pub const Syntax = struct {
                 if (Syntax.patternHasAnchor(regex)) {
                     self.is_anchored = true;
                 }
-                const re = try oni.Regex.init(
+                const re = oni.Regex.init(
                     regex,
                     .{},
                     oni.Encoding.utf8,
                     oni.Syntax.default,
                     null,
-                );
+                ) catch |err| {
+                    std.debug.print("regex compile error {s}\n", .{regex});
+                    return err;
+                };
                 errdefer re.deinit();
                 entry.regex_ptr.* = re;
             }

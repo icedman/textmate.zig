@@ -1,4 +1,4 @@
-const std = @import("std")
+const std = @import("std");
 
 // TODO move to config.. smallcaps
 const MAX_NAME_LENGTH = 128;
