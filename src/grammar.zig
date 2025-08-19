@@ -419,7 +419,7 @@ pub const GrammarLibrary = struct {
     pub fn grammarFromScopeName(self: *GrammarLibrary, name: []const u8) !Grammar {
         if (name.len >= 128) return error.NotFound;
         for (self.grammars.items) |item| {
-            const item_name: [:0]const u8 = &item.scope_name;
+            const item_name: []const u8 = &item.scope_name;
             if (std.mem.eql(u8, item_name[0..name.len], name[0..name.len])) {
                 // TODO how to get len for fixed [_]u8?
                 const path_len = for (0..std.fs.max_path_bytes) |i| {
@@ -449,7 +449,7 @@ pub const GrammarLibrary = struct {
             if (item.file_types_count > 0) {
                 // check against file types
                 for (0..item.file_types_count) |fi| {
-                    const item_name: [:0]const u8 = &item.file_types[fi];
+                    const item_name: []const u8 = &item.file_types[fi];
                     const name_len = for (0..16) |ci| {
                         if (item.file_types[fi][ci] == 0) break ci;
                     } else 0;
@@ -464,7 +464,7 @@ pub const GrammarLibrary = struct {
                 }
             } else {
                 // check against scope
-                const item_name: [:0]const u8 = &item.scope_name;
+                const item_name: []const u8 = &item.scope_name;
                 const name_len = for (0..16) |ci| {
                     if (item_name[ci] == 0) break ci;
                 } else 0;

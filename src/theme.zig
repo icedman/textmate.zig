@@ -33,9 +33,7 @@ pub const ThemeLibrary = struct {
     pub fn themeFromName(self: *ThemeLibrary, name: []const u8) !Theme {
         if (name.len >= 128) return error.NotFound;
         for (self.themes.items) |item| {
-            const item_name: [:0]const u8 = &item.name;
-            if (std.mem.eql(u8, item_name[0..name.len], name[0..name.len])) {
-                // how to get len?!!!
+            if (std.mem.eql(u8, item.name[0..name.len], name)) {
                 const path_len = for (0..std.fs.max_path_bytes) |i| {
                     if (item.full_path[i] == 0) break i;
                 } else 0;
