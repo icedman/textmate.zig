@@ -1,5 +1,7 @@
 const std = @import("std");
 const oni = @import("oniguruma");
+const resources = @import("resources.zig");
+const GrammarInfo = resources.GrammarInfo;
 
 var syntax_id: u32 = 1;
 
@@ -393,6 +395,109 @@ pub const Syntax = struct {
     }
 };
 
+var theGrammarLibrary: ?*GrammarLibrary = null;
+
+pub const GrammarLibrary = struct {
+    allocator: std.mem.Allocator = undefined,
+    grammars: std.ArrayList(GrammarInfo) = undefined,
+
+    fn init(self: *GrammarLibrary) !void {
+        self.grammars = std.ArrayList(GrammarInfo).init(self.allocator);
+    }
+
+    fn deinit(self: *GrammarLibrary) void {
+        self.grammars.deinit();
+    }
+
+    pub fn addGrammars(self: *GrammarLibrary, path: []const u8) !void {
+        try resources.listGrammars(self.allocator, path, &self.grammars);
+    }
+
+    pub fn grammarFromScopeName(self: *GrammarLibrary, name: []const u8) !Grammar {
+        if (name.len >= 128) return error.NotFound;
+        for (self.grammars.items) |item| {
+            const item_name: [:0]const u8 = &item.scope_name;
+            if (std.mem.eql(u8, item_name[0..name.len], name[0..name.len])) {
+                // TODO how to get len for fixed [_]u8?
+                const path_len = for (0..std.fs.max_path_bytes) |i| {
+                    if (item.full_path[i] == 0) break i;
+                } else 0;
+                const item_path: []const u8 = item.full_path[0..path_len];
+                return Grammar.init(self.allocator, item_path);
+            }
+        }
+        return error.NotFound;
+    }
+
+    pub fn grammarFromExtension(self: *GrammarLibrary, name: []const u8) !Grammar {
+        const dot_ext = std.fs.path.extension(name);
+        const ext = dot_ext[1..];
+        if (ext.len >= 16) return error.NotFound;
+
+        // most grammar definitions don't provide fileTypes
+        // check against scope name instead .. using "source.{ext}"
+        var scope_name: [32]u8 = [_]u8{0} ** 32;
+        var scope_name_len = "source".len;
+        @memcpy(scope_name[0..scope_name_len], "source");
+        scope_name_len += dot_ext.len;
+        @memcpy(scope_name[6..scope_name_len], dot_ext);
+
+        for (self.grammars.items) |item| {
+            if (item.file_types_count > 0) {
+                // check against file types
+                for (0..item.file_types_count) |fi| {
+                    const item_name: [:0]const u8 = &item.file_types[fi];
+                    const name_len = for (0..16) |ci| {
+                        if (item.file_types[fi][ci] == 0) break ci;
+                    } else 0;
+                    if (std.mem.eql(u8, item_name[0..name_len], ext[0..ext.len])) {
+                        // how to get len?!!!
+                        const path_len = for (0..std.fs.max_path_bytes) |i| {
+                            if (item.full_path[i] == 0) break i;
+                        } else 0;
+                        const item_path: []const u8 = item.full_path[0..path_len];
+                        return Grammar.init(self.allocator, item_path);
+                    }
+                }
+            } else {
+                // check against scope
+                const item_name: [:0]const u8 = &item.scope_name;
+                const name_len = for (0..16) |ci| {
+                    if (item_name[ci] == 0) break ci;
+                } else 0;
+                if (std.mem.eql(u8, item_name[0..name_len], scope_name[0..scope_name_len])) {
+                    // how to get len?!!!
+                    const path_len = for (0..std.fs.max_path_bytes) |i| {
+                        if (item.full_path[i] == 0) break i;
+                    } else 0;
+                    const item_path: []const u8 = item.full_path[0..path_len];
+                    return Grammar.init(self.allocator, item_path);
+                }
+            }
+        }
+        return error.NotFound;
+    }
+};
+
+pub fn initGrammarLibrary(allocator: std.mem.Allocator) !void {
+    theGrammarLibrary = try allocator.create(GrammarLibrary);
+    if (theGrammarLibrary) |lib| {
+        lib.allocator = allocator;
+        try lib.init();
+    }
+}
+
+pub fn deinitGrammarLibrary() void {
+    if (theGrammarLibrary) |lib| {
+        lib.deinit();
+        theGrammarLibrary = null;
+    }
+}
+
+pub fn getGrammarLibrary() ?*GrammarLibrary {
+    return theGrammarLibrary;
+}
+
 pub const Grammar = struct {
     allocator: std.mem.Allocator,
     arena: std.heap.ArenaAllocator,
@@ -413,12 +518,14 @@ pub const Grammar = struct {
     }
 
     pub fn deinit(self: *Grammar) void {
-        if (self.syntax) |syntax| {
-            syntax.deinit();
-        }
-        if (self.parsed) |parsed| {
-            parsed.deinit();
-        }
+        // _ = self;
+        // if (self.syntax) |syntax| {
+        //     syntax.deinit();
+        // }
+        // if (self.parsed) |parsed| {
+        //     parsed.deinit();
+        // }
+        // TODO arena - makes allocation really abstract.. remove
         self.arena.deinit();
     }
 

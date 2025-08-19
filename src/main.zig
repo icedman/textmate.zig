@@ -42,16 +42,57 @@ pub fn main() !void {
         }
     }
 
-    var thm = theme.Theme.init(allocator, theme_path orelse "data/tests/dracula.json") catch {
-        std.debug.print("unable to open theme {s}\n", .{theme_path orelse ""});
+    theme.initThemeLibrary(allocator) catch {
         return;
     };
+    defer theme.deinitThemeLibrary();
+    if (theme.getThemeLibrary()) |thl| {
+        thl.addThemes("./data/themes") catch {
+            std.debug.print("unable to add themes directory\n", .{});
+        };
+    }
+
+    grammar.initGrammarLibrary(allocator) catch {
+        return;
+    };
+    defer grammar.deinitGrammarLibrary();
+    if (grammar.getGrammarLibrary()) |gml| {
+        gml.addGrammars("./data/grammars") catch {
+            std.debug.print("unable to add grammars directory\n", .{});
+        };
+    }
+
+    // var thm = theme.Theme.init(allocator, theme_path orelse "data/tests/dracula.json") catch {
+    //     std.debug.print("unable to open theme {s}\n", .{theme_path orelse ""});
+    //     return;
+    // };
+    var thm: theme.Theme = undefined;
+    if (theme.getThemeLibrary()) |thl| {
+        thm = thl.themeFromName(theme_path orelse "dracula-soft") catch {
+            std.debug.print("unable to open theme\n", .{});
+            return;
+        };
+    }
     defer thm.deinit();
 
-    var gmr = grammar.Grammar.init(allocator, grammar_path orelse "data/tests/zig.tmLanguage.json") catch {
-        std.debug.print("unable to open grammar {s}\n", .{grammar_path orelse ""});
-        return;
-    };
+    // var gmr = grammar.Grammar.init(allocator, grammar_path orelse "data/tests/zig.tmLanguage.json") catch {
+    //     std.debug.print("unable to open grammar {s}\n", .{grammar_path orelse ""});
+    //     return;
+    // };
+    var gmr: grammar.Grammar = undefined;
+    if (grammar.getGrammarLibrary()) |gml| {
+        if (grammar_path) |gp| {
+            gmr = gml.grammarFromScopeName(gp) catch {
+                std.debug.print("unable to open grammar from scope name\n", .{});
+                return;
+            };
+        } else {
+            gmr = gml.grammarFromExtension(file_path orelse "") catch {
+                std.debug.print("unable to open grammar from extension\n", .{});
+                return;
+            };
+        }
+    }
     defer gmr.deinit();
 
     var par = try parser.Parser.init(allocator, &gmr);
@@ -119,10 +160,15 @@ pub fn main() !void {
         std.debug.print("==================\n", .{});
         std.debug.print("lines: {}\n", .{line_no - 1});
         std.debug.print("execs: {}\n", .{par.regex_execs});
+        if (line_no > 0) {
+            std.debug.print("execs/line: {}\n", .{par.regex_execs / line_no});
+        }
         std.debug.print("skips: {}\n", .{par.regex_skips});
         std.debug.print("done in {d:.6}s\n", .{elapsed});
         std.debug.print("state depth: {}\n", .{state.size()});
-        state.dump();
+        std.debug.print("grammar: {s}\n", .{gmr.name});
+        std.debug.print("theme: {s}\n", .{thm.name});
+        // state.dump();
     }
 }
 

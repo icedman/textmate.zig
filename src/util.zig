@@ -1,0 +1,47 @@
+const std = @import("std");
+const theme = @import("theme.zig");
+const Rgb = theme.Rgb;
+
+pub fn setColorHex(stdout: anytype, hex: []const u8) !void {
+    if (hex.len != 7 or hex[0] != '#') {
+        return error.InvalidHexColor;
+    }
+
+    const r = try std.fmt.parseInt(u8, hex[1..3], 16);
+    const g = try std.fmt.parseInt(u8, hex[3..5], 16);
+    const b = try std.fmt.parseInt(u8, hex[5..7], 16);
+
+    // 24-bit ANSI foreground color
+    stdout.print("\x1b[38;2;{d};{d};{d}m", .{ r, g, b });
+    // stdout.print("[{d};{d};{d}]\n", .{ r, g, b });
+}
+
+pub fn setColorRgb(stdout: anytype, rgb: Rgb) !void {
+    // 24-bit ANSI foreground color
+    stdout.print("\x1b[38;2;{d};{d};{d}m", .{ rgb.r, rgb.g, rgb.b });
+    // stdout.print("[{d};{d};{d}]\n", .{ rgb.r, rgb.g, rgb.b });
+}
+
+pub fn setBgColorHex(stdout: anytype, hex: []const u8) !void {
+    if (hex.len < 7 or hex[0] != '#') {
+        return error.InvalidHexColor;
+    }
+
+    const r = try std.fmt.parseInt(u8, hex[1..3], 16);
+    const g = try std.fmt.parseInt(u8, hex[3..5], 16);
+    const b = try std.fmt.parseInt(u8, hex[5..7], 16);
+
+    // 24-bit ANSI background color
+    stdout.print("\x1b[48;2;{d};{d};{d}m", .{ r, g, b });
+    // stdout.print("[{d};{d};{d}]\n", .{ r, g, b });
+}
+
+pub fn setBgColorRgb(stdout: anytype, rgb: Rgb) !void {
+    // 24-bit ANSI foreground color
+    stdout.print("\x1b[48;2;{d};{d};{d}m", .{ rgb.r, rgb.g, rgb.b });
+    // stdout.print("[{d};{d};{d}]\n", .{ r, g, b });
+}
+
+pub fn resetColor(stdout: anytype) !void {
+    stdout.print("\x1b[0m", .{});
+}

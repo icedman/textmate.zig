@@ -1,49 +1,69 @@
 const std = @import("std");
+const resources = @import("resources.zig");
+const ThemeInfo = resources.ThemeInfo;
 
+const util = @import("util.zig");
+const setColorHex = util.setColorHex;
+const setColorRgb = util.setColorRgb;
+const setBgColorHex = util.setBgColorHex;
+const setBgColorRgb = util.setBgColorRgb;
+const resetColor = util.resetColor;
+
+// TODO move to config.. smallcaps
 const ENABLE_SCOPE_CACHING = true;
 
-pub fn setColorHex(stdout: anytype, hex: []const u8) !void {
-    if (hex.len != 7 or hex[0] != '#') {
-        return error.InvalidHexColor;
+var theThemeLibrary: ?*ThemeLibrary = null;
+
+pub const ThemeLibrary = struct {
+    allocator: std.mem.Allocator = undefined,
+    themes: std.ArrayList(ThemeInfo) = undefined,
+
+    fn init(self: *ThemeLibrary) !void {
+        self.themes = std.ArrayList(ThemeInfo).init(self.allocator);
     }
 
-    const r = try std.fmt.parseInt(u8, hex[1..3], 16);
-    const g = try std.fmt.parseInt(u8, hex[3..5], 16);
-    const b = try std.fmt.parseInt(u8, hex[5..7], 16);
-
-    // 24-bit ANSI foreground color
-    stdout.print("\x1b[38;2;{d};{d};{d}m", .{ r, g, b });
-    // stdout.print("[{d};{d};{d}]\n", .{ r, g, b });
-}
-
-pub fn setColorRgb(stdout: anytype, rgb: Rgb) !void {
-    // 24-bit ANSI foreground color
-    stdout.print("\x1b[38;2;{d};{d};{d}m", .{ rgb.r, rgb.g, rgb.b });
-    // stdout.print("[{d};{d};{d}]\n", .{ rgb.r, rgb.g, rgb.b });
-}
-
-pub fn setBgColorHex(stdout: anytype, hex: []const u8) !void {
-    if (hex.len < 7 or hex[0] != '#') {
-        return error.InvalidHexColor;
+    fn deinit(self: *ThemeLibrary) void {
+        self.themes.deinit();
     }
 
-    const r = try std.fmt.parseInt(u8, hex[1..3], 16);
-    const g = try std.fmt.parseInt(u8, hex[3..5], 16);
-    const b = try std.fmt.parseInt(u8, hex[5..7], 16);
+    pub fn addThemes(self: *ThemeLibrary, path: []const u8) !void {
+        try resources.listThemes(self.allocator, path, &self.themes);
+    }
 
-    // 24-bit ANSI background color
-    stdout.print("\x1b[48;2;{d};{d};{d}m", .{ r, g, b });
-    // stdout.print("[{d};{d};{d}]\n", .{ r, g, b });
+    pub fn themeFromName(self: *ThemeLibrary, name: []const u8) !Theme {
+        if (name.len >= 128) return error.NotFound;
+        for (self.themes.items) |item| {
+            const item_name: [:0]const u8 = &item.name;
+            if (std.mem.eql(u8, item_name[0..name.len], name[0..name.len])) {
+                // how to get len?!!!
+                const path_len = for (0..std.fs.max_path_bytes) |i| {
+                    if (item.full_path[i] == 0) break i;
+                } else 0;
+                const item_path: []const u8 = item.full_path[0..path_len];
+                return Theme.init(self.allocator, item_path);
+            }
+        }
+        return error.NotFound;
+    }
+};
+
+pub fn initThemeLibrary(allocator: std.mem.Allocator) !void {
+    theThemeLibrary = try allocator.create(ThemeLibrary);
+    if (theThemeLibrary) |lib| {
+        lib.allocator = allocator;
+        try lib.init();
+    }
 }
 
-pub fn setBgColorRgb(stdout: anytype, rgb: Rgb) !void {
-    // 24-bit ANSI foreground color
-    stdout.print("\x1b[48;2;{d};{d};{d}m", .{ rgb.r, rgb.g, rgb.b });
-    // stdout.print("[{d};{d};{d}]\n", .{ r, g, b });
+pub fn deinitThemeLibrary() void {
+    if (theThemeLibrary) |lib| {
+        lib.deinit();
+        theThemeLibrary = null;
+    }
 }
 
-pub fn resetColor(stdout: anytype) !void {
-    stdout.print("\x1b[0m", .{});
+pub fn getThemeLibrary() ?*ThemeLibrary {
+    return theThemeLibrary;
 }
 
 pub const Scope = struct {
@@ -223,7 +243,10 @@ pub const Theme = struct {
     parsed: ?std.json.Parsed(std.json.Value) = null,
 
     pub fn init(allocator: std.mem.Allocator, source_path: []const u8) !Theme {
-        const file = try std.fs.cwd().openFile(source_path, .{});
+        const file = std.fs.cwd().openFile(source_path, .{}) catch |err| {
+            std.debug.print("unable to open {s}\n", .{source_path});
+            return err;
+        };
         defer file.close();
         const file_size = (try file.stat()).size;
         const file_contents = try file.readToEndAlloc(allocator, file_size);
@@ -234,7 +257,9 @@ pub const Theme = struct {
     pub fn deinit(self: *Theme) void {
         self.root.deinit();
         self.cache.deinit();
-        self.arena.deinit();
+
+        // TODO arena - makes allocation really abstract.. remove
+        // self.arena.deinit();
     }
 
     pub fn parse(allocator: std.mem.Allocator, source: []const u8) !Theme {

@@ -4,6 +4,7 @@ const grammar = @import("grammar.zig");
 const processor = @import("processor.zig");
 const Syntax = grammar.Syntax;
 
+// TODO move to config.. smallcaps
 const ENABLE_MATCH_CACHING = true;
 const ENABLE_END_MATCH_CACHING = true;
 
@@ -605,15 +606,8 @@ pub const Parser = struct {
         }
     }
 
+    // feed the parser a source code line. It must be terminated by a newline character '\n'.
     pub fn parseLine(self: *Parser, state: *ParseState, block: []const u8) !void {
-        // var block = self.allocator.alloc(u8, buffer.len + 1) catch {
-        //     return error.OutOfMemory;
-        // };
-        // defer self.allocator.free(block);
-        // @memcpy(block[0..buffer.len], buffer);
-        // block[buffer.len] = '\n';
-
-        // save the buffer, not block - as block is freed at the end of scope
         if (self.processor) |proc| proc.startLine(block);
 
         if (block.len > MAX_LINE_LEN) {

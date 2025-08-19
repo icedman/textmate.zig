@@ -1,6 +1,12 @@
 const std = @import("std");
 const parser = @import("parser.zig");
 const theme = @import("theme.zig");
+const util = @import("util.zig");
+const setColorHex = util.setColorHex;
+const setColorRgb = util.setColorRgb;
+const setBgColorHex = util.setBgColorHex;
+const setBgColorRgb = util.setBgColorRgb;
+const resetColor = util.resetColor;
 
 pub const Processor = struct {
     allocator: std.mem.Allocator,
@@ -174,12 +180,6 @@ pub const DumpProcessor = struct {
         };
     }
 };
-
-const setColorRgb = theme.setColorRgb;
-const setColorHex = theme.setColorHex;
-const setBgColorRgb = theme.setBgColorRgb;
-const setBgColorHex = theme.setBgColorHex;
-const resetColor = theme.resetColor;
 
 pub const RenderProcessor = struct {
     pub fn endLine(self: *Processor) void {
