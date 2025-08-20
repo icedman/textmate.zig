@@ -181,53 +181,61 @@ pub const DumpProcessor = struct {
     }
 };
 
+const Rgb = theme.Rgb;
+
 pub const RenderProcessor = struct {
     pub fn endLine(self: *Processor) void {
         if (self.theme) |thm| {
             // const defaultColor: ?theme.Settings = theme.Settings{.foreground_rgb = theme.Rgb {.r = 255 }};
-            const default_color = thm.getColor("editor.foreground") orelse
-                thm.getColor("foreground");
             const captures = self.captures;
             const block = self.block orelse "";
 
+            var color_stack: [1024]Rgb = [_]Rgb{Rgb{}} ** 1024;
+            var color_stack_idx: usize = 0;
+            var current_color = Rgb{};
+
+            const default_color = thm.getColor("editor.foreground") orelse
+                thm.getColor("foreground");
+
             if (default_color) |c| {
                 if (c.foreground_rgb) |fg| {
-                    setColorRgb(std.debug, fg) catch {};
+                    color_stack[color_stack_idx] = fg;
+                    color_stack_idx += 1;
                 }
-            } else {
-                resetColor(std.debug) catch {};
             }
 
-            var cap_start: usize = 0;
             for (block, 0..) |ch, i| {
                 if (ch == '\n') break;
                 var cap: parser.Capture = parser.Capture{};
-                var hit = false;
-                for (cap_start..captures.items.len) |ci| {
-                    if (i >= captures.items[ci].start and i < captures.items[ci].end) {
+                for (0..captures.items.len) |ci| {
+                    if (i == captures.items[ci].start) {
                         cap = captures.items[ci];
-                        if (!hit) {
-                            cap_start = ci;
-                            hit = true;
+
+                        var colors = theme.Settings{};
+                        const scope = thm.getScope(cap.scope[0..cap.scope.len], &colors);
+                        _ = scope;
+
+                        // if (colors.foreground) |fgs| {
+                        //     std.debug.print("{s}\n", .{fgs});
+                        // }
+
+                        if (colors.foreground_rgb) |fg| {
+                            color_stack[color_stack_idx] = fg;
+                        } else {
+                            color_stack[color_stack_idx] = color_stack[color_stack_idx - 1];
                         }
-                        // std.debug.print("\n{s} {}-{} [{}]\n", .{ cap.scope, captures.items[ci].start, captures.items[ci].end, i });
-                    } else if (hit) {
-                        // break;
+
+                        color_stack_idx += 1;
                     }
                 }
 
-                var colors = theme.Settings{};
-                const scope_len = for (0..64) |ci| {
-                    if (cap.scope[ci] == 0) break ci;
-                } else 0;
-                const scope = thm.getScope(cap.scope[0..scope_len], &colors);
-                _ = scope;
-
-                if (colors.foreground_rgb) |fg| {
-                    setColorRgb(std.debug, fg) catch {};
-                }
-                if (colors.background_rgb) |bg| {
-                    setBgColorRgb(std.debug, bg) catch {};
+                const top_color = color_stack[color_stack_idx - 1];
+                if (top_color.r != current_color.r or
+                    top_color.g != current_color.g or
+                    top_color.b != current_color.b)
+                {
+                    current_color = top_color;
+                    setColorRgb(std.debug, current_color) catch {};
                 }
 
                 // _ = ch;
@@ -237,16 +245,15 @@ pub const RenderProcessor = struct {
                     std.debug.print("{c}", .{ch});
                 }
 
-                if (i + 1 >= cap.end) {
-                    if (default_color) |c| {
-                        if (c.foreground_rgb) |fg| {
-                            setColorRgb(std.debug, fg) catch {};
-                        }
-                    } else {
+                for (0..captures.items.len) |ci| {
+                    if (i + 1 == captures.items[ci].end) {
+                        color_stack_idx -= 1;
+                        current_color = Rgb{};
                         resetColor(std.debug) catch {};
                     }
                 }
             }
+
             std.debug.print("\n", .{});
         } else {
             std.debug.print("theme is not set\n", .{});

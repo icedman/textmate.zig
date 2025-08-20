@@ -1,11 +1,9 @@
-**bold text**
-*italicized text*
+# heading 1 # 
+## heading 2 ## 
+### heading 3 ###
 
-**bold text** normal text
 *italicized text* normal text
-
-**bold text** normal text *italicized text* normal text
-*italicized text* normal text **bold text** normal text
+**bold text** normal text ***bold italicized text*** normal text
 
 1. First item
 2. Second item

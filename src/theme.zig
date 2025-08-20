@@ -2,7 +2,9 @@ const std = @import("std");
 const resources = @import("resources.zig");
 const ThemeInfo = resources.ThemeInfo;
 
+const scopez = @import("scope.zig");
 const util = @import("util.zig");
+
 const setColorHex = util.setColorHex;
 const setColorRgb = util.setColorRgb;
 const setBgColorHex = util.setBgColorHex;
@@ -231,8 +233,11 @@ pub const Theme = struct {
     tokenColors: ?[]TokenColor = null,
     semantic_highlighting: bool = false,
 
-    root: Scope,
+    type: ?[]const u8 = null, // dark,light?
 
+    // redo the Scope implementation
+    root: Scope,
+    temp_scope: Scope,
     cache: std.StringHashMap(ScopeCache),
 
     // TODO release this after parse (requires that all string values be allocated and copied)
@@ -252,6 +257,7 @@ pub const Theme = struct {
 
     pub fn deinit(self: *Theme) void {
         self.root.deinit();
+        self.temp_scope.deinit();
         self.cache.deinit();
 
         // TODO arena - makes allocation really abstract.. remove
@@ -264,6 +270,7 @@ pub const Theme = struct {
             .arena = std.heap.ArenaAllocator.init(allocator),
             .name = "",
             .root = Scope.init(allocator),
+            .temp_scope = Scope.init(allocator),
             .cache = std.StringHashMap(ScopeCache).init(allocator),
         };
 
@@ -283,6 +290,7 @@ pub const Theme = struct {
 
         // colors
         var colors = std.StringHashMap(Settings).init(aa);
+        errdefer colors.deinit();
         if (obj.get("colors")) |colors_val| {
             if (colors_val == .object) {
                 var it = colors_val.object.iterator();
@@ -310,14 +318,17 @@ pub const Theme = struct {
 
         const tokenColors_arr = obj.get("tokenColors").?.array;
         const tokenColors = try aa.alloc(TokenColor, tokenColors_arr.items.len);
+        errdefer aa.free(tokenColors);
         for (tokenColors_arr.items, 0..) |item, i| {
             const o = item.object;
             const token_name = if (o.get("name")) |v| v.string else "";
 
             // settings
             if (o.get("settings") == null) {
+                tokenColors[i] = TokenColor{ .name = token_name };
                 continue;
             }
+
             const settings_value = o.get("settings").?;
             const settings = try std.json.parseFromValue(Settings, aa, settings_value, .{ .ignore_unknown_fields = true });
 
@@ -325,11 +336,13 @@ pub const Theme = struct {
                 const opt = o.get("scope") orelse break :blk null;
                 if (opt == .string) {
                     const scopes = try aa.alloc([]const u8, 1);
+                    errdefer aa.free(scopes);
                     scopes[0] = opt.string;
                     break :blk scopes;
                 }
                 if (opt == .array) {
                     const scopes = try aa.alloc([]const u8, opt.array.items.len);
+                    errdefer aa.free(scopes);
                     for (opt.array.items, 0..) |scope_item, j| {
                         scopes[j] = scope_item.string;
                     }
