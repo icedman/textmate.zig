@@ -2,8 +2,9 @@ const std = @import("std");
 const resources = @import("resources.zig");
 const ThemeInfo = resources.ThemeInfo;
 
-const scopez = @import("scope.zig");
+const scope_ = @import("scope.zig");
 const util = @import("util.zig");
+const Atom = scope_.Atom;
 
 const setColorHex = util.setColorHex;
 const setColorRgb = util.setColorRgb;
@@ -63,114 +64,9 @@ pub fn getThemeLibrary() ?*ThemeLibrary {
     return theThemeLibrary;
 }
 
-// TODO - this one served it's purpose, scope.zig implements the more accurate scope resolution
 pub const Scope = struct {
-    allocator: std.mem.Allocator,
-    children: std.StringHashMap(Scope),
+    atom: Atom = Atom{},
     token: ?*TokenColor = null,
-
-    pub fn init(allocator: std.mem.Allocator) Scope {
-        return Scope{
-            .allocator = allocator,
-            .children = std.StringHashMap(Scope).init(allocator),
-        };
-    }
-
-    pub fn deinit(self: *Scope) void {
-        // std.debug.print("deinit scope\n", .{});
-        var it = self.children.iterator();
-        while (it.next()) |kv| {
-            const v = kv.value_ptr;
-            v.deinit();
-        }
-        self.children.deinit();
-    }
-
-    pub fn addScope(self: *Scope, scope: []const u8, token: ?*TokenColor) void {
-        // split
-        // TODO " " denotes nesting (currently unimplemented)
-        const space: []const u8 = " ";
-        if (std.mem.indexOf(u8, scope, space)) |idx| {
-            self.addScope(scope[0..idx], token);
-            self.addScope(scope[idx + 1 ..], token);
-            return;
-        }
-
-        const dot: []const u8 = ".";
-        var key = scope[0..scope.len];
-        if (std.mem.indexOf(u8, scope, dot)) |idx| {
-            key = scope[0..idx];
-        }
-
-        // insert or get existing
-        const gop = self.children.getOrPut(key) catch return;
-        if (!gop.found_existing) {
-            gop.value_ptr.* = Scope.init(self.allocator);
-        }
-        var target: *Scope = gop.value_ptr;
-
-        if ((key.len + 1) < scope.len) {
-            const next = scope[key.len + 1 ..];
-            target.addScope(next, token);
-        } else if (target.token == null) {
-            target.token = token;
-        }
-    }
-
-    pub fn getScope(self: *const Scope, scope: []const u8, colors: ?*Settings) ?*const Scope {
-        // split
-        const dot: []const u8 = ".";
-        var key = scope[0..scope.len];
-        if (std.mem.indexOf(u8, scope, dot)) |idx| {
-            key = scope[0..idx];
-        }
-
-        const target = self.children.get(key) orelse null;
-        if (target) |*t| {
-            if (colors) |clr| {
-                if (t.token) |tk| {
-                    if (tk.settings) |ss| {
-                        clr.* = ss;
-                    }
-                }
-            }
-            if ((key.len + 1) < scope.len) {
-                const next = scope[key.len + 1 ..];
-                return t.getScope(next, colors) orelse self;
-            } else {
-                return t;
-            }
-        }
-
-        if ((key.len + 1) < scope.len) {
-            const next = scope[key.len + 1 ..];
-            return self.getScope(next, colors) orelse self;
-        }
-
-        return self;
-    }
-
-    pub fn dump(self: *const Scope, depth: u32) void {
-        var it = self.children.iterator();
-        while (it.next()) |kv| {
-            const k = kv.key_ptr.*;
-            const v = kv.value_ptr.*;
-            for (0..depth) |i| {
-                _ = i;
-                std.debug.print("  ", .{});
-            }
-            std.debug.print("{s} ", .{k});
-            if (v.token) |tk| {
-                if (tk.settings) |ts| {
-                    if (ts.foreground) |fg| {
-                        std.debug.print("fg: {s} ", .{fg});
-                    }
-                }
-            }
-            std.debug.print("\n", .{});
-            v.dump(depth + 1);
-        }
-    }
 };
 
 pub const TokenColor = struct {
@@ -218,11 +114,6 @@ pub const Settings = struct {
     }
 };
 
-const ScopeCache = struct {
-    scope: *const Scope,
-    settings: Settings,
-};
-
 pub const Theme = struct {
     allocator: std.mem.Allocator,
     arena: std.heap.ArenaAllocator,
@@ -230,15 +121,14 @@ pub const Theme = struct {
     name: []const u8,
     author: ?[]const u8 = null,
     colors: ?std.StringHashMap(Settings) = null,
-    tokenColors: ?[]TokenColor = null,
+    token_colors: ?[]TokenColor = null,
     semantic_highlighting: bool = false,
 
     type: ?[]const u8 = null, // dark,light?
 
-    // redo the Scope implementation
-    root: Scope,
-    temp_scope: Scope,
-    cache: std.StringHashMap(ScopeCache),
+    atoms: ?std.StringHashMap(u32) = null,
+    scopes: ?std.ArrayList(Scope) = null,
+    scope_cache: ?std.StringHashMap(*Scope) = null,
 
     // TODO release this after parse (requires that all string values be allocated and copied)
     parsed: ?std.json.Parsed(std.json.Value) = null,
@@ -256,11 +146,15 @@ pub const Theme = struct {
     }
 
     pub fn deinit(self: *Theme) void {
-        self.root.deinit();
-        self.temp_scope.deinit();
-        self.cache.deinit();
-
-        // TODO arena - makes allocation really abstract.. remove
+        if (self.atoms) |*atoms| {
+            atoms.deinit();
+        }
+        if (self.scopes) |*scopes| {
+            scopes.deinit();
+        }
+        if (self.scope_cache) |*cache| {
+            cache.deinit();
+        }
         self.arena.deinit();
     }
 
@@ -269,9 +163,6 @@ pub const Theme = struct {
             .allocator = allocator,
             .arena = std.heap.ArenaAllocator.init(allocator),
             .name = "",
-            .root = Scope.init(allocator),
-            .temp_scope = Scope.init(allocator),
-            .cache = std.StringHashMap(ScopeCache).init(allocator),
         };
 
         // anything associated with reading the json
@@ -316,16 +207,18 @@ pub const Theme = struct {
             return error.InvalidTheme;
         }
 
-        const tokenColors_arr = obj.get("tokenColors").?.array;
-        const tokenColors = try aa.alloc(TokenColor, tokenColors_arr.items.len);
-        errdefer aa.free(tokenColors);
-        for (tokenColors_arr.items, 0..) |item, i| {
+        var atoms = std.StringHashMap(u32).init(allocator);
+        errdefer atoms.deinit();
+        const token_colors_arr = obj.get("tokenColors").?.array;
+        const token_colors = try aa.alloc(TokenColor, token_colors_arr.items.len);
+        errdefer aa.free(token_colors);
+        for (token_colors_arr.items, 0..) |item, i| {
             const o = item.object;
             const token_name = if (o.get("name")) |v| v.string else "";
 
             // settings
             if (o.get("settings") == null) {
-                tokenColors[i] = TokenColor{ .name = token_name };
+                token_colors[i] = TokenColor{ .name = token_name };
                 continue;
             }
 
@@ -351,12 +244,30 @@ pub const Theme = struct {
                 break :blk null;
             };
 
-            tokenColors[i] = TokenColor{ .name = token_name, .settings = settings.value, .scope = scopes };
-            tokenColors[i].settings.?.compute();
+            token_colors[i] = TokenColor{ .name = token_name, .settings = settings.value, .scope = scopes };
+            token_colors[i].settings.?.compute();
 
             if (scopes) |outer| {
                 for (outer) |sc| {
-                    theme.root.addScope(sc, &tokenColors[i]);
+                    scope_.extractAtom(sc, &atoms);
+                }
+            }
+        }
+
+        var atom_scopes = std.ArrayList(Scope).init(allocator);
+        errdefer atom_scopes.deinit();
+
+        for (token_colors, 0..) |tokenColor, ti| {
+            if (tokenColor.scope) |sc| {
+                for (sc) |scope_name| {
+                    if (std.mem.indexOf(u8, scope_name, ",")) |_| continue;
+                    if (std.mem.indexOf(u8, scope_name, " ")) |_| continue;
+                    var atom = Atom{};
+                    atom.compute(scope_name, &atoms);
+                    atom_scopes.append(Scope{
+                        .atom = atom,
+                        .token = &token_colors[ti],
+                    }) catch {};
                 }
             }
         }
@@ -365,52 +276,50 @@ pub const Theme = struct {
         theme.author = author;
         theme.semantic_highlighting = semantic_highlighting;
         theme.colors = colors;
-        theme.tokenColors = tokenColors;
+        theme.token_colors = token_colors;
+        theme.atoms = atoms;
+        theme.scopes = atom_scopes;
+        theme.scope_cache = std.StringHashMap(*Scope).init(allocator);
         theme.parsed = parsed;
 
         return theme;
     }
 
     pub fn getScope(self: *Theme, scope: []const u8, colors: ?*Settings) ?*const Scope {
-        // TODO pass parse state for nesting checks
         if (scope.len == 0) {
             return null;
         }
 
-        const enable_cache = ENABLE_SCOPE_CACHING and scope.len > 16;
-        if (enable_cache) {
-            if (self.cache.get(scope)) |cached| {
-                if (colors) |c| {
-                    c.foreground = cached.settings.foreground;
-                    c.foreground_rgb = cached.settings.foreground_rgb;
-                }
-                return cached.scope;
-            }
+        var atom = Atom{};
+        // todo.. this should be cached from the grammar side too
+        if (self.atoms) |*a| {
+            atom.compute(scope, @constCast(a));
         }
 
-        const res = self.root.getScope(scope, colors);
-
-        if (enable_cache) {
-            if (res) |item| {
-                if (colors) |c| {
-                    // why the need to allocate? isn't hash computed from string content?
-                    const key = self.arena.allocator().dupe(u8, scope) catch {
-                        return item;
-                    };
-                    _ = self.cache.put(key, ScopeCache{
-                        .scope = item,
-                        .settings = Settings{
-                            .foreground = c.foreground,
-                            .foreground_rgb = c.foreground_rgb,
-                        },
-                    }) catch {
-                        return item;
-                    };
+        if (self.scopes) |scopes| {
+            var highest: u8 = 0;
+            var matched: ?*Scope = null;
+            for (scopes.items) |*sc| {
+                const m = Atom.cmp(atom, sc.atom);
+                if (m > highest) {
+                    highest = m;
+                    matched = sc;
                 }
             }
+            if (colors) |cc| {
+                if (matched) |mm| {
+                    if (mm.token) |tk| {
+                        if (tk.settings) |ts| {
+                            cc.foreground = ts.foreground;
+                            cc.foreground_rgb = ts.foreground_rgb;
+                        }
+                    }
+                }
+            }
+            return matched;
         }
 
-        return res;
+        return null;
     }
 
     pub fn getColor(self: *Theme, name: []const u8) ?Settings {

@@ -226,6 +226,7 @@ pub const RenderProcessor = struct {
                         }
 
                         color_stack_idx += 1;
+                        if (color_stack_idx > 500) color_stack_idx = 10;
                     }
                 }
 
