@@ -178,6 +178,7 @@ pub fn main() !void {
         std.debug.print("retained: {}\n", .{proc.retained_captures.items.len});
         std.debug.print("grammar: {s}\n", .{gmr.name});
         std.debug.print("theme: {s}\n", .{thm.name});
+        std.debug.print("theme atoms: {}\n", .{thm.atoms.?.count()});
         // state.dump();
     }
 }

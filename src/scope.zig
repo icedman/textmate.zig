@@ -6,6 +6,8 @@ const theme = @import("theme.zig");
 const util = @import("util.zig");
 const ThemeInfo = resources.ThemeInfo;
 
+// TODO
+// These needs to be in a config or option.zig and in smallcaps
 const BITS_PER_ATOM = 10;
 
 fn addAtom(scope: []const u8, map: *std.StringHashMap(u32)) void {
@@ -25,12 +27,12 @@ fn addAtom(scope: []const u8, map: *std.StringHashMap(u32)) void {
         return;
     };
     if (!gop.found_existing) {
-        // gop.value_ptr.* = 0;
+        // ID is positio in the map as it is added
         gop.value_ptr.* = 1 + map.count();
     }
-    // gop.value_ptr.* += 1;
 }
 
+// TODO should be extractAtomsFromScopeName
 pub fn extractAtom(scope_: []const u8, map: *std.StringHashMap(u32)) void {
     if (scope_.len == 0) {
         return;
@@ -59,6 +61,15 @@ pub fn extractAtom(scope_: []const u8, map: *std.StringHashMap(u32)) void {
             return;
         }
     }
+    // has -
+    {
+        const idx = std.mem.indexOf(u8, scope, " - ") orelse 0;
+        if (idx > 0) {
+            extractAtom(scope[0..idx], map);
+            extractAtom(scope[idx + 3 ..], map);
+            return;
+        }
+    }
 
     // split by "."
     const idx = std.mem.indexOf(u8, scope, ".") orelse 0;
@@ -71,6 +82,7 @@ pub fn extractAtom(scope_: []const u8, map: *std.StringHashMap(u32)) void {
     addAtom(scope, map);
 }
 
+// Given the default 60 themes only 743 unique IDs were generated (u128 for ID with u10 for IDs will be more than enough)
 fn testLoadingAllThemes(allocator: std.mem.Allocator) !void {
     var map = std.StringHashMap(u32).init(allocator);
     defer map.deinit();
@@ -92,7 +104,7 @@ fn testLoadingAllThemes(allocator: std.mem.Allocator) !void {
         std.debug.print("----------------\n", .{});
         std.debug.print(" {s}\n", .{thm.name});
         std.debug.print("----------------\n", .{});
-        if (thm.tokenColors) |tc| {
+        if (thm.token_colors) |tc| {
             for (tc) |tokenColor| {
                 if (tokenColor.scope) |sc| {
                     // std.debug.print("{s}\n", .{sc});
@@ -120,6 +132,8 @@ fn testLoadingAllThemes(allocator: std.mem.Allocator) !void {
     }
 }
 
+// define a scope by into chunks separated by '.' each identified by a unique number encoded into u10
+// combine the chunk ids into one u128
 pub const Atom = struct {
     id: u128 = 0,
     count: u8 = 0,
@@ -135,6 +149,9 @@ pub const Atom = struct {
     }
 };
 
+// This converts a scope entity.name.function.c into a u128 atom (with section having its u10 id)
+// IDs are given by map which is generated and provide by the Theme.
+// Anything not in the map will just be dropped.
 fn atomize(scope_: []const u8, map: *std.StringHashMap(u32)) Atom {
     var atom = Atom{};
     // std.debug.print("{s}\n", .{scope_});
@@ -145,6 +162,11 @@ fn atomize(scope_: []const u8, map: *std.StringHashMap(u32)) Atom {
             const ga: u128 = g;
             atom.id = atom.id | (ga << shift);
             atom.count += 1;
+
+            // u128 -- so only a max of 11 chunks here + 1 more trailing
+            // if (atom.count == (128 / BITS_PER_ATOM) - 1) break;
+            if (atom.count == 11) break;
+
             // std.debug.print("{} {s} {}\n", .{shift, scope[0..idx], g});
             shift += BITS_PER_ATOM;
         }
@@ -174,22 +196,25 @@ const masks = [_]u128{
     (@as(u128, 0b1111111111)) << 110,
 };
 
+// TODO this comparison still misses comparing the front bits of A with the last bits of B
 pub fn atomsCmp(a_: Atom, b_: Atom) u8 {
     const a = if (a_.count > b_.count) a_ else b_;
     const b = if (a_.count > b_.count) b_ else a_;
-
     var matches: u8 = 0;
     var shift: u7 = 0;
 
     // Try all alignments of b against a
-    for (0..a.count) |x| {
+    for (0..a.count) |j| {
         const shifted_b = b.id << shift;
 
-        for (0..a.count) |i| {
+        // j - as we're shifting left .. no need to check trailing bits
+        for (j..a.count) |i| {
             const mask = masks[i];
             if ((a.id & mask) == (shifted_b & mask)) {
-                matches += 1 + @as(u8, @intCast(x >> 1));
-                // matches += 1;
+                matches += 1;
+                // TODO avoid lazy cheating like below
+                // This gives higher value to leading bits or preceeding atoms
+                matches += @as(u8, @intCast(i >> 1));
             }
         }
 
@@ -211,7 +236,7 @@ fn testTheme(allocator: std.mem.Allocator) !void {
     std.debug.print("----------------\n", .{});
     std.debug.print("{s}\n", .{thm.name});
     std.debug.print("----------------\n", .{});
-    if (thm.tokenColors) |tc| {
+    if (thm.token_colors) |tc| {
         for (tc) |tokenColor| {
             if (tokenColor.scope) |sc| {
                 // std.debug.print("{s}\n", .{sc});
@@ -225,25 +250,35 @@ fn testTheme(allocator: std.mem.Allocator) !void {
         }
     }
 
-    std.debug.print("----------------\n", .{});
-    const scope_input = "entity.name.function.c";
-    // const scope_input = "punctuation.section.parameters.begin.bracket.round.c";
-    // const scope_input = "meta.function.definition.parameters.c";
-    // const scope_input = "punctuation.section.parameters.end.bracket.round.c";
-    // const scope_input = "markup.list.unnumbered.markdown";
-    const sa = atomize(scope_input, &map);
-    std.debug.print("{s}\n", .{scope_input});
-    if (thm.tokenColors) |tc| {
-        for (tc) |tokenColor| {
-            if (tokenColor.scope) |sc| {
-                for (sc) |scope_name| {
-                    if (std.mem.indexOf(u8, scope_name, ",")) |_| continue;
-                    if (std.mem.indexOf(u8, scope_name, " ")) |_| continue;
-                    const sca = atomize(scope_name, &map);
-                    const matches = atomsCmp(sa, sca);
-                    if (matches > 0) {
-                        std.debug.print("-- {s} {} => {s}\n", .{ scope_name, matches, tokenColor.settings.?.foreground orelse "" });
-                        if (matches == sa.count) break;
+    // TODO add an actual check on which token should win
+    const scope_inputs = [_][]const u8{
+        "entity.name.function.c",
+        "punctuation.section.parameters.begin.bracket.round.c",
+        "meta.function.definition.parameters.c",
+        "punctuation.section.parameters.end.bracket.round.c",
+        "markup.list.unnumbered.markdown",
+    };
+
+    for (scope_inputs) |scope_input| {
+        std.debug.print("----------------\n", .{});
+        std.debug.print("{s}\n", .{scope_input});
+        const sa = atomize(scope_input, &map);
+        if (thm.token_colors) |tc| {
+            for (tc) |tokenColor| {
+                if (tokenColor.scope) |sc| {
+                    for (sc) |scope_name| {
+                        // TODO Handle ',' separated for grouped tokens
+                        if (std.mem.indexOf(u8, scope_name, ",")) |_| continue;
+                        // TODO Handle ' ' separated for ascendant handling
+                        if (std.mem.indexOf(u8, scope_name, " ")) |_| continue;
+                        // TODO Handle '-' separated for exclusions
+                        // if (std.mem.indexOf(u8, scope_name, "-")) |_| continue;
+                        const sca = atomize(scope_name, &map);
+                        const matches = atomsCmp(sa, sca);
+                        if (matches > 0) {
+                            std.debug.print("-- {s} {} => {s}\n", .{ scope_name, matches, tokenColor.settings.?.foreground orelse "" });
+                            if (matches == sa.count) break;
+                        }
                     }
                 }
             }
@@ -262,8 +297,6 @@ fn testTheme(allocator: std.mem.Allocator) !void {
 
 test "scopes" {
     const allocator = std.testing.allocator;
-    // try testLoadingAllThemes(allocator);
+    try testLoadingAllThemes(allocator);
     try testTheme(allocator);
-    //
-    // test .. markup.list.unnumbered.markdown
 }

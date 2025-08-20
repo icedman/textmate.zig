@@ -26,6 +26,19 @@ or
 
 CPU: AMD Ryzen AI 9 HX 370 (24) @ 5.16 GHz
 
+* with atom based scope matching
+
+lines: 222905
+execs: 18938979
+execs/line: 84
+recompile: 0
+skips: 74704939
+done in 43.564070s
+state depth: 1
+retained: 1
+grammar: c
+theme: dracula-soft
+
 * aggressive caching
 lines: 222905
 execs: 16398602

@@ -288,6 +288,8 @@ pub const Theme = struct {
             return null;
         }
 
+        // This caching should be done per grammar, not per theme.
+        // Otherwise the cache hashmap would grow too large.
         const enable_cache = ENABLE_SCOPE_CACHING and scope.len > 16;
         if (enable_cache) {
             if (self.cache.get(scope)) |cached| {
@@ -304,7 +306,7 @@ pub const Theme = struct {
         }
 
         var atom = Atom{};
-        // todo.. this should be cached from the grammar side too
+        // TODO This should be cached from the grammar side too?
         if (self.atoms) |*a| {
             atom.compute(scope, @constCast(a));
         }
