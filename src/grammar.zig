@@ -5,12 +5,6 @@ const GrammarInfo = resources.GrammarInfo;
 
 var syntax_id: u32 = 1;
 
-const NullSyntax = Syntax{
-    .name = "",
-    .content_name = "",
-    .scope_name = "",
-};
-
 pub const Syntax = struct {
     id: u32 = 0,
     name: []const u8,
@@ -510,6 +504,10 @@ pub const Grammar = struct {
 
     name: []const u8,
     syntax: ?*Syntax = null,
+
+    // TODO
+    // firstLineMatch
+    // foldingStartMarker / foldingStopMarker
 
     // TODO release this after parse (requires that all string values be allocated and copied)
     parsed: ?std.json.Parsed(std.json.Value) = null,

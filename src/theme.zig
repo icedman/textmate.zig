@@ -64,6 +64,7 @@ pub fn getThemeLibrary() ?*ThemeLibrary {
     return theThemeLibrary;
 }
 
+// TODO - this one served it's purpose, scope.zig implements the more accurate scope resolution
 pub const Scope = struct {
     allocator: std.mem.Allocator,
     children: std.StringHashMap(Scope),

@@ -83,7 +83,7 @@ pub fn listGrammars(allocator: std.mem.Allocator, path: []const u8, list: *std.A
         defer allocator.free(tmp);
         const gi = try getGrammarInfo(allocator, entry.path, tmp);
 
-        // std.debug.print("  {s}\n", .{gi.name});
+        // std.debug.print("{s}\n", .{gi.name});
         // std.debug.print("  {s}\n", .{gi.scope_name});
         // std.debug.print("  {s}\n", .{gi.full_path});
         // for (0..gi.file_types_count) |i| {
@@ -91,9 +91,6 @@ pub fn listGrammars(allocator: std.mem.Allocator, path: []const u8, list: *std.A
         // }
 
         try list.append(gi);
-
-        // if (list.items.len > 10) break;
-        // std.debug.print("{any}\n", .{entry});
     }
 }
 
@@ -151,14 +148,11 @@ pub fn listThemes(allocator: std.mem.Allocator, path: []const u8, list: *std.Arr
         defer allocator.free(tmp);
         const ti = try getThemeInfo(allocator, entry.path, tmp);
 
-        // std.debug.print("  {s}\n", .{ti.name});
+        // std.debug.print("{s}\n", .{ti.name});
         // std.debug.print("  {s}\n", .{ti.author});
         // std.debug.print("  {s}\n", .{ti.full_path});
 
         try list.append(ti);
-
-        // if (list.items.len > 10) break;
-        // std.debug.print("{any}\n", .{entry});
     }
 }
 

@@ -267,8 +267,15 @@ pub const RenderProcessor = struct {
 pub const RenderHtmlProcessor = struct {
     pub fn startDocument(self: *Processor) void {
         const stdout = std.io.getStdOut().writer();
-        stdout.print("<html><body style=\"background: black;\"><span>", .{}) catch {};
-        _ = self;
+        if (self.theme) |thm| {
+            const default_color = thm.getColor("editor.background") orelse
+                thm.getColor("background");
+            if (default_color) |c| {
+                if (c.foreground) |fg| {
+                    stdout.print("<html><body style=\"background: {s};\"><span>", .{fg[0..7]}) catch {};
+                }
+            }
+        }
     }
 
     pub fn endDocument(self: *Processor) void {
@@ -283,7 +290,6 @@ pub const RenderHtmlProcessor = struct {
             // const defaultColor: ?theme.Settings = theme.Settings{.foreground_rgb = theme.Rgb {.r = 255 }};
             // const default_color = (thm.getColor("editor.foreground") orelse
             //     thm.getColor("foreground") orelse theme.Settings{.foreground = "#FFFFFF"}).foreground.?;
-            var current_color: [32]u8 = [_]u8{0} ** 32;
 
             const captures = self.captures;
             const block = self.block orelse "";
@@ -292,34 +298,44 @@ pub const RenderHtmlProcessor = struct {
                 if (ch == '\n') break;
                 var cap: parser.Capture = parser.Capture{};
                 for (0..captures.items.len) |ci| {
-                    if (i >= captures.items[ci].start and i < captures.items[ci].end) {
+                    if (i == captures.items[ci].start) {
                         cap = captures.items[ci];
+
+                        var colors = theme.Settings{};
+                        const scope = thm.getScope(cap.scope[0..cap.scope.len], &colors);
+                        _ = scope;
+                        if (colors.foreground) |fg| {
+                            const scope_len = for (0..64) |si| {
+                                if (cap.scope[si] == 0) break si;
+                            } else 0;
+                            stdout.print("<span class=\"{s}\" style=\"color:{s};\">", .{ cap.scope[0..scope_len], fg[0..7] }) catch {};
+                        }
                         // std.debug.print("\n{s} {}-{} [{}]\n", .{ cap.scope, captures.items[ci].start, captures.items[ci].end, i });
                     }
                 }
 
-                var colors = theme.Settings{};
-                const scope = thm.getScope(cap.scope[0..cap.scope.len], &colors);
-                _ = scope;
-                if (colors.foreground) |fg| {
-                    if (!std.mem.eql(u8, fg, current_color[0..8])) {
-                        @memcpy(current_color[0..fg.len], fg);
-                        stdout.print("</span><span style=\"color:{s};\">", .{current_color[0..7]}) catch {};
-                    }
-                }
-
                 // _ = ch;
-                if (ch == '\t') {
-                    stdout.print("  ", .{}) catch {};
+                if (ch == '<') {
+                    stdout.print("&lt;", .{}) catch {};
+                } else if (ch == '\t') {
+                    stdout.print("&nbsp;&nbsp;", .{}) catch {};
                 } else {
                     stdout.print("{c}", .{ch}) catch {};
                 }
 
-                if (i + 1 >= cap.end) {
-                    current_color = [_]u8{0} ** 32;
+                for (0..captures.items.len) |ci| {
+                    if (i == captures.items[ci].end) {
+                        var colors = theme.Settings{};
+                        const scope = thm.getScope(cap.scope[0..cap.scope.len], &colors);
+                        _ = scope;
+                        if (colors.foreground) |fg| {
+                            _ = fg;
+                            stdout.print("</span>", .{}) catch {};
+                        }
+                    }
                 }
             }
-            stdout.print("<span><br/>\n", .{}) catch {};
+            stdout.print("<br/>\n", .{}) catch {};
         } else {
             stdout.print("theme is not set\n", .{}) catch {};
         }

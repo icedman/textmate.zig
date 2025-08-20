@@ -727,8 +727,6 @@ pub const Parser = struct {
                             start = pattern_match.start;
                             end = pattern_match.end;
 
-                            self.collectMatch(match_syn, &pattern_match, block);
-
                             if (match_syn.regexs_end != null) {
                                 // if it has a regexs_end.. it is a begin and should cause a push
                                 // std.debug.print("push {s}\n", .{match_syn.getName()});
@@ -748,11 +746,12 @@ pub const Parser = struct {
                                     proc.openTag(c);
                                 }
 
-                                // collect begin captures
+                                self.collectMatch(match_syn, &pattern_match, block);
                                 if (match_syn.begin_captures) |beg_cap| {
                                     self.collectCaptures(&pattern_match, &beg_cap, block);
                                 }
                             } else {
+                                self.collectMatch(match_syn, &pattern_match, block);
                                 if (match_syn.captures) |cap| {
                                     self.collectCaptures(&pattern_match, &cap, block);
                                 }
