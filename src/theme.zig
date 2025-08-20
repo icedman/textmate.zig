@@ -128,7 +128,7 @@ pub const Theme = struct {
 
     atoms: ?std.StringHashMap(u32) = null,
     scopes: ?std.ArrayList(Scope) = null,
-    scope_cache: ?std.StringHashMap(*Scope) = null,
+    cache: std.StringHashMap(*Scope),
 
     // TODO release this after parse (requires that all string values be allocated and copied)
     parsed: ?std.json.Parsed(std.json.Value) = null,
@@ -152,15 +152,14 @@ pub const Theme = struct {
         if (self.scopes) |*scopes| {
             scopes.deinit();
         }
-        if (self.scope_cache) |*cache| {
-            cache.deinit();
-        }
+        self.cache.deinit();
         self.arena.deinit();
     }
 
     pub fn parse(allocator: std.mem.Allocator, source: []const u8) !Theme {
         var theme = Theme{
             .allocator = allocator,
+            .cache = std.StringHashMap(*Scope).init(allocator),
             .arena = std.heap.ArenaAllocator.init(allocator),
             .name = "",
         };
@@ -279,7 +278,6 @@ pub const Theme = struct {
         theme.token_colors = token_colors;
         theme.atoms = atoms;
         theme.scopes = atom_scopes;
-        theme.scope_cache = std.StringHashMap(*Scope).init(allocator);
         theme.parsed = parsed;
 
         return theme;
@@ -288,6 +286,21 @@ pub const Theme = struct {
     pub fn getScope(self: *Theme, scope: []const u8, colors: ?*Settings) ?*const Scope {
         if (scope.len == 0) {
             return null;
+        }
+
+        const enable_cache = ENABLE_SCOPE_CACHING and scope.len > 16;
+        if (enable_cache) {
+            if (self.cache.get(scope)) |cached| {
+                if (colors) |c| {
+                    if (cached.token) |token| {
+                        if (token.settings) |settings| {
+                            c.foreground = settings.foreground;
+                            c.foreground_rgb = settings.foreground_rgb;
+                        }
+                    }
+                }
+                return cached;
+            }
         }
 
         var atom = Atom{};
@@ -314,6 +327,11 @@ pub const Theme = struct {
                             cc.foreground_rgb = ts.foreground_rgb;
                         }
                     }
+                    // why the need to allocate? isn't hash computed from string content?
+                    const key = self.arena.allocator().dupe(u8, scope) catch {
+                        return mm;
+                    };
+                    _ = self.cache.put(key, mm) catch {};
                 }
             }
             return matched;

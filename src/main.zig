@@ -156,6 +156,8 @@ pub fn main() !void {
 
         _ = try par.parseLine(&state, slice);
         line_no += 1;
+
+        if (line_no > 20000) break;
     }
     proc.endDocument();
     const end = std.time.nanoTimestamp();
@@ -168,9 +170,11 @@ pub fn main() !void {
         if (line_no > 0) {
             std.debug.print("execs/line: {}\n", .{par.regex_execs / line_no});
         }
+        std.debug.print("recompile: {}\n", .{par.regex_compile});
         std.debug.print("skips: {}\n", .{par.regex_skips});
         std.debug.print("done in {d:.6}s\n", .{elapsed});
         std.debug.print("state depth: {}\n", .{state.size()});
+        std.debug.print("retained: {}\n", .{proc.retained_captures.items.len});
         std.debug.print("grammar: {s}\n", .{gmr.name});
         std.debug.print("theme: {s}\n", .{thm.name});
         // state.dump();

@@ -247,6 +247,7 @@ pub const Parser = struct {
     // stats
     regex_execs: u32 = 0,
     regex_skips: u32 = 0,
+    regex_compile: u32 = 0,
     current_state: ?*ParseState = null,
 
     pub fn init(allocator: std.mem.Allocator, lang: *grammar.Grammar) !Parser {
@@ -453,6 +454,8 @@ pub const Parser = struct {
                         if (t.while_regex) |r| {
                             // use dynamic while_regex here if one was compiled
                             // not caching or result in this case
+                            // TODO caching is possible though
+                            self.regex_compile += 1;
                             const m = self.execRegex(@constCast(syn), r, syn.regexs_while, block, start, end);
                             break :blk m;
                         }
@@ -505,6 +508,7 @@ pub const Parser = struct {
                     if (t.end_regex) |r| {
                         // use dynamic end_regex here if one was compiled
                         // not caching or result in this case
+                        self.regex_compile += 1;
                         const m = self.execRegex(@constCast(syn), r, syn.regexs_end, block, start, end);
                         break :blk m;
                     }

@@ -214,6 +214,7 @@ pub const RenderProcessor = struct {
                         var colors = theme.Settings{};
                         const scope = thm.getScope(cap.scope[0..cap.scope.len], &colors);
                         _ = scope;
+                        // std.debug.print("?", .{});
 
                         // if (colors.foreground) |fgs| {
                         //     std.debug.print("{s}\n", .{fgs});
@@ -236,6 +237,7 @@ pub const RenderProcessor = struct {
                     top_color.b != current_color.b)
                 {
                     current_color = top_color;
+                    // std.debug.print("-", .{});
                     setColorRgb(std.debug, current_color) catch {};
                 }
 
