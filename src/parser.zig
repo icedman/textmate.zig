@@ -160,6 +160,7 @@ pub const ParseState = struct {
         }
     }
 
+    // TODO why optional match?
     pub fn push(self: *ParseState, syntax: *Syntax, block: []const u8, match: ?Match) !void {
         const anchor = (match orelse Match{ .start = 0 }).start;
         var sc = StateContext{
@@ -167,8 +168,8 @@ pub const ParseState = struct {
             .anchor = anchor,
         };
         if (syntax.has_back_references) {
-            // compile regex_end
             if (match) |m| {
+                // compile regex_end
                 if (syntax.regex_end == null) {
                     if (syntax.regexs_end) |regexs| {
                         var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
@@ -185,6 +186,7 @@ pub const ParseState = struct {
                         }
                     }
                 }
+                // compile regex_while
                 if (syntax.regex_while == null) {
                     if (syntax.regexs_while) |regexs| {
                         var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
@@ -461,8 +463,11 @@ pub const Parser = struct {
                         }
 
                         // while_match without caching
-                        const m = self.execRegex(@constCast(syn), syn.regex_while, syn.regexs_while, block, start, end);
-                        break :blk m;
+                        if (syn.regex_while) |r| {
+                            const m = self.execRegex(@constCast(syn), r, syn.regexs_while, block, start, end);
+                            break :blk m;
+                        }
+                        break :blk Match{};
                     };
 
                     if (m.count == 0) {

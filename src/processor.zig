@@ -56,6 +56,10 @@ pub const Processor = struct {
         if (self.end_line_fn) |f| {
             f(self);
         }
+
+        // can't be inside both comment and string
+        if (self.retained_captures.items.len > 0) return;
+
         self.retained_captures.clearRetainingCapacity();
         for (0..self.captures.items.len) |i| {
             const cap = self.captures.items[i];
@@ -72,7 +76,7 @@ pub const Processor = struct {
                 c.start = b.len;
             }
             c.end = b.len;
-            c.retain = true;
+            // c.retain = true;
             // TODO retain only string and comment blocks?
             // set retention at Parser, since capture only has syntax_id
         }
@@ -227,7 +231,6 @@ pub const RenderProcessor = struct {
                         }
 
                         color_stack_idx += 1;
-                        if (color_stack_idx > 500) color_stack_idx = 10;
                     }
                 }
 
@@ -250,7 +253,9 @@ pub const RenderProcessor = struct {
 
                 for (0..captures.items.len) |ci| {
                     if (i + 1 == captures.items[ci].end) {
-                        color_stack_idx -= 1;
+                        if (color_stack_idx > 1) {
+                            color_stack_idx -= 1;
+                        }
                         current_color = Rgb{};
                         resetColor(std.debug) catch {};
                     }
@@ -358,6 +363,16 @@ pub const RenderHtmlProcessor = struct {
             .start_document_fn = self.startDocument,
             .end_document_fn = self.endDocument,
             .end_line_fn = self.endLine,
+            .captures = std.ArrayList(parser.Capture).init(allocator),
+            .retained_captures = std.ArrayList(parser.Capture).init(allocator),
+        };
+    }
+};
+
+pub const NullProcessor = struct {
+    pub fn init(allocator: std.mem.Allocator) !Processor {
+        return Processor{
+            .allocator = allocator,
             .captures = std.ArrayList(parser.Capture).init(allocator),
             .retained_captures = std.ArrayList(parser.Capture).init(allocator),
         };

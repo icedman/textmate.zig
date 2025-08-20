@@ -182,13 +182,14 @@ pub fn atomsCmp(a_: Atom, b_: Atom) u8 {
     var shift: u7 = 0;
 
     // Try all alignments of b against a
-    for (0..a.count) |_| {
+    for (0..a.count) |x| {
         const shifted_b = b.id << shift;
 
         for (0..a.count) |i| {
             const mask = masks[i];
             if ((a.id & mask) == (shifted_b & mask)) {
-                matches += 1;
+                matches += 1 + @as(u8, @intCast(x >> 1));
+                // matches += 1;
             }
         }
 

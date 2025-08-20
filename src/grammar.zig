@@ -126,11 +126,11 @@ pub const Syntax = struct {
         };
 
         // special cases for retaining captures across lines
-        if (syntax.regexs_begin) |regexs| {
-            if (std.mem.indexOf(u8, regexs, "string")) |_| {
+        if (syntax.regexs_begin) |_| {
+            if (std.mem.indexOf(u8, syntax.getName(), "string")) |_| {
                 syntax.is_string_block = true;
             }
-            if (std.mem.indexOf(u8, regexs, "comment")) |_| {
+            if (std.mem.indexOf(u8, syntax.getName(), "comment")) |_| {
                 syntax.is_comment_block = true;
             }
         }

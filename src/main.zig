@@ -112,6 +112,7 @@ pub fn main() !void {
     var proc = blk: {
         if (dump) {
             break :blk try processor.DumpProcessor.init(allocator);
+            // break :blk try processor.NullProcessor.init(allocator);
         } else if (html) {
             break :blk try processor.RenderHtmlProcessor.init(allocator);
         } else {
@@ -157,7 +158,7 @@ pub fn main() !void {
         _ = try par.parseLine(&state, slice);
         line_no += 1;
 
-        if (line_no > 20000) break;
+        // if (line_no > 50000) break;
     }
     proc.endDocument();
     const end = std.time.nanoTimestamp();
