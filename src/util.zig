@@ -2,6 +2,13 @@ const std = @import("std");
 const theme = @import("theme.zig");
 const Rgb = theme.Rgb;
 
+pub fn toSlice(comptime T: type, array: T) []const u8 {
+    const len = for (array, 0..) |ch, i| {
+        if (ch == 0) break i;
+    } else 0;
+    return array[0..len];
+}
+
 pub fn setColorHex(stdout: anytype, hex: []const u8) !void {
     if (hex.len != 7 or hex[0] != '#') {
         return error.InvalidHexColor;

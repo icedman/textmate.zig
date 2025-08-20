@@ -34,11 +34,8 @@ pub const ThemeLibrary = struct {
         if (name.len >= 128) return error.NotFound;
         for (self.themes.items) |item| {
             if (std.mem.eql(u8, item.name[0..name.len], name)) {
-                const path_len = for (0..std.fs.max_path_bytes) |i| {
-                    if (item.full_path[i] == 0) break i;
-                } else 0;
-                const item_path: []const u8 = item.full_path[0..path_len];
-                return Theme.init(self.allocator, item_path);
+                const p: []const u8 = &item.full_path;
+                return Theme.init(self.allocator, util.toSlice([]const u8, p));
             }
         }
         return error.NotFound;
@@ -258,7 +255,7 @@ pub const Theme = struct {
         self.cache.deinit();
 
         // TODO arena - makes allocation really abstract.. remove
-        // self.arena.deinit();
+        self.arena.deinit();
     }
 
     pub fn parse(allocator: std.mem.Allocator, source: []const u8) !Theme {
@@ -290,8 +287,8 @@ pub const Theme = struct {
             if (colors_val == .object) {
                 var it = colors_val.object.iterator();
                 while (it.next()) |entry| {
-                    if (entry.value_ptr.* == .array) {
-                        std.debug.print(">>{s}\n", .{entry.key_ptr.*});
+                    if (entry.value_ptr.* != .string) {
+                        // fail silenty
                         continue;
                     }
                     const k = entry.key_ptr.*;
@@ -307,6 +304,10 @@ pub const Theme = struct {
         }
 
         // tokenColors
+        if (obj.get("tokenColors") == null) {
+            return error.InvalidTheme;
+        }
+
         const tokenColors_arr = obj.get("tokenColors").?.array;
         const tokenColors = try aa.alloc(TokenColor, tokenColors_arr.items.len);
         for (tokenColors_arr.items, 0..) |item, i| {
@@ -314,6 +315,9 @@ pub const Theme = struct {
             const token_name = if (o.get("name")) |v| v.string else "";
 
             // settings
+            if (o.get("settings") == null) {
+                continue;
+            }
             const settings_value = o.get("settings").?;
             const settings = try std.json.parseFromValue(Settings, aa, settings_value, .{ .ignore_unknown_fields = true });
 

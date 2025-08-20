@@ -1,6 +1,7 @@
 const std = @import("std");
 const oni = @import("oniguruma");
 const resources = @import("resources.zig");
+const util = @import("util.zig");
 const GrammarInfo = resources.GrammarInfo;
 
 var syntax_id: u32 = 1;
@@ -413,14 +414,10 @@ pub const GrammarLibrary = struct {
     pub fn grammarFromScopeName(self: *GrammarLibrary, name: []const u8) !Grammar {
         if (name.len >= 128) return error.NotFound;
         for (self.grammars.items) |item| {
-            const item_name: []const u8 = &item.scope_name;
-            if (std.mem.eql(u8, item_name[0..name.len], name[0..name.len])) {
-                // TODO how to get len for fixed [_]u8?
-                const path_len = for (0..std.fs.max_path_bytes) |i| {
-                    if (item.full_path[i] == 0) break i;
-                } else 0;
-                const item_path: []const u8 = item.full_path[0..path_len];
-                return Grammar.init(self.allocator, item_path);
+            const np: []const u8 = &item.scope_name;
+            if (std.mem.eql(u8, util.toSlice([]const u8, np), name)) {
+                const p: []const u8 = &item.full_path;
+                return Grammar.init(self.allocator, util.toSlice([]const u8, p));
             }
         }
         return error.NotFound;
@@ -446,32 +443,18 @@ pub const GrammarLibrary = struct {
             if (item.file_types_count > 0) {
                 // check against file types
                 for (0..item.file_types_count) |fi| {
-                    const item_name: []const u8 = &item.file_types[fi];
-                    const name_len = for (0..16) |ci| {
-                        if (item.file_types[fi][ci] == 0) break ci;
-                    } else 0;
-                    if (std.mem.eql(u8, item_name[0..name_len], ext[0..ext.len])) {
-                        // how to get len?!!!
-                        const path_len = for (0..std.fs.max_path_bytes) |i| {
-                            if (item.full_path[i] == 0) break i;
-                        } else 0;
-                        const item_path: []const u8 = item.full_path[0..path_len];
-                        return Grammar.init(self.allocator, item_path);
+                    const np: []const u8 = &item.file_types[fi];
+                    if (std.mem.eql(u8, util.toSlice([]const u8, np), ext[0..ext.len])) {
+                        const p: []const u8 = &item.full_path;
+                        return Grammar.init(self.allocator, util.toSlice([]const u8, p));
                     }
                 }
             } else {
                 // check against scope
-                const item_name: []const u8 = &item.scope_name;
-                const name_len = for (0..16) |ci| {
-                    if (item_name[ci] == 0) break ci;
-                } else 0;
-                if (std.mem.eql(u8, item_name[0..name_len], scope_name[0..scope_name_len])) {
-                    // how to get len?!!!
-                    const path_len = for (0..std.fs.max_path_bytes) |i| {
-                        if (item.full_path[i] == 0) break i;
-                    } else 0;
-                    const item_path: []const u8 = item.full_path[0..path_len];
-                    return Grammar.init(self.allocator, item_path);
+                const np: []const u8 = &item.scope_name;
+                if (std.mem.eql(u8, util.toSlice([]const u8, np), scope_name[0..scope_name_len])) {
+                    const p: []const u8 = &item.full_path;
+                    return Grammar.init(self.allocator, util.toSlice([]const u8, p));
                 }
             }
         }
@@ -547,7 +530,7 @@ pub const Grammar = struct {
         const parsed = try std.json.parseFromSlice(std.json.Value, aa, source, .{ .ignore_unknown_fields = true });
         const root = parsed.value;
 
-        if (root != .object) return error.InvalidSyntax;
+        if (root != .object) return error.InvalidGrammar;
         const obj = root.object;
 
         // grammar meta

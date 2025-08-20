@@ -52,7 +52,6 @@ pub fn getGrammarInfo(allocator: std.mem.Allocator, path: []const u8, full_path:
     @memcpy(gi.name[0..name.len], name);
     @memcpy(gi.scope_name[0..scope_name.len], scope_name);
     @memcpy(gi.full_path[0..full_path.len], full_path);
-
     if (obj.get("fileTypes")) |ft| {
         if (ft == .array) {
             for (ft.array.items, 0..) |f, j| {
