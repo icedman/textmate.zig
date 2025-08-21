@@ -415,7 +415,7 @@ pub const GrammarLibrary = struct {
     pub fn addGrammars(self: *GrammarLibrary, path: []const u8) !void {
         try resources.listGrammars(self.allocator, path, &self.grammars);
     }
-    
+
     pub fn addEmbeddedGrammars(self: *GrammarLibrary) !void {
         // _ = self;
         try embedded.listGrammars(self.allocator, &self.grammars);
@@ -454,6 +454,7 @@ pub const GrammarLibrary = struct {
         @memcpy(scope_name[6..scope_name_len], dot_ext);
 
         for (self.grammars.items) |item| {
+            if (item.inject_only) continue;
             if (item.file_types_count > 0) {
                 // check against file types
                 for (0..item.file_types_count) |fi| {
@@ -508,6 +509,8 @@ pub const Grammar = struct {
     name: []const u8,
     syntax: ?*Syntax = null,
 
+    inject_to: std.ArrayList([]const u8),
+
     // TODO
     // firstLineMatch
     // foldingStartMarker / foldingStopMarker
@@ -523,26 +526,21 @@ pub const Grammar = struct {
         defer allocator.free(file_contents);
         return Grammar.parse(allocator, file_contents);
     }
-    
+
     pub fn initWithData(allocator: std.mem.Allocator, file_contents: []const u8) !Grammar {
         return Grammar.parse(allocator, file_contents);
     }
 
     pub fn deinit(self: *Grammar) void {
-        // _ = self;
-        // if (self.syntax) |syntax| {
-        //     syntax.deinit();
-        // }
-        // if (self.parsed) |parsed| {
-        //     parsed.deinit();
-        // }
         // TODO arena - makes allocation really abstract.. remove
+        self.inject_to.deinit();
         self.arena.deinit();
     }
 
     pub fn parse(allocator: std.mem.Allocator, source: []const u8) !Grammar {
         var grammar = Grammar{
             .allocator = allocator,
+            .inject_to = std.ArrayList([]const u8).init(allocator),
             .arena = std.heap.ArenaAllocator.init(allocator),
             .name = "",
         };
@@ -561,10 +559,15 @@ pub const Grammar = struct {
         const name = obj.get("name").?.string;
         const syntax = try Syntax.init(aa, root);
 
+        if (obj.get("injectTo")) |inject| {
+            if (inject == .array) {
+                try grammar.inject_to.append("-- placeholder --");
+            }
+        }
+
         grammar.name = name;
         grammar.syntax = syntax;
         grammar.parsed = parsed;
-
         return grammar;
     }
 };

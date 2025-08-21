@@ -128,6 +128,8 @@ pub const Theme = struct {
     arena: std.heap.ArenaAllocator,
 
     name: []const u8,
+
+    // TODO minimize optionals
     author: ?[]const u8 = null,
     colors: ?std.StringHashMap(Settings) = null,
     token_colors: ?[]TokenColor = null,
@@ -135,8 +137,8 @@ pub const Theme = struct {
 
     type: ?[]const u8 = null, // dark,light?
 
-    atoms: ?std.StringHashMap(u32) = null,
-    scopes: ?std.ArrayList(Scope) = null,
+    atoms: std.StringHashMap(u32),
+    scopes: std.ArrayList(Scope),
     cache: std.StringHashMap(*Scope),
 
     // TODO release this after parse (requires that all string values be allocated and copied)
@@ -159,12 +161,8 @@ pub const Theme = struct {
     }
 
     pub fn deinit(self: *Theme) void {
-        if (self.atoms) |*atoms| {
-            atoms.deinit();
-        }
-        if (self.scopes) |*scopes| {
-            scopes.deinit();
-        }
+        self.atoms.deinit();
+        self.scopes.deinit();
         self.cache.deinit();
         self.arena.deinit();
     }
@@ -172,10 +170,16 @@ pub const Theme = struct {
     pub fn parse(allocator: std.mem.Allocator, source: []const u8) !Theme {
         var theme = Theme{
             .allocator = allocator,
+            .atoms = std.StringHashMap(u32).init(allocator),
+            .scopes = std.ArrayList(Scope).init(allocator),
             .cache = std.StringHashMap(*Scope).init(allocator),
             .arena = std.heap.ArenaAllocator.init(allocator),
             .name = "",
         };
+
+        errdefer theme.atoms.deinit();
+        errdefer theme.scopes.deinit();
+        errdefer theme.cache.deinit();
 
         // anything associated with reading the json
         const aa = theme.arena.allocator();
@@ -219,8 +223,6 @@ pub const Theme = struct {
             return error.InvalidTheme;
         }
 
-        var atoms = std.StringHashMap(u32).init(allocator);
-        errdefer atoms.deinit();
         const token_colors_arr = obj.get("tokenColors").?.array;
         const token_colors = try aa.alloc(TokenColor, token_colors_arr.items.len);
         errdefer aa.free(token_colors);
@@ -261,13 +263,10 @@ pub const Theme = struct {
 
             if (scopes) |outer| {
                 for (outer) |sc| {
-                    scope_.extractAtom(sc, &atoms);
+                    scope_.extractAtom(sc, &theme.atoms);
                 }
             }
         }
-
-        var atom_scopes = std.ArrayList(Scope).init(allocator);
-        errdefer atom_scopes.deinit();
 
         for (token_colors, 0..) |tokenColor, ti| {
             if (tokenColor.scope) |sc| {
@@ -275,8 +274,8 @@ pub const Theme = struct {
                     if (std.mem.indexOf(u8, scope_name, ",")) |_| continue;
                     if (std.mem.indexOf(u8, scope_name, " ")) |_| continue;
                     var atom = Atom{};
-                    atom.compute(scope_name, &atoms);
-                    atom_scopes.append(Scope{
+                    atom.compute(scope_name, &theme.atoms);
+                    theme.scopes.append(Scope{
                         .atom = atom,
                         .token = &token_colors[ti],
                     }) catch {};
@@ -289,8 +288,6 @@ pub const Theme = struct {
         theme.semantic_highlighting = semantic_highlighting;
         theme.colors = colors;
         theme.token_colors = token_colors;
-        theme.atoms = atoms;
-        theme.scopes = atom_scopes;
         theme.parsed = parsed;
 
         return theme;
@@ -319,40 +316,33 @@ pub const Theme = struct {
         }
 
         var atom = Atom{};
-        // TODO This should be cached from the grammar side too?
-        if (self.atoms) |*a| {
-            atom.compute(scope, @constCast(a));
-        }
+        atom.compute(scope, &self.atoms);
 
-        if (self.scopes) |scopes| {
-            var highest: u8 = 0;
-            var matched: ?*Scope = null;
-            for (scopes.items) |*sc| {
-                const m = Atom.cmp(atom, sc.atom);
-                if (m > highest) {
-                    highest = m;
-                    matched = sc;
-                }
+        var highest: u8 = 0;
+        var matched: ?*Scope = null;
+        for (self.scopes.items) |*sc| {
+            const m = Atom.cmp(atom, sc.atom);
+            if (m > highest) {
+                highest = m;
+                matched = sc;
             }
-            if (colors) |cc| {
-                if (matched) |mm| {
-                    if (mm.token) |tk| {
-                        if (tk.settings) |ts| {
-                            cc.foreground = ts.foreground;
-                            cc.foreground_rgb = ts.foreground_rgb;
-                        }
+        }
+        if (colors) |cc| {
+            if (matched) |mm| {
+                if (mm.token) |tk| {
+                    if (tk.settings) |ts| {
+                        cc.foreground = ts.foreground;
+                        cc.foreground_rgb = ts.foreground_rgb;
                     }
-                    // why the need to allocate? isn't hash computed from string content?
-                    const key = self.arena.allocator().dupe(u8, scope) catch {
-                        return mm;
-                    };
-                    _ = self.cache.put(key, mm) catch {};
                 }
+                // why the need to allocate? isn't hash computed from string content?
+                const key = self.arena.allocator().dupe(u8, scope) catch {
+                    return mm;
+                };
+                _ = self.cache.put(key, mm) catch {};
             }
-            return matched;
         }
-
-        return null;
+        return matched;
     }
 
     pub fn getColor(self: *Theme, name: []const u8) ?Settings {

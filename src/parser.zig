@@ -19,7 +19,7 @@ const STATE_STACK_PRUNE = 120; // prune off states from the stack
 pub const Capture = struct {
     start: usize = 0,
     end: usize = 0,
-    
+
     // is this expensive to pass around (copy)
     scope: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN,
 

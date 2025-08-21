@@ -50,6 +50,8 @@ pub fn main() !void {
         return;
     }
 
+    const warm_start = std.time.nanoTimestamp();
+
     theme.initThemeLibrary(allocator) catch {
         return;
     };
@@ -149,6 +151,9 @@ pub fn main() !void {
     var buf: [1024]u8 = undefined;
     var line_no: usize = 1;
 
+    const warm_end = std.time.nanoTimestamp();
+    const warm_elapsed = @as(f64, @floatFromInt(warm_end - warm_start)) / 1_000_000_000.0;
+
     const start = std.time.nanoTimestamp();
     proc.startDocument();
 
@@ -185,12 +190,13 @@ pub fn main() !void {
         }
         std.debug.print("recompile: {}\n", .{par.regex_compile});
         std.debug.print("skips: {}\n", .{par.regex_skips});
+        std.debug.print("warmup in {d:.6}s\n", .{warm_elapsed});
         std.debug.print("done in {d:.6}s\n", .{elapsed});
         std.debug.print("state depth: {}\n", .{state.size()});
         std.debug.print("retained: {}\n", .{proc.retained_captures.items.len});
         std.debug.print("grammar: {s}\n", .{gmr.name});
         std.debug.print("theme: {s}\n", .{thm.name});
-        std.debug.print("theme atoms: {}\n", .{thm.atoms.?.count()});
+        std.debug.print("theme atoms: {}\n", .{thm.atoms.count()});
         // state.dump();
     }
 }
