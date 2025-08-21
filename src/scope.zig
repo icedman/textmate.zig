@@ -234,8 +234,9 @@ fn testTheme(allocator: std.mem.Allocator) !void {
     // everforest-dark "keyword, storage.type"
     // var thm = theme.Theme.init(allocator, "./src/themes/aurora-x.json") catch {
     // var thm = theme.Theme.init(allocator, "./src/themes/vitesse-dark.json") catch {
-    var thm = theme.Theme.init(allocator, "./src/themes/everforest-dark.json") catch {
-    // var thm = theme.Theme.init(allocator, "./src/themes/dracula.json") catch {
+    // var thm = theme.Theme.init(allocator, "./src/themes/everforest-dark.json") catch {
+    var thm = theme.Theme.init(allocator, "./src/themes/monokai.json") catch {
+        // var thm = theme.Theme.init(allocator, "./src/themes/dracula.json") catch {
         unreachable;
     };
     defer thm.deinit();

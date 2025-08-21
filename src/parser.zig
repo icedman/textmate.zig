@@ -161,14 +161,16 @@ pub const ParseState = struct {
         }
     }
 
-    pub fn pop(self: *ParseState) void {
+    pub fn pop(self: *ParseState, where: []const u8) void {
         if (self.stack.items.len > 0) {
             _ = self.stack.pop();
+            _ = where;
+            // std.debug.print("state pop {} - {s}\n", .{ self.size(), where });
         }
     }
 
     // TODO why optional match?
-    pub fn push(self: *ParseState, syntax: *Syntax, block: []const u8, match: ?Match) !void {
+    pub fn push(self: *ParseState, syntax: *Syntax, block: []const u8, match: ?Match, where: []const u8) !void {
         const anchor = (match orelse Match{ .start = 0 }).start;
         var sc = StateContext{
             .syntax = syntax,
@@ -213,6 +215,8 @@ pub const ParseState = struct {
             }
         }
         _ = self.stack.append(sc) catch {};
+        _ = where;
+        // std.debug.print("state push {} {s}\n", .{self.size(), where});
     }
 
     pub fn size(self: *ParseState) usize {
@@ -474,12 +478,13 @@ pub const Parser = struct {
                             const m = self.execRegex(@constCast(syn), r, syn.regexs_while, block, start, end);
                             break :blk m;
                         }
-                        break :blk Match{};
+                        break :blk Match{ .count = 1 };
                     };
 
                     if (m.count == 0) {
+                        std.debug.print("while! {s}\n", .{syn.regexs_while orelse "?"});
                         while (state.size() >= state_depth) {
-                            state.pop();
+                            state.pop("matchWhile");
                         }
                     }
 
@@ -487,7 +492,7 @@ pub const Parser = struct {
                     //     const m = self.execRegex(@constCast(syn), regex, syn.regexs_while, block, start, end);
                     //     if (m.count == 0) {
                     //         while (state.size() >= state_depth) {
-                    //             state.pop();
+                    //             state.pop("matchWhile");
                     //         }
                     //     }
                     // }
@@ -736,7 +741,7 @@ pub const Parser = struct {
                         }
 
                         // pop!
-                        state.pop();
+                        state.pop("matchEnd");
                     } else if (pattern_match.count > 0) {
                         if (pattern_match.syntax) |match_syn| {
                             // pattern has been matched
@@ -746,7 +751,7 @@ pub const Parser = struct {
                             if (match_syn.regexs_end != null) {
                                 // if it has a regexs_end.. it is a begin and should cause a push
                                 // std.debug.print("push {s}\n", .{match_syn.getName()});
-                                state.push(match_syn, block, pattern_match) catch {
+                                state.push(match_syn, block, pattern_match, "patttern") catch {
                                     // fail silently?
                                 };
 

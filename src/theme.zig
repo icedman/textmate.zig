@@ -171,31 +171,32 @@ pub const Theme = struct {
         self.cache.deinit();
         self.arena.deinit();
     }
-        
+
     fn addScopeForToken(self: *Theme, scope_name: []const u8, token: *TokenColor, ascendant: Atom, exclusion: Atom) !void {
-        // Exclusions scopes... 
+        if (scope_name.len == 0) return;
+
+        // Exclusions scopes...
         if (std.mem.indexOf(u8, scope_name, " - ")) |_| {
-            // split by comma and make atoms for the same tokenColor 
-            var sc = scope_name[0..]; 
-            while(std.mem.indexOf(u8, sc, ",")) |idx| {
+            // split by comma and make atoms for the same tokenColor
+            // TODO ... disregard exclusionist scope
+            var sc = scope_name[0..];
+            while (std.mem.indexOf(u8, sc, " - ")) |idx| {
                 const ss = sc[0..idx];
                 self.addScopeForToken(ss, token, ascendant, exclusion) catch {};
-                sc = sc[idx+1..];
-                if (sc.len > 1 and sc[0] == ' ') sc = sc[1..];
+                return;
             }
-            self.addScopeForToken(sc, token, ascendant, exclusion) catch {};
             return;
         }
 
         // Grouped scopes ... split by ","
         if (std.mem.indexOf(u8, scope_name, ",")) |_| {
-            // split by comma and make atoms for the same tokenColor 
-            var sc = scope_name[0..]; 
-            while(std.mem.indexOf(u8, sc, ",")) |idx| {
+            // split by comma and make atoms for the same tokenColor
+            var sc = scope_name[0..];
+            while (std.mem.indexOf(u8, sc, ",")) |idx| {
                 const ss = sc[0..idx];
                 self.addScopeForToken(ss, token, ascendant, exclusion) catch {};
-                sc = sc[idx+1..];
-                if (sc.len > 1 and sc[0] == ' ') sc = sc[1..];
+                sc = sc[idx + 1 ..];
+                while (sc.len > 1 and sc[0] == ' ') sc = sc[1..];
             }
             self.addScopeForToken(sc, token, ascendant, exclusion) catch {};
             return;
@@ -205,7 +206,7 @@ pub const Theme = struct {
         if (std.mem.indexOf(u8, scope_name, " ")) |_| {
             var asc = Atom{};
             var sc = scope_name[0..];
-            while(std.mem.indexOf(u8, sc, " ")) |idx| {
+            while (std.mem.indexOf(u8, sc, " ")) |idx| {
                 const ss = sc[0..idx];
                 if (asc.id == 0) {
                     asc = Atom.fromScopeName(ss, &self.atoms);
@@ -213,13 +214,13 @@ pub const Theme = struct {
                     self.addScopeForToken(ss, token, asc, exclusion) catch {};
                     return;
                 }
-                sc = sc[idx+1..];
-                if (sc.len > 1 and sc[0] == ' ') sc = sc[1..];
+                sc = sc[idx + 1 ..];
+                while (sc.len > 1 and sc[0] == ' ') sc = sc[1..];
             }
             self.addScopeForToken(sc, token, asc, exclusion) catch {};
             return;
         }
-        
+
         try self.scopes.append(Scope{
             .atom = Atom.fromScopeName(scope_name, &self.atoms),
             .ascendant = ascendant,
