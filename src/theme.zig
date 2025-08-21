@@ -76,6 +76,11 @@ pub fn getThemeLibrary() ?*ThemeLibrary {
 pub const Scope = struct {
     atom: Atom = Atom{},
     token: ?*TokenColor = null,
+
+    // having ascendant(s) - one for now - will allow this atom to score better
+    ascendant: Atom = Atom{},
+    // having exclusion(s) - one for now - will allow this atom to fail
+    exclusion: Atom = Atom{},
 };
 
 pub const TokenColor = struct {
@@ -165,6 +170,62 @@ pub const Theme = struct {
         self.scopes.deinit();
         self.cache.deinit();
         self.arena.deinit();
+    }
+        
+    fn addScopeForToken(self: *Theme, scope_name: []const u8, token: *TokenColor, ascendant: Atom, exclusion: Atom) !void {
+        // Exclusions scopes... 
+        if (std.mem.indexOf(u8, scope_name, " - ")) |_| {
+            // split by comma and make atoms for the same tokenColor 
+            var sc = scope_name[0..]; 
+            while(std.mem.indexOf(u8, sc, ",")) |idx| {
+                const ss = sc[0..idx];
+                self.addScopeForToken(ss, token, ascendant, exclusion) catch {};
+                sc = sc[idx+1..];
+                if (sc.len > 1 and sc[0] == ' ') sc = sc[1..];
+            }
+            self.addScopeForToken(sc, token, ascendant, exclusion) catch {};
+            return;
+        }
+
+        // Grouped scopes ... split by ","
+        if (std.mem.indexOf(u8, scope_name, ",")) |_| {
+            // split by comma and make atoms for the same tokenColor 
+            var sc = scope_name[0..]; 
+            while(std.mem.indexOf(u8, sc, ",")) |idx| {
+                const ss = sc[0..idx];
+                self.addScopeForToken(ss, token, ascendant, exclusion) catch {};
+                sc = sc[idx+1..];
+                if (sc.len > 1 and sc[0] == ' ') sc = sc[1..];
+            }
+            self.addScopeForToken(sc, token, ascendant, exclusion) catch {};
+            return;
+        }
+
+        // Scopes with ascendants ... split by " "
+        if (std.mem.indexOf(u8, scope_name, " ")) |_| {
+            var asc = Atom{};
+            var sc = scope_name[0..];
+            while(std.mem.indexOf(u8, sc, " ")) |idx| {
+                const ss = sc[0..idx];
+                if (asc.id == 0) {
+                    asc = Atom.fromScopeName(ss, &self.atoms);
+                } else {
+                    self.addScopeForToken(ss, token, asc, exclusion) catch {};
+                    return;
+                }
+                sc = sc[idx+1..];
+                if (sc.len > 1 and sc[0] == ' ') sc = sc[1..];
+            }
+            self.addScopeForToken(sc, token, asc, exclusion) catch {};
+            return;
+        }
+        
+        try self.scopes.append(Scope{
+            .atom = Atom.fromScopeName(scope_name, &self.atoms),
+            .ascendant = ascendant,
+            .exclusion = exclusion,
+            .token = token,
+        });
     }
 
     pub fn parse(allocator: std.mem.Allocator, source: []const u8) !Theme {
@@ -268,21 +329,6 @@ pub const Theme = struct {
             }
         }
 
-        for (token_colors, 0..) |tokenColor, ti| {
-            if (tokenColor.scope) |sc| {
-                for (sc) |scope_name| {
-                    if (std.mem.indexOf(u8, scope_name, ",")) |_| continue;
-                    if (std.mem.indexOf(u8, scope_name, " ")) |_| continue;
-                    var atom = Atom{};
-                    atom.compute(scope_name, &theme.atoms);
-                    theme.scopes.append(Scope{
-                        .atom = atom,
-                        .token = &token_colors[ti],
-                    }) catch {};
-                }
-            }
-        }
-
         theme.name = name;
         theme.author = author;
         theme.semantic_highlighting = semantic_highlighting;
@@ -290,6 +336,13 @@ pub const Theme = struct {
         theme.token_colors = token_colors;
         theme.parsed = parsed;
 
+        for (token_colors, 0..) |tokenColor, ti| {
+            if (tokenColor.scope) |sc| {
+                for (sc) |scope_name| {
+                    theme.addScopeForToken(scope_name, &token_colors[ti], Atom{}, Atom{}) catch {};
+                }
+            }
+        }
         return theme;
     }
 

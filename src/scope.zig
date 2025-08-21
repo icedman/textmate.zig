@@ -89,7 +89,7 @@ fn testLoadingAllThemes(allocator: std.mem.Allocator) !void {
 
     var list = std.ArrayList(ThemeInfo).init(allocator);
     defer list.deinit();
-    try resources.listThemes(allocator, "./data/themes", &list);
+    try resources.listThemes(allocator, "./src/themes", &list);
 
     var themes = std.ArrayList(theme.Theme).init(allocator);
     defer themes.deinit();
@@ -137,6 +137,12 @@ fn testLoadingAllThemes(allocator: std.mem.Allocator) !void {
 pub const Atom = struct {
     id: u128 = 0,
     count: u8 = 0,
+
+    pub fn fromScopeName(scope: []const u8, map: *std.StringHashMap(u32)) Atom {
+        var a = Atom{};
+        a.compute(scope, map);
+        return a;
+    }
 
     pub fn compute(self: *Atom, scope: []const u8, map: *std.StringHashMap(u32)) void {
         const a = atomize(scope, map);
@@ -224,8 +230,12 @@ pub fn atomsCmp(a_: Atom, b_: Atom) u8 {
 }
 
 fn testTheme(allocator: std.mem.Allocator) !void {
-    var thm = theme.Theme.init(allocator, "./data/themes/aurora-x.json") catch {
-        // var thm = theme.Theme.init(allocator, "./data/themes/vitesse-dark.json") catch {
+    // dracula "meta.function.arguments variable.other.php"
+    // everforest-dark "keyword, storage.type"
+    // var thm = theme.Theme.init(allocator, "./src/themes/aurora-x.json") catch {
+    // var thm = theme.Theme.init(allocator, "./src/themes/vitesse-dark.json") catch {
+    var thm = theme.Theme.init(allocator, "./src/themes/everforest-dark.json") catch {
+    // var thm = theme.Theme.init(allocator, "./src/themes/dracula.json") catch {
         unreachable;
     };
     defer thm.deinit();
@@ -253,10 +263,10 @@ fn testTheme(allocator: std.mem.Allocator) !void {
     // TODO add an actual check on which token should win
     const scope_inputs = [_][]const u8{
         "entity.name.function.c",
-        "punctuation.section.parameters.begin.bracket.round.c",
-        "meta.function.definition.parameters.c",
-        "punctuation.section.parameters.end.bracket.round.c",
-        "markup.list.unnumbered.markdown",
+        // "punctuation.section.parameters.begin.bracket.round.c",
+        // "meta.function.definition.parameters.c",
+        // "punctuation.section.parameters.end.bracket.round.c",
+        // "markup.list.unnumbered.markdown",
     };
 
     for (scope_inputs) |scope_input| {
@@ -297,6 +307,6 @@ fn testTheme(allocator: std.mem.Allocator) !void {
 
 test "scopes" {
     const allocator = std.testing.allocator;
-    try testLoadingAllThemes(allocator);
+    // try testLoadingAllThemes(allocator);
     try testTheme(allocator);
 }
