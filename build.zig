@@ -16,23 +16,45 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    // generate assets
-    // TODO make this optional
-    if (true) {
-        var assets_buffer = std.ArrayList(u8).init(b.allocator);
-        defer assets_buffer.deinit();
-        const themes_path = b.build_root.join(b.allocator, &.{"/src/themes"}) catch unreachable;
-        res.generateEmbeddedThemesFile(b.allocator, assets_buffer.writer(), "theme_", themes_path) catch unreachable;
-        const grammars_path = b.build_root.join(b.allocator, &.{"/src/grammars"}) catch unreachable;
-        res.generateEmbeddedGrammarsFile(b.allocator, assets_buffer.writer(), "grammar_", grammars_path) catch unreachable;
+    const generate_embedded = b.allocator.create(std.Build.Step) catch unreachable;
+    generate_embedded.* = std.Build.Step.init(.{
+        .id = .custom,
+        .name = "generate_embedded",
+        .owner = b,
+        .makeFn = struct {
+            fn make(step: *std.Build.Step, opts: std.Build.Step.MakeOptions) !void {
+                const bb = step.owner;
+                _ = opts;
 
-        // const embed_path = b.cache_root.join(b.allocator, &.{"embedded.zig"}) catch unreachable;
-        const embed_path = b.build_root.join(b.allocator, &.{"/src/embedded.zig"}) catch unreachable;
-        // std.debug.print("{s}\n", .{embed_path});
-        const embed_file = std.fs.cwd().createFile(embed_path, .{ .truncate = true }) catch unreachable;
-        defer embed_file.close();
-        embed_file.writeAll(assets_buffer.items) catch unreachable;
-    }
+                var assets_buffer = std.ArrayList(u8).init(bb.allocator);
+                defer assets_buffer.deinit();
+
+                const themes_path = try bb.build_root.join(bb.allocator, &.{"src/themes"});
+                try res.generateEmbeddedThemesFile(bb.allocator, assets_buffer.writer(), "theme_", themes_path);
+
+                const grammars_path = try bb.build_root.join(bb.allocator, &.{"src/grammars"});
+                try res.generateEmbeddedGrammarsFile(bb.allocator, assets_buffer.writer(), "grammar_", grammars_path);
+
+                const embed_path = try bb.cache_root.join(bb.allocator, &.{"embedded.zig"});
+                std.debug.print("{s}\n", .{embed_path});
+
+                const embed_file = try std.fs.cwd().createFile(embed_path, .{ .truncate = true });
+                defer embed_file.close();
+                try embed_file.writeAll(assets_buffer.items);
+            }
+        }.make,
+    });
+
+    const update_embedded = b.addUpdateSourceFiles();
+    update_embedded.addCopyFileToSource(
+        b.path(".zig-cache/embedded.zig"),
+        "src/embedded.zig",
+    );
+    update_embedded.step.dependOn(generate_embedded);
+
+    // Wrap update in a step
+    const update_step = b.step("generate", "Read themes and grammars folders and generate embedded.zig");
+    update_step.dependOn(&update_embedded.step);
 
     // This creates a "module", which represents a collection of source files alongside
     // some compilation options, such as optimization mode and linked system libraries.
