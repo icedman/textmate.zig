@@ -10,7 +10,8 @@ const ENABLE_END_MATCH_CACHING = true;
 
 const MAX_LINE_LEN = 1024; // and line longer will not be parsed
 const MAX_MATCH_RANGES = 10; // max $1 in grammar files is just 8
-const MAX_SCOPE_LEN = 64;
+const MAX_SCOPE_LEN = 98;
+
 const MAX_STATE_STACK_DEPTH = 200; // if the state depth is too deep .. just prune (this shouldn't happen though)
 const STATE_STACK_PRUNE = 120; // prune off states from the stack
 
@@ -18,6 +19,8 @@ const STATE_STACK_PRUNE = 120; // prune off states from the stack
 pub const Capture = struct {
     start: usize = 0,
     end: usize = 0,
+    
+    // is this expensive to pass around (copy)
     scope: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN,
 
     // open block and strings will be retained across line parsing
@@ -63,7 +66,7 @@ const Match = struct {
                     const digit: u8 = blk: {
                         const d = ch - '0';
                         if (MAX_MATCH_RANGES > 9 and output_idx < output.len - 1) {
-                            // check for another digit
+                            // check for another digit if allowed the config
                             const ch2 = target[idx + 1];
                             if (std.ascii.isDigit(ch2)) {
                                 const d2 = ch2 - '0';
@@ -108,6 +111,10 @@ const Match = struct {
 const StateContext = struct {
     syntax: *Syntax,
     anchor: usize = 0,
+
+    // These dynamic regexes should be cached
+    // 1. to allow restoration from serialized copy
+    // 2. and minimize recompilation
     while_regex: ?oni.Regex = null,
     end_regex: ?oni.Regex = null,
 };

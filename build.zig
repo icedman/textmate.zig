@@ -18,7 +18,7 @@ pub fn build(b: *std.Build) void {
 
     // generate assets
     // TODO make this optional
-    if (false)
+    if (true)
     {
         var assets_buffer = std.ArrayList(u8).init(b.allocator);
         defer assets_buffer.deinit();
@@ -26,8 +26,10 @@ pub fn build(b: *std.Build) void {
         res.generateEmbeddedThemesFile(b.allocator, assets_buffer.writer(), "theme_", themes_path) catch unreachable;
         const grammars_path = b.build_root.join(b.allocator, &.{"/src/grammars"}) catch unreachable;
         res.generateEmbeddedGrammarsFile(b.allocator, assets_buffer.writer(), "grammar_", grammars_path) catch unreachable;
-        const embed_path = b.cache_root.join(b.allocator, &.{"embedded.zig"}) catch unreachable;
-        std.debug.print("{s}\n", .{embed_path});
+        
+        // const embed_path = b.cache_root.join(b.allocator, &.{"embedded.zig"}) catch unreachable;
+        const embed_path = b.build_root.join(b.allocator, &.{"/src/embedded.zig"}) catch unreachable;
+        // std.debug.print("{s}\n", .{embed_path});
         const embed_file = std.fs.cwd().createFile(embed_path, .{.truncate = true}) catch unreachable;
         defer embed_file.close();
         embed_file.writeAll(assets_buffer.items) catch unreachable;

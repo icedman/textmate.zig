@@ -355,6 +355,7 @@ pub const Syntax = struct {
         if (self.scope_name.len > 0) {
             return self.scope_name;
         }
+        // no need to return name (match is unscoped?)
         return self.name;
     }
 
@@ -394,6 +395,9 @@ pub const Syntax = struct {
     }
 };
 
+// Grammars may load other grammars
+// This will also a hold embedded grammar files.
+// And optionally hold additional grammars from requested directories
 var theGrammarLibrary: ?*GrammarLibrary = null;
 
 pub const GrammarLibrary = struct {

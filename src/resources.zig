@@ -6,7 +6,8 @@ const MAX_NAME_LENGTH = 128;
 const MAX_FILE_TYPES = 8;
 const MAX_EXT_LENGTH = 16;
 
-// fixed length strings for embedded resources
+// Fixed length strings for embedded resources
+// convert to []const u8 for faster embedding (avoiding memcpy)
 pub const GrammarInfo = struct {
     name: [MAX_NAME_LENGTH]u8 = [_]u8{0} ** MAX_NAME_LENGTH,
     scope_name: [MAX_NAME_LENGTH]u8 = [_]u8{0} ** MAX_NAME_LENGTH,
