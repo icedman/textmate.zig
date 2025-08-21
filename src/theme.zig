@@ -1,5 +1,6 @@
 const std = @import("std");
 const resources = @import("resources.zig");
+const embedded = @import("embedded.zig");
 const ThemeInfo = resources.ThemeInfo;
 
 const scope_ = @import("scope.zig");
@@ -33,10 +34,18 @@ pub const ThemeLibrary = struct {
         try resources.listThemes(self.allocator, path, &self.themes);
     }
 
+    pub fn addEmbeddedThemes(self: *ThemeLibrary) !void {
+        // _ = self;
+        try embedded.listThemes(self.allocator, &self.themes);
+    }
+
     pub fn themeFromName(self: *ThemeLibrary, name: []const u8) !Theme {
         if (name.len >= 128) return error.NotFound;
         for (self.themes.items) |item| {
             if (std.mem.eql(u8, item.name[0..name.len], name)) {
+                if (item.embedded_file) |file| {
+                    return Theme.initWithData(self.allocator, file);
+                }
                 const p: []const u8 = &item.full_path;
                 return Theme.init(self.allocator, util.toSlice([]const u8, p));
             }
@@ -142,6 +151,10 @@ pub const Theme = struct {
         const file_size = (try file.stat()).size;
         const file_contents = try file.readToEndAlloc(allocator, file_size);
         defer allocator.free(file_contents);
+        return Theme.parse(allocator, file_contents);
+    }
+
+    pub fn initWithData(allocator: std.mem.Allocator, file_contents: []const u8) !Theme {
         return Theme.parse(allocator, file_contents);
     }
 

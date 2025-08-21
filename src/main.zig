@@ -21,6 +21,7 @@ pub fn main() !void {
     var grammar_path: ?[]const u8 = null;
     var theme_path: ?[]const u8 = null;
     var file_path: ?[]const u8 = null;
+    var extra_resources_path: ?[]const u8 = null;
 
     var args = std.process.args();
     var arg = args.next(); // skips the executable name
@@ -29,6 +30,8 @@ pub fn main() !void {
         if (arg == null) break;
         if (std.mem.eql(u8, arg.?, "-s")) {
             stats = true;
+        } else if (std.mem.eql(u8, arg.?, "-r")) {
+            extra_resources_path = args.next();
         } else if (std.mem.eql(u8, arg.?, "-h")) {
             html = true;
         } else if (std.mem.eql(u8, arg.?, "-d")) {
@@ -52,9 +55,15 @@ pub fn main() !void {
     };
     defer theme.deinitThemeLibrary();
     if (theme.getThemeLibrary()) |thl| {
-        thl.addThemes("./data/themes") catch {
-            std.debug.print("unable to add themes directory\n", .{});
+        thl.addEmbeddedThemes() catch {
+            std.debug.print("unable to add embedded themes\n", .{});
         };
+        // for (thl.themes.items) |item| {
+        //     std.debug.print("{s}\n", .{item.name});
+        // }
+        // thl.addThemes("./src/themes") catch {
+        //     std.debug.print("unable to add themes directory\n", .{});
+        // };
     }
 
     grammar.initGrammarLibrary(allocator) catch {
@@ -62,9 +71,12 @@ pub fn main() !void {
     };
     defer grammar.deinitGrammarLibrary();
     if (grammar.getGrammarLibrary()) |gml| {
-        gml.addGrammars("./data/grammars") catch {
-            std.debug.print("unable to add grammars directory\n", .{});
+        gml.addEmbeddedGrammars() catch {
+            std.debug.print("unable to add embedded grammars\n", .{});
         };
+        // gml.addGrammars("./src/grammars") catch {
+        //     std.debug.print("unable to add grammars directory\n", .{});
+        // };
     }
 
     // var thm = theme.Theme.init(allocator, theme_path orelse "data/tests/dracula.json") catch {

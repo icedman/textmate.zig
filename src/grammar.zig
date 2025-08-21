@@ -1,6 +1,7 @@
 const std = @import("std");
 const oni = @import("oniguruma");
 const resources = @import("resources.zig");
+const embedded = @import("embedded.zig");
 const util = @import("util.zig");
 const GrammarInfo = resources.GrammarInfo;
 
@@ -410,12 +411,21 @@ pub const GrammarLibrary = struct {
     pub fn addGrammars(self: *GrammarLibrary, path: []const u8) !void {
         try resources.listGrammars(self.allocator, path, &self.grammars);
     }
+    
+    pub fn addEmbeddedGrammars(self: *GrammarLibrary) !void {
+        // _ = self;
+        try embedded.listGrammars(self.allocator, &self.grammars);
+    }
 
     pub fn grammarFromScopeName(self: *GrammarLibrary, name: []const u8) !Grammar {
         if (name.len >= 128) return error.NotFound;
         for (self.grammars.items) |item| {
             const np: []const u8 = &item.scope_name;
             if (std.mem.eql(u8, util.toSlice([]const u8, np), name)) {
+                // std.debug.print("found!\n", .{});
+                if (item.embedded_file) |file| {
+                    return Grammar.initWithData(self.allocator, file);
+                }
                 const p: []const u8 = &item.full_path;
                 return Grammar.init(self.allocator, util.toSlice([]const u8, p));
             }
@@ -433,7 +443,7 @@ pub const GrammarLibrary = struct {
 
         // most grammar definitions don't provide fileTypes
         // check against scope name instead .. using "source.{ext}"
-        var scope_name: [32]u8 = [_]u8{0} ** 32;
+        var scope_name: [64]u8 = [_]u8{0} ** 64;
         var scope_name_len = "source".len;
         @memcpy(scope_name[0..scope_name_len], "source");
         scope_name_len += dot_ext.len;
@@ -445,6 +455,9 @@ pub const GrammarLibrary = struct {
                 for (0..item.file_types_count) |fi| {
                     const np: []const u8 = &item.file_types[fi];
                     if (std.mem.eql(u8, util.toSlice([]const u8, np), ext[0..ext.len])) {
+                        if (item.embedded_file) |file| {
+                            return Grammar.initWithData(self.allocator, file);
+                        }
                         const p: []const u8 = &item.full_path;
                         return Grammar.init(self.allocator, util.toSlice([]const u8, p));
                     }
@@ -453,6 +466,9 @@ pub const GrammarLibrary = struct {
                 // check against scope
                 const np: []const u8 = &item.scope_name;
                 if (std.mem.eql(u8, util.toSlice([]const u8, np), scope_name[0..scope_name_len])) {
+                    if (item.embedded_file) |file| {
+                        return Grammar.initWithData(self.allocator, file);
+                    }
                     const p: []const u8 = &item.full_path;
                     return Grammar.init(self.allocator, util.toSlice([]const u8, p));
                 }
@@ -501,6 +517,10 @@ pub const Grammar = struct {
         const file_size = (try file.stat()).size;
         const file_contents = try file.readToEndAlloc(allocator, file_size);
         defer allocator.free(file_contents);
+        return Grammar.parse(allocator, file_contents);
+    }
+    
+    pub fn initWithData(allocator: std.mem.Allocator, file_contents: []const u8) !Grammar {
         return Grammar.parse(allocator, file_contents);
     }
 

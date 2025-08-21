@@ -17,20 +17,21 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     // generate assets
-    // const embed_path = b.cache_root.join(b.allocator, &.{"embed.zig"}) catch unreachable;
-
-    // var assets_buffer = std.ArrayList(u8).init(b.allocator);
-    // defer assets_buffer.deinit();
-
-    // var grammars = std.ArrayList(res.GrammarInfo).init(b.allocator);
-    // defer grammars.deinit();
-    // const grammars_path = b.build_root.join(b.allocator, &.{"/data/grammars"}) catch unreachable;
-    // defer b.allocator.free(grammars_path);
-    // res.listGrammars(b.allocator, grammars_path, &grammars) catch unreachable;
-
-    // assets_buffer.writer().print("whoa!\n", .{}) catch unreachable;
-    // const w: []const u8 = assets_buffer.toOwnedSlice() catch unreachable;
-    // std.debug.print("?{s}\n", .{w});
+    // TODO make this optional
+    if (false)
+    {
+        var assets_buffer = std.ArrayList(u8).init(b.allocator);
+        defer assets_buffer.deinit();
+        const themes_path = b.build_root.join(b.allocator, &.{"/src/themes"}) catch unreachable;
+        res.generateEmbeddedThemesFile(b.allocator, assets_buffer.writer(), "theme_", themes_path) catch unreachable;
+        const grammars_path = b.build_root.join(b.allocator, &.{"/src/grammars"}) catch unreachable;
+        res.generateEmbeddedGrammarsFile(b.allocator, assets_buffer.writer(), "grammar_", grammars_path) catch unreachable;
+        const embed_path = b.cache_root.join(b.allocator, &.{"embedded.zig"}) catch unreachable;
+        std.debug.print("{s}\n", .{embed_path});
+        const embed_file = std.fs.cwd().createFile(embed_path, .{.truncate = true}) catch unreachable;
+        defer embed_file.close();
+        embed_file.writeAll(assets_buffer.items) catch unreachable;
+    }
 
     // This creates a "module", which represents a collection of source files alongside
     // some compilation options, such as optimization mode and linked system libraries.
