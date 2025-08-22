@@ -6,6 +6,36 @@ const util = @import("util.zig");
 const GrammarInfo = resources.GrammarInfo;
 
 var syntax_id: u32 = 1;
+var regex_id: u32 = 1;
+
+// Regex is merely a wrapper to oni.Regex
+// It adds an idenfier and points to the expression string
+// It also holds other cached information
+
+const Regex = struct {
+    id: u64 = 0,
+    expr: ?[]const u8 = null,
+    regex: ?oni.Regex = null,
+    has_references: bool = false,
+    is_anchored: bool = false,
+    is_string_block: bool = false,
+    is_comment_block: bool = false,
+
+    valid: CompileResult = .Uncompiled,
+    const CompileResult = enum {
+        Uncompiled,
+        Valid,
+        Invalid,
+    };
+
+    pub fn hash(self: *Regex) void {
+        if (self.expr) |s| {
+            var hasher = std.hash.Fnv1a_64.init();
+            hasher.update(s);
+            self.id = hasher.final();
+        }
+    }
+};
 
 pub const Syntax = struct {
     id: u32 = 0,
@@ -21,11 +51,19 @@ pub const Syntax = struct {
     regexs_while: ?[]const u8 = null,
     regexs_end: ?[]const u8 = null,
 
-    // TODO wrap this into a struct R{ id, regex_str, regex } for better caching, and sharing
     regex_match: ?oni.Regex = null,
     regex_begin: ?oni.Regex = null,
     regex_while: ?oni.Regex = null,
     regex_end: ?oni.Regex = null,
+
+    // TODO these will replace regexs_ and regex_ pairing above
+    // Wrap oni.Regex into a struct R{ id, regex_str, regex } for better caching, and sharing
+    // cached compiles will be saved at the Parser?
+    // cached matched will be saved Parser
+    rx_match: Regex = Regex{},
+    rx_begin: Regex = Regex{},
+    rx_end: Regex = Regex{},
+    rx_while: Regex = Regex{},
 
     repository: ?std.StringHashMap(*Syntax) = null,
 
@@ -125,9 +163,21 @@ pub const Syntax = struct {
             .regexs_begin = if (obj.get("begin")) |v| v.string else null,
             .regexs_while = if (obj.get("while")) |v| v.string else null,
             .regexs_end = if (obj.get("end")) |v| v.string else null,
+            .rx_match = Regex{ .expr = if (obj.get("match")) |v| v.string else null },
+            .rx_begin = Regex{ .expr = if (obj.get("begin")) |v| v.string else null },
+            .rx_while = Regex{ .expr = if (obj.get("while")) |v| v.string else null },
+            .rx_end = Regex{ .expr = if (obj.get("end")) |v| v.string else null },
         };
 
         // special cases for retaining captures across lines
+        if (syntax.regexs_match) |_| {
+            if (std.mem.indexOf(u8, syntax.getName(), "string")) |_| {
+                syntax.is_string_block = true;
+            }
+            if (std.mem.indexOf(u8, syntax.getName(), "comment")) |_| {
+                syntax.is_comment_block = true;
+            }
+        }
         if (syntax.regexs_begin) |_| {
             if (std.mem.indexOf(u8, syntax.getName(), "string")) |_| {
                 syntax.is_string_block = true;
@@ -233,27 +283,33 @@ pub const Syntax = struct {
     }
 
     pub fn compileAllRegexes(self: *Syntax) !void {
+        // TODO, compilation will now be done a load but only when required
         const Entry = struct {
             string: *const ?[]const u8,
             regex_ptr: *?oni.Regex,
+            rx_ptr: *Regex,
         };
 
         const entries = [_]Entry{
             .{
                 .string = &self.regexs_match,
                 .regex_ptr = &self.regex_match,
+                .rx_ptr = &self.rx_match,
             },
             .{
                 .string = &self.regexs_begin,
                 .regex_ptr = &self.regex_begin,
+                .rx_ptr = &self.rx_begin,
             },
             .{
                 .string = &self.regexs_while,
                 .regex_ptr = &self.regex_while,
+                .rx_ptr = &self.rx_while,
             },
             .{
                 .string = &self.regexs_end,
                 .regex_ptr = &self.regex_end,
+                .rx_ptr = &self.rx_end,
             },
         };
 
@@ -275,11 +331,16 @@ pub const Syntax = struct {
                     oni.Syntax.default,
                     null,
                 ) catch |err| {
+                    entry.rx_ptr.*.valid = .Invalid;
                     std.debug.print("{} regex compile error {s}\n", .{ i, regex });
                     return err;
                 };
                 errdefer re.deinit();
                 entry.regex_ptr.* = re;
+
+                entry.rx_ptr.*.regex = re;
+                entry.rx_ptr.*.valid = .Valid;
+                entry.rx_ptr.*.hash();
             }
         }
     }

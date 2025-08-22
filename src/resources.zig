@@ -6,8 +6,8 @@ const MAX_NAME_LENGTH = 128;
 const MAX_FILE_TYPES = 8;
 const MAX_EXT_LENGTH = 16;
 
-var theme_id: u16 = 0;
-var grammar_id: u16 = 0;
+var theme_id: u16 = 1;
+var grammar_id: u16 = 1;
 
 // Fixed length strings for embedded resources
 // convert to []const u8 for faster embedding (avoiding memcpy)
@@ -78,8 +78,8 @@ pub fn getGrammarInfo(allocator: std.mem.Allocator, path: []const u8, full_path:
         gi.inject_only = true;
     }
 
-    grammar_id += 1;
     gi.id = grammar_id;
+    grammar_id += 1;
     return gi;
 }
 
@@ -146,8 +146,8 @@ pub fn getThemeInfo(allocator: std.mem.Allocator, path: []const u8, full_path: [
     @memcpy(ti.author[0..author.len], author);
     @memcpy(ti.full_path[0..full_path.len], full_path);
 
-    theme_id += 1;
     ti.id = theme_id;
+    theme_id += 1;
     return ti;
 }
 

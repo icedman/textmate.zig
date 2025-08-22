@@ -261,8 +261,8 @@ pub const Parser = struct {
     lang: *grammar.Grammar,
 
     // line parse data
-    match_cache: std.AutoHashMap(u32, Match),
-    end_match_cache: std.AutoHashMap(u32, Match),
+    match_cache: std.AutoHashMap(u64, Match),
+    end_match_cache: std.AutoHashMap(u64, Match),
 
     // processor
     processor: ?*processor.Processor = null,
@@ -277,8 +277,8 @@ pub const Parser = struct {
         return Parser{
             .allocator = allocator,
             .lang = lang,
-            .match_cache = std.AutoHashMap(u32, Match).init(allocator),
-            .end_match_cache = std.AutoHashMap(u32, Match).init(allocator),
+            .match_cache = std.AutoHashMap(u64, Match).init(allocator),
+            .end_match_cache = std.AutoHashMap(u64, Match).init(allocator),
         };
     }
 
@@ -405,12 +405,14 @@ pub const Parser = struct {
         }
 
         // match
-        if (syntax.regex_match != null) {
-            if (syntax.regex_match) |regex| {
+        if (syntax.rx_match.valid == .Valid) {
+            if (syntax.rx_match.regex) |regex| {
+                // if (syntax.regex_match != null) {
+                //     if (syntax.regex_match) |regex| {
                 // check of matching has been previously cached (for the same position in the buffer)
                 var should_cache = false;
                 const m = blk: {
-                    const mm = self.match_cache.get(syntax.id) orelse {
+                    const mm = self.match_cache.get(syntax.rx_match.id) orelse {
                         should_cache = true;
                         break :blk null;
                     };
@@ -425,7 +427,7 @@ pub const Parser = struct {
                     break :blk null;
                 } orelse self.execRegex(syntax, regex, syntax.regexs_match, block, start, end);
                 if (should_cache and ENABLE_MATCH_CACHING) {
-                    _ = self.match_cache.put(syntax.id, m) catch {};
+                    _ = self.match_cache.put(syntax.rx_match.id, m) catch {};
                 }
                 if (m.count > 0) {
                     return m;
@@ -434,12 +436,14 @@ pub const Parser = struct {
         }
 
         // begin
-        if (syntax.regex_begin != null) {
-            if (syntax.regex_begin) |regex| {
+        if (syntax.rx_begin.valid == .Valid) {
+            if (syntax.rx_begin.regex) |regex| {
+                // if (syntax.regex_begin != null) {
+                //     if (syntax.regex_begin) |regex| {
                 // check of matching has been previously cached (for the same position in the buffer)
                 var should_cache = false;
                 const m = blk: {
-                    const mm = self.match_cache.get(syntax.id) orelse {
+                    const mm = self.match_cache.get(syntax.rx_begin.id) orelse {
                         should_cache = true;
                         break :blk null;
                     };
@@ -454,7 +458,7 @@ pub const Parser = struct {
                     break :blk null;
                 } orelse self.execRegex(syntax, regex, syntax.regexs_begin, block, start, end);
                 if (should_cache and ENABLE_MATCH_CACHING) {
-                    _ = self.match_cache.put(syntax.id, m) catch {};
+                    _ = self.match_cache.put(syntax.rx_begin.id, m) catch {};
                 }
                 if (m.count > 0) {
                     return m;
@@ -549,7 +553,7 @@ pub const Parser = struct {
                     // end_match with caching
                     var should_cache = false;
                     const m = inner_blk: {
-                        const mm = self.end_match_cache.get(syn.id) orelse {
+                        const mm = self.end_match_cache.get(syn.rx_end.id) orelse {
                             should_cache = true;
                             break :inner_blk null;
                         };
@@ -564,7 +568,7 @@ pub const Parser = struct {
                         break :inner_blk null;
                     } orelse self.execRegex(@constCast(syn), syn.regex_end, syn.regexs_end, block, start, end);
                     if (should_cache and ENABLE_END_MATCH_CACHING) {
-                        _ = self.end_match_cache.put(syn.id, m) catch {};
+                        _ = self.end_match_cache.put(syn.rx_end.id, m) catch {};
                     }
 
                     break :blk m;
