@@ -20,7 +20,7 @@ pub const Syntax = grammar.Syntax;
 
 pub const Parser = parser.Parser;
 pub const ParseState = parser.ParseState;
-pub const ParseCapture = parser.Capture;
+pub const ParseCapture = parser.ParseCapture;
 
 pub const Processor = processor.Processor;
 pub const NullProcessor = processor.NullProcessor;

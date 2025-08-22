@@ -28,25 +28,22 @@ pub const Regex = struct {
         Invalid,
     };
 
-    pub fn compile(self: *Regex) !void {
-        if (self.expr) |s| {
-            const re = oni.Regex.init(
-                s,
-                .{},
-                oni.Encoding.utf8,
-                oni.Syntax.default,
-                null,
-            ) catch |err| {
-                self.valid = .Invalid;
-                return err;
-            };
-            errdefer re.deinit();
-            self.regex = re;
-            self.valid = .Valid;
-            var hasher = std.hash.Fnv1a_64.init();
-            hasher.update(s);
-            self.id = hasher.final();
-        }
+    // TODO change to void - regex compile errors are blamed on user-defined grammars - fail silently
+    pub fn compile(self: *Regex, regex: []const u8) !void {
+        const re = oni.Regex.init(
+            regex,
+            .{},
+            oni.Encoding.utf8,
+            oni.Syntax.default,
+            null,
+        ) catch |err| {
+            self.valid = .Invalid;
+            return err;
+        };
+        errdefer re.deinit();
+        self.regex = re;
+        self.valid = .Valid;
+        self.id = util.toHash(regex);
     }
 };
 
@@ -291,7 +288,7 @@ pub const Syntax = struct {
                     entry.rx_ptr.*.has_references = true;
                     continue;
                 }
-                entry.rx_ptr.*.compile() catch {
+                entry.rx_ptr.*.compile(regex) catch {
                     // fail silently
                 };
             }
@@ -569,10 +566,12 @@ pub const Grammar = struct {
         const file_size = (try file.stat()).size;
         const file_contents = try file.readToEndAlloc(allocator, file_size);
         defer allocator.free(file_contents);
+        // TODO apply injectors
         return Grammar.parse(allocator, file_contents);
     }
 
     pub fn initWithData(allocator: std.mem.Allocator, file_contents: []const u8) !Grammar {
+        // TODO apply injectors
         return Grammar.parse(allocator, file_contents);
     }
 
@@ -582,7 +581,7 @@ pub const Grammar = struct {
         self.arena.deinit();
     }
 
-    pub fn parse(allocator: std.mem.Allocator, source: []const u8) !Grammar {
+    fn parse(allocator: std.mem.Allocator, source: []const u8) !Grammar {
         var grammar = Grammar{
             .allocator = allocator,
             .inject_to = std.ArrayList([]const u8).init(allocator),

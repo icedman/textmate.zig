@@ -2,16 +2,16 @@ const std = @import("std");
 const oni = @import("oniguruma");
 const grammar = @import("grammar.zig");
 const processor = @import("processor.zig");
+const util = @import("util.zig");
 const Syntax = grammar.Syntax;
 const Regex = grammar.Regex;
 
 // TODO move to config.. smallcaps
 // is exec level (findMatch) caching slower as it caches everything -- even resolving captures?)
+const ENABLE_EXEC_CACHING = true;
+// redundant to enable match-end cache with exec cache?
 const ENABLE_MATCH_CACHING = true;
-
-// redundant to enable match-end cache with exec cache
-const ENABLE_EXEC_CACHING = false and !ENABLE_MATCH_CACHING;
-const ENABLE_END_CACHING = true and !ENABLE_MATCH_CACHING;
+const ENABLE_END_CACHING = true;
 
 const MAX_LINE_LEN = 1024; // and line longer will not be parsed
 const MAX_MATCH_RANGES = 9; // max $1 in grammar files is just 8
@@ -36,7 +36,7 @@ pub const ParseCapture = struct {
     retain: bool = false,
 };
 
-pub const Capture = ParseCapture;
+const Capture = ParseCapture;
 
 // the lighter version of Capture, used internally
 const MatchRange = struct {
@@ -132,16 +132,22 @@ const StateContext = struct {
     // These dynamic regexes should be cached
     // 1. to allow restoration from serialized copy
     // 2. and minimize recompilation
-    while_regex: ?oni.Regex = null,
-    end_regex: ?oni.Regex = null,
+    // while_regex: ?oni.Regex = null,
+    // end_regex: ?oni.Regex = null,
+
+    // Parser owns these at regex_map and responsible for oni.Regex.deinit not Self
+    rx_while: Regex = Regex{},
+    rx_end: Regex = Regex{},
 };
 
 /// ParseState is a StateContext stack
+/// This should be (de)serializable
 pub const ParseState = struct {
     allocator: std.mem.Allocator,
     stack: std.ArrayList(StateContext),
+    owner: *Parser = undefined,
 
-    pub fn init(allocator: std.mem.Allocator, syntax: *Syntax) !ParseState {
+    pub fn init(owner: *Parser, allocator: std.mem.Allocator, syntax: *Syntax) !ParseState {
         var stack = std.ArrayList(StateContext).init(allocator);
         try stack.append(StateContext{
             .syntax = syntax,
@@ -149,16 +155,11 @@ pub const ParseState = struct {
         return ParseState{
             .allocator = allocator,
             .stack = stack,
+            .owner = owner,
         };
     }
 
     pub fn deinit(self: *ParseState) void {
-        for (self.stack.items) |item| {
-            // free parse-time compiled regex
-            if (item.end_regex) |*regex| {
-                @constCast(regex).deinit();
-            }
-        }
         self.stack.deinit();
     }
 
@@ -195,37 +196,33 @@ pub const ParseState = struct {
         };
         if (rx.has_references) {
             if (match) |m| {
-                // compile regex_end
-                if (syntax.rx_end.valid != .Valid) {
-                    if (syntax.rx_end.expr) |regexs| {
-                        var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
-                        _ = m.applyReferences(block, regexs, &output);
-                        {
-                            sc.end_regex = try oni.Regex.init(
-                                &output,
-                                .{},
-                                oni.Encoding.utf8,
-                                oni.Syntax.default,
-                                null,
-                            );
-                            errdefer sc.end_regex.deinit();
+                // compile StateContext.rx_end
+                if (syntax.rx_end.expr) |regexs| {
+                    var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
+                    _ = m.applyReferences(block, regexs, &output);
+                    {
+                        if (self.owner.regex_map.get(util.toHash(util.toSlice([MAX_SCOPE_LEN]u8, output)))) |r| {
+                            sc.rx_end = r;
+                        } else {
+                            sc.rx_end.compile(&output) catch {};
+                            if (sc.rx_end.id > 0) {
+                                try self.owner.regex_map.put(sc.rx_end.id, sc.rx_end);
+                            }
                         }
                     }
                 }
-                // compile regex_while
-                if (syntax.rx_while.expr != null) {
-                    if (syntax.rx_while.expr) |regexs| {
-                        var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
-                        _ = m.applyReferences(block, regexs, &output);
-                        {
-                            sc.while_regex = try oni.Regex.init(
-                                &output,
-                                .{},
-                                oni.Encoding.utf8,
-                                oni.Syntax.default,
-                                null,
-                            );
-                            errdefer sc.while_regex.deinit();
+                // compile StateContext.rx_while
+                if (syntax.rx_while.expr) |regexs| {
+                    var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
+                    _ = m.applyReferences(block, regexs, &output);
+                    {
+                        if (self.owner.regex_map.get(util.toHash(util.toSlice([MAX_SCOPE_LEN]u8, output)))) |r| {
+                            sc.rx_while = r;
+                        } else {
+                            sc.rx_while.compile(&output) catch {};
+                            if (sc.rx_while.id > 0) {
+                                try self.owner.regex_map.put(sc.rx_while.id, sc.rx_while);
+                            }
                         }
                     }
                 }
@@ -284,7 +281,6 @@ pub const Parser = struct {
     // stats
     regex_execs: u32 = 0,
     regex_skips: u32 = 0,
-    regex_compile: u32 = 0,
     current_state: ?*ParseState = null,
 
     pub fn init(allocator: std.mem.Allocator, lang: *grammar.Grammar) !Parser {
@@ -299,13 +295,21 @@ pub const Parser = struct {
 
     pub fn deinit(self: *Parser) void {
         self.match_cache.deinit();
-        // self.end_cache.deinit();
         self.exec_cache.deinit();
+
+        var it = self.regex_map.iterator();
+        while (it.next()) |kv| {
+            const v = kv.value_ptr.*;
+            if (v.regex) |*r| {
+                @constCast(r).deinit();
+            }
+        }
+        self.regex_map.deinit();
     }
 
     pub fn initState(self: *Parser) !ParseState {
         if (self.lang.syntax) |s| {
-            return ParseState.init(self.allocator, s);
+            return ParseState.init(self, self.allocator, s);
         }
         return error.InvalidGrammar;
     }
@@ -526,12 +530,11 @@ pub const Parser = struct {
                 const ls = ts.resolve(ts, self.lang.syntax);
                 if (ls) |syn| {
                     const m: Match = blk: {
-                        if (t.while_regex) |r| {
+                        if (t.rx_while.valid == .Valid) {
                             // use dynamic while_regex here if one was compiled
                             // not caching or result in this case
                             // TODO caching is possible though
-                            self.regex_compile += 1;
-                            const m = self.findMatch(@constCast(syn), @constCast(&syn.rx_while), r, block, start, end);
+                            const m = self.findMatch(@constCast(syn), @constCast(&syn.rx_while), t.rx_while.regex, block, start, end);
                             break :blk m;
                         }
 
@@ -575,11 +578,10 @@ pub const Parser = struct {
             const ls = ts.resolve(ts, self.lang.syntax);
             if (ls) |syn| {
                 const end_match: Match = blk: {
-                    if (t.end_regex) |r| {
+                    if (t.rx_end.valid == .Valid) {
                         // use dynamic end_regex here if one was compiled
                         // not caching or result in this case
-                        self.regex_compile += 1;
-                        const m = self.findMatch(@constCast(syn), @constCast(&syn.rx_end), r, block, start, end);
+                        const m = self.findMatch(@constCast(syn), @constCast(&syn.rx_end), t.rx_end.regex, block, start, end);
                         break :blk m;
                     }
 

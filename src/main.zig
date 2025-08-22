@@ -28,8 +28,6 @@ fn printUsage() void {
     std.debug.print(" -l list avaiable themes and grammars\n", .{});
 }
 
-fn listResources() void {}
-
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
 
@@ -89,7 +87,7 @@ pub fn main() !void {
         //     std.debug.print("unable to add themes directory\n", .{});
         // };
         if (list) {
-            std.debug.print("\nThemes:\n", .{});
+            std.debug.print("\nThemes ({}):\n", .{thl.themes.items.len});
             for (thl.themes.items, 0..) |item, i| {
                 std.debug.print("{s}  ", .{item.name});
                 if ((i + 1) % 8 == 0) std.debug.print("\n", .{});
@@ -110,7 +108,7 @@ pub fn main() !void {
         //     std.debug.print("unable to add grammars directory\n", .{});
         // };
         if (list) {
-            std.debug.print("\nGrammars:\n", .{});
+            std.debug.print("\nGrammars ({}):\n", .{gml.grammars.items.len});
             for (gml.grammars.items, 0..) |item, i| {
                 std.debug.print("{s}  ", .{item.name});
                 if ((i + 1) % 8 == 0) std.debug.print("\n", .{});
@@ -233,7 +231,6 @@ pub fn main() !void {
         if (line_no > 0) {
             std.debug.print("execs/line: {}\n", .{par.regex_execs / line_no});
         }
-        std.debug.print("recompile: {}\n", .{par.regex_compile});
         std.debug.print("skips: {}\n", .{par.regex_skips});
         std.debug.print("warmup in {d:.6}s\n", .{warm_elapsed});
         std.debug.print("done in {d:.6}s\n", .{elapsed});
@@ -246,12 +243,13 @@ pub fn main() !void {
     }
 }
 
-// test "themes" {
-//     try theme.runTests(std.testing, TEST_VERBOSELY);
-// }
-//
+// TODO make proper tests
 // test "grammar" {
 //     try grammar.runTests(std.testing, TEST_VERBOSELY);
+// }
+// TODO make proper tests - test against vscode
+// test "parser" {
+//     try parser.runTests(std.testing, TEST_VERBOSELY);
 // }
 
 const std = @import("std");

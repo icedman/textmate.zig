@@ -234,7 +234,7 @@ pub const Theme = struct {
         });
     }
 
-    pub fn parse(allocator: std.mem.Allocator, source: []const u8) !Theme {
+    fn parse(allocator: std.mem.Allocator, source: []const u8) !Theme {
         var theme = Theme{
             .allocator = allocator,
             .atoms = std.StringHashMap(u32).init(allocator),
