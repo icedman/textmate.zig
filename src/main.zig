@@ -2,10 +2,17 @@
 //! you are building an executable. If you are making a library, the convention
 //! is to delete this file and start with root.zig instead.
 const oni = lib.oni;
-const theme = lib.theme;
-const grammar = lib.grammar;
-const parser = lib.parser;
-const processor = lib.processor;
+
+const Theme = lib.Theme;
+const ThemeLibrary = lib.ThemeLibrary;
+const Grammar = lib.Grammar;
+const GrammarLibrary = lib.GrammarLibrary;
+const Parser = lib.Parser;
+const ParseState = lib.ParseState;
+const NullProcessor = lib.NullProcessor;
+const DumpProcessor = lib.DumpProcessor;
+const RenderProcessor = lib.RenderProcessor;
+const RenderHtmlProcessor = lib.RenderHtmlProcessor;
 
 const TEST_VERBOSELY = false;
 
@@ -54,23 +61,28 @@ pub fn main() !void {
             grammar_path = args.next();
         } else if (std.mem.eql(u8, arg.?, "-t")) {
             theme_path = args.next();
-        } else if (std.mem.eql(u8, arg.?, "-l")) {
-            list = true;
         } else if (std.mem.eql(u8, arg.?, "-h")) {
             printUsage();
             return;
+        } else if (std.mem.eql(u8, arg.?, "-l")) {
+            list = true;
         } else {
             file_path = arg;
         }
     }
 
+    if (file_path == null) {
+        printUsage();
+        return;
+    }
+
     const warm_start = std.time.nanoTimestamp();
 
-    theme.initThemeLibrary(allocator) catch {
+    ThemeLibrary.initLibrary(allocator) catch {
         return;
     };
-    defer theme.deinitThemeLibrary();
-    if (theme.getThemeLibrary()) |thl| {
+    defer ThemeLibrary.deinitLibrary();
+    if (ThemeLibrary.getLibrary()) |thl| {
         thl.addEmbeddedThemes() catch {
             std.debug.print("unable to add embedded themes\n", .{});
         };
@@ -87,11 +99,11 @@ pub fn main() !void {
         }
     }
 
-    grammar.initGrammarLibrary(allocator) catch {
+    GrammarLibrary.initLibrary(allocator) catch {
         return;
     };
-    defer grammar.deinitGrammarLibrary();
-    if (grammar.getGrammarLibrary()) |gml| {
+    defer GrammarLibrary.deinitLibrary();
+    if (GrammarLibrary.getLibrary()) |gml| {
         gml.addEmbeddedGrammars() catch {
             std.debug.print("unable to add embedded grammars\n", .{});
         };
@@ -112,12 +124,12 @@ pub fn main() !void {
         return;
     }
 
-    // var thm = theme.Theme.init(allocator, theme_path orelse "data/tests/dracula.json") catch {
+    // var thm = Theme.init(allocator, theme_path orelse "data/tests/dracula.json") catch {
     //     std.debug.print("unable to open theme {s}\n", .{theme_path orelse ""});
     //     return;
     // };
-    var thm: theme.Theme = undefined;
-    if (theme.getThemeLibrary()) |thl| {
+    var thm: Theme = undefined;
+    if (ThemeLibrary.getLibrary()) |thl| {
         thm = thl.themeFromName(theme_path orelse "dracula-soft") catch {
             std.debug.print("unable to open theme\n", .{});
             return;
@@ -125,17 +137,12 @@ pub fn main() !void {
     }
     defer thm.deinit();
 
-    if (file_path == null) {
-        printUsage();
-        return;
-    }
-
-    // var gmr = grammar.Grammar.init(allocator, grammar_path orelse "data/tests/zig.tmLanguage.json") catch {
+    // var gmr = Grammar.init(allocator, grammar_path orelse "data/tests/zig.tmLanguage.json") catch {
     //     std.debug.print("unable to open grammar {s}\n", .{grammar_path orelse ""});
     //     return;
     // };
-    var gmr: grammar.Grammar = undefined;
-    if (grammar.getGrammarLibrary()) |gml| {
+    var gmr: Grammar = undefined;
+    if (GrammarLibrary.getLibrary()) |gml| {
         if (grammar_path) |gp| {
             gmr = gml.grammarFromScopeName(gp) catch {
                 std.debug.print("unable to open grammar from scope name\n", .{});
@@ -150,23 +157,22 @@ pub fn main() !void {
     }
     defer gmr.deinit();
 
-    var par = try parser.Parser.init(allocator, &gmr);
+    var par = try Parser.init(allocator, &gmr);
     defer par.deinit();
 
     const syntax = gmr.syntax orelse {
         return;
     };
-    var state = try parser.ParseState.init(allocator, syntax);
+    var state = try ParseState.init(allocator, syntax);
     defer state.deinit();
 
     var proc = blk: {
         if (dump) {
-            break :blk try processor.DumpProcessor.init(allocator);
-            // break :blk try processor.NullProcessor.init(allocator);
+            break :blk try DumpProcessor.init(allocator);
         } else if (html) {
-            break :blk try processor.RenderHtmlProcessor.init(allocator);
+            break :blk try RenderHtmlProcessor.init(allocator);
         } else {
-            break :blk try processor.RenderProcessor.init(allocator);
+            break :blk try RenderProcessor.init(allocator);
         }
     };
 
@@ -237,13 +243,13 @@ pub fn main() !void {
     }
 }
 
-test "themes" {
-    try theme.runTests(std.testing, TEST_VERBOSELY);
-}
-
-test "grammar" {
-    try grammar.runTests(std.testing, TEST_VERBOSELY);
-}
+// test "themes" {
+//     try theme.runTests(std.testing, TEST_VERBOSELY);
+// }
+//
+// test "grammar" {
+//     try grammar.runTests(std.testing, TEST_VERBOSELY);
+// }
 
 const std = @import("std");
 

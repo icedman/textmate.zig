@@ -2,27 +2,30 @@ const std = @import("std");
 const parser = @import("parser.zig");
 const theme = @import("theme.zig");
 const util = @import("util.zig");
+
 const setColorHex = util.setColorHex;
 const setColorRgb = util.setColorRgb;
 const setBgColorHex = util.setBgColorHex;
 const setBgColorRgb = util.setBgColorRgb;
 const resetColor = util.resetColor;
 
+const ParseCapture = parser.ParseCapture;
+
 pub const Processor = struct {
     allocator: std.mem.Allocator,
     block: ?[]const u8 = null,
     theme: ?*theme.Theme = null,
 
-    captures: std.ArrayList(parser.Capture),
-    retained_captures: std.ArrayList(parser.Capture),
+    captures: std.ArrayList(ParseCapture),
+    retained_captures: std.ArrayList(ParseCapture),
 
     start_document_fn: ?*const fn (*Processor) void = null,
     end_document_fn: ?*const fn (*Processor) void = null,
     start_line_fn: ?*const fn (*Processor, block: []const u8) void = null,
     end_line_fn: ?*const fn (*Processor) void = null,
-    open_tag_fn: ?*const fn (*Processor, parser.Capture) void = null,
-    close_tag_fn: ?*const fn (*Processor, parser.Capture) void = null,
-    capture_fn: ?*const fn (*Processor, parser.Capture) void = null,
+    open_tag_fn: ?*const fn (*Processor, ParseCapture) void = null,
+    close_tag_fn: ?*const fn (*Processor, ParseCapture) void = null,
+    capture_fn: ?*const fn (*Processor, ParseCapture) void = null,
 
     pub fn startDocument(self: *Processor) void {
         if (self.start_document_fn) |f| {
@@ -69,7 +72,7 @@ pub const Processor = struct {
         }
     }
 
-    pub fn openTag(self: *Processor, cap: parser.Capture) void {
+    pub fn openTag(self: *Processor, cap: ParseCapture) void {
         var c = cap;
         if (self.block) |b| {
             if (c.start > b.len and b.len > 0) {
@@ -86,7 +89,7 @@ pub const Processor = struct {
         }
     }
 
-    pub fn closeTag(self: *Processor, cap: parser.Capture) void {
+    pub fn closeTag(self: *Processor, cap: ParseCapture) void {
         var c = cap;
         if (self.block) |b| {
             // this happens if parser adds '\n' at every parse
@@ -112,7 +115,7 @@ pub const Processor = struct {
         }
     }
 
-    pub fn capture(self: *Processor, cap: parser.Capture) void {
+    pub fn capture(self: *Processor, cap: ParseCapture) void {
         var c = cap;
         if (self.block) |b| {
             // this happens if parser adds '\n' at every parse
@@ -148,21 +151,21 @@ pub const DumpProcessor = struct {
         std.debug.print("----------------------------------]]\n\n", .{});
     }
 
-    pub fn openTag(self: *Processor, cap: parser.Capture) void {
+    pub fn openTag(self: *Processor, cap: ParseCapture) void {
         if (self.block) |b| {
             const text = b[cap.start..cap.end];
             std.debug.print("open: {s} {}-{} {s}\n", .{ text, cap.start, cap.end, cap.scope });
         }
     }
 
-    pub fn closeTag(self: *Processor, cap: parser.Capture) void {
+    pub fn closeTag(self: *Processor, cap: ParseCapture) void {
         if (self.block) |b| {
             const text = b[cap.start..cap.end];
             std.debug.print("close: {s} {}-{} {s}\n", .{ text, cap.start, cap.end, cap.scope });
         }
     }
 
-    pub fn capture(self: *Processor, cap: parser.Capture) void {
+    pub fn capture(self: *Processor, cap: ParseCapture) void {
         if (self.block) |b| {
             if (cap.start >= b.len) return;
             const text = b[cap.start..cap.end];
@@ -179,8 +182,8 @@ pub const DumpProcessor = struct {
             .open_tag_fn = self.openTag,
             .close_tag_fn = self.closeTag,
             .capture_fn = self.capture,
-            .captures = std.ArrayList(parser.Capture).init(allocator),
-            .retained_captures = std.ArrayList(parser.Capture).init(allocator),
+            .captures = std.ArrayList(ParseCapture).init(allocator),
+            .retained_captures = std.ArrayList(ParseCapture).init(allocator),
         };
     }
 };
@@ -210,7 +213,7 @@ pub const RenderProcessor = struct {
 
             for (block, 0..) |ch, i| {
                 if (ch == '\n') break;
-                var cap: parser.Capture = parser.Capture{};
+                var cap: ParseCapture = ParseCapture{};
                 for (0..captures.items.len) |ci| {
                     if (i == captures.items[ci].start) {
                         cap = captures.items[ci];
@@ -273,8 +276,8 @@ pub const RenderProcessor = struct {
         return Processor{
             .allocator = allocator,
             .end_line_fn = self.endLine,
-            .captures = std.ArrayList(parser.Capture).init(allocator),
-            .retained_captures = std.ArrayList(parser.Capture).init(allocator),
+            .captures = std.ArrayList(ParseCapture).init(allocator),
+            .retained_captures = std.ArrayList(ParseCapture).init(allocator),
         };
     }
 };
@@ -311,7 +314,7 @@ pub const RenderHtmlProcessor = struct {
 
             for (block, 0..) |ch, i| {
                 if (ch == '\n') break;
-                var cap: parser.Capture = parser.Capture{};
+                var cap: ParseCapture = ParseCapture{};
                 for (0..captures.items.len) |ci| {
                     if (i == captures.items[ci].start) {
                         cap = captures.items[ci];
@@ -363,8 +366,8 @@ pub const RenderHtmlProcessor = struct {
             .start_document_fn = self.startDocument,
             .end_document_fn = self.endDocument,
             .end_line_fn = self.endLine,
-            .captures = std.ArrayList(parser.Capture).init(allocator),
-            .retained_captures = std.ArrayList(parser.Capture).init(allocator),
+            .captures = std.ArrayList(ParseCapture).init(allocator),
+            .retained_captures = std.ArrayList(ParseCapture).init(allocator),
         };
     }
 };
@@ -373,8 +376,8 @@ pub const NullProcessor = struct {
     pub fn init(allocator: std.mem.Allocator) !Processor {
         return Processor{
             .allocator = allocator,
-            .captures = std.ArrayList(parser.Capture).init(allocator),
-            .retained_captures = std.ArrayList(parser.Capture).init(allocator),
+            .captures = std.ArrayList(ParseCapture).init(allocator),
+            .retained_captures = std.ArrayList(ParseCapture).init(allocator),
         };
     }
 };

@@ -6,9 +6,13 @@ const MAX_NAME_LENGTH = 128;
 const MAX_FILE_TYPES = 8;
 const MAX_EXT_LENGTH = 16;
 
+var theme_id: u16 = 1;
+var grammar_id: u16 = 1;
+
 // Fixed length strings for embedded resources
 // convert to []const u8 for faster embedding (avoiding memcpy)
 pub const GrammarInfo = struct {
+    id: u16 = 0, // for caching purposed
     name: [MAX_NAME_LENGTH]u8 = [_]u8{0} ** MAX_NAME_LENGTH,
     scope_name: [MAX_NAME_LENGTH]u8 = [_]u8{0} ** MAX_NAME_LENGTH,
     full_path: [std.fs.max_path_bytes]u8 = [_]u8{0} ** std.fs.max_path_bytes,
@@ -19,6 +23,7 @@ pub const GrammarInfo = struct {
 };
 
 pub const ThemeInfo = struct {
+    id: u16 = 0, // for caching purposes
     name: [MAX_NAME_LENGTH]u8 = [_]u8{0} ** MAX_NAME_LENGTH,
     author: [MAX_NAME_LENGTH]u8 = [_]u8{0} ** MAX_NAME_LENGTH,
     full_path: [std.fs.max_path_bytes]u8 = [_]u8{0} ** std.fs.max_path_bytes,
@@ -72,6 +77,9 @@ pub fn getGrammarInfo(allocator: std.mem.Allocator, path: []const u8, full_path:
     if (obj.get("injectTo")) |_| {
         gi.inject_only = true;
     }
+
+    gi.id = grammar_id;
+    grammar_id += 1;
     return gi;
 }
 
@@ -137,6 +145,9 @@ pub fn getThemeInfo(allocator: std.mem.Allocator, path: []const u8, full_path: [
     @memcpy(ti.name[0..name.len], name);
     @memcpy(ti.author[0..author.len], author);
     @memcpy(ti.full_path[0..full_path.len], full_path);
+
+    ti.id = theme_id;
+    theme_id += 1;
     return ti;
 }
 
