@@ -192,6 +192,9 @@ const Rgb = theme.Rgb;
 
 pub const RenderProcessor = struct {
     pub fn endLine(self: *Processor) void {
+        var bw = std.io.bufferedWriter(std.io.getStdOut().writer());
+        const stdout = bw.writer();
+
         if (self.theme) |thm| {
             // const defaultColor: ?theme.Settings = theme.Settings{.foreground_rgb = theme.Rgb {.r = 255 }};
             const captures = self.captures;
@@ -244,14 +247,14 @@ pub const RenderProcessor = struct {
                 {
                     current_color = top_color;
                     // std.debug.print("-", .{});
-                    setColorRgb(std.debug, current_color) catch {};
+                    setColorRgb(stdout, current_color) catch {};
                 }
 
                 // _ = ch;
                 if (ch == '\t') {
-                    std.debug.print("  ", .{});
+                    stdout.print("  ", .{}) catch {};
                 } else {
-                    std.debug.print("{c}", .{ch});
+                    stdout.print("{c}", .{ch}) catch {};
                 }
 
                 for (0..captures.items.len) |ci| {
@@ -260,15 +263,17 @@ pub const RenderProcessor = struct {
                             color_stack_idx -= 1;
                         }
                         current_color = Rgb{};
-                        resetColor(std.debug) catch {};
+                        resetColor(stdout) catch {};
                     }
                 }
             }
 
-            std.debug.print("\n", .{});
+            stdout.print("\n", .{}) catch {};
         } else {
-            std.debug.print("theme is not set\n", .{});
+            stdout.print("theme is not set\n", .{}) catch {};
         }
+
+        bw.flush() catch {};
     }
 
     pub fn init(allocator: std.mem.Allocator) !Processor {

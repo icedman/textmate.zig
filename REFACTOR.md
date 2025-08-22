@@ -11,6 +11,22 @@ O(n) ~ Time is linear to number of lines
 
 CPU: AMD Ryzen AI 9 HX 370 (24) @ 5.16 GHz
 
+* new regex caching
+* output buffers
+
+lines: 222905
+execs: 15256966
+execs/line: 68
+recompile: 0
+skips: 51645720
+warmup in 0.003783s
+done in 6.121390s
+state depth: 1
+retained: 1
+grammar: c
+theme: dracula-soft
+theme atoms: 208
+
 * with atom based scope matching
 
 lines: 222905
