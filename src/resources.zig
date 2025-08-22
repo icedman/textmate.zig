@@ -242,23 +242,23 @@ pub fn generateEmbeddedGrammarsFile(allocator: std.mem.Allocator, writer: anytyp
         const nps = util.toSlice([]const u8, np);
         const sp: []const u8 = &item.scope_name;
         const sps = util.toSlice([]const u8, sp);
-        try writer.print("  {c}\n", .{'{'});
-        try writer.print("    const bytes: []const u8 = {s}{}[0..{s}{}.len];\n", .{ prefix, embed_id, prefix, embed_id });
-        try writer.print("    var gi = GrammarInfo{c} .embedded_file = bytes, .file_types_count = {}, .inject_only = {}, {c};\n", .{
+        try writer.print("    {c}\n", .{'{'});
+        try writer.print("      const bytes: []const u8 = {s}{}[0..{s}{}.len];\n", .{ prefix, embed_id, prefix, embed_id });
+        try writer.print("      var gi = GrammarInfo{c} .embedded_file = bytes, .file_types_count = {}, .inject_only = {}, {c};\n", .{
             '{',
             item.file_types_count,
             item.inject_only,
             '}',
         });
-        try writer.print("    @memcpy(gi.name[0..\"{s}\".len], \"{s}\");\n", .{ nps, nps });
-        try writer.print("    @memcpy(gi.scope_name[0..\"{s}\".len], \"{s}\");\n", .{ sps, sps });
+        try writer.print("      @memcpy(gi.name[0..\"{s}\".len], \"{s}\");\n", .{ nps, nps });
+        try writer.print("      @memcpy(gi.scope_name[0..\"{s}\".len], \"{s}\");\n", .{ sps, sps });
         for (0..item.file_types_count) |fi| {
             const fp: []const u8 = &item.file_types[fi];
             const fps = util.toSlice([]const u8, fp);
-            try writer.print("    @memcpy(gi.file_types[{}][0..\"{s}\".len], \"{s}\");\n", .{ fi, fps, fps });
+            try writer.print("      @memcpy(gi.file_types[{}][0..\"{s}\".len], \"{s}\");\n", .{ fi, fps, fps });
         }
-        try writer.print("    try list.append(gi);\n", .{});
-        try writer.print("  {c}\n", .{'}'});
+        try writer.print("      try list.append(gi);\n", .{});
+        try writer.print("    {c}\n", .{'}'});
         embed_id += 1;
     }
 

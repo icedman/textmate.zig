@@ -164,10 +164,7 @@ pub fn main() !void {
     var par = try Parser.init(allocator, &gmr);
     defer par.deinit();
 
-    const syntax = gmr.syntax orelse {
-        return;
-    };
-    var state = try ParseState.init(allocator, syntax);
+    var state = try par.initState();
     defer state.deinit();
 
     var proc = blk: {

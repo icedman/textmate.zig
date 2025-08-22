@@ -6,13 +6,15 @@ const Syntax = grammar.Syntax;
 const Regex = grammar.Regex;
 
 // TODO move to config.. smallcaps
+// is exec level (findMatch) caching is slower as it caches everything -- even resolving captures?)
 const ENABLE_MATCH_CACHING = true;
-const ENABLE_END_CACHING = true;
+
 // redundant to enable match-end cache with exec cache
-const ENABLE_EXEC_CACHING = false;
+const ENABLE_EXEC_CACHING = false and !ENABLE_MATCH_CACHING;
+const ENABLE_END_CACHING = true and !ENABLE_MATCH_CACHING;
 
 const MAX_LINE_LEN = 1024; // and line longer will not be parsed
-const MAX_MATCH_RANGES = 10; // max $1 in grammar files is just 8
+const MAX_MATCH_RANGES = 9; // max $1 in grammar files is just 8
 const MAX_SCOPE_LEN = 98;
 
 const MAX_STATE_STACK_DEPTH = 200; // if the state depth is too deep .. just prune (this shouldn't happen though)
@@ -48,6 +50,7 @@ const Match = struct {
     syntax: ?*Syntax = null,
     regex: ?*Regex = null,
 
+    // is this expensive to pass around (copy)
     ranges: [MAX_MATCH_RANGES]MatchRange = [_]MatchRange{MatchRange{ .group = 0, .start = 0, .end = 0 }} ** MAX_MATCH_RANGES,
     count: u8 = 0,
 
@@ -296,6 +299,13 @@ pub const Parser = struct {
         self.match_cache.deinit();
         // self.end_cache.deinit();
         self.exec_cache.deinit();
+    }
+
+    pub fn initState(self: *Parser) !ParseState {
+        if (self.lang.syntax) |s| {
+            return ParseState.init(self.allocator, s);
+        }
+        return error.InvalidGrammar;
     }
 
     fn getCurrentAnchor(self: *Parser) usize {
@@ -648,7 +658,7 @@ pub const Parser = struct {
             if (match.applyCaptures(block, name, &c.scope) == 0) {
                 c.scope_hash = syntax.scope_hash;
             }
-            proc.capture(c);
+            proc.capture(&c);
         }
     }
 
@@ -671,7 +681,7 @@ pub const Parser = struct {
                     if (match.applyCaptures(block, syn.name, &c.scope) == 0) {
                         c.scope_hash = syn.scope_hash;
                     }
-                    proc.capture(c);
+                    proc.capture(&c);
                 }
 
                 // some captures have themselves some patterns
@@ -698,7 +708,7 @@ pub const Parser = struct {
                                         if (m.applyCaptures(block, p.name, &c.scope) == 0) {
                                             c.scope_hash = p.scope_hash;
                                         }
-                                        proc.capture(c);
+                                        proc.capture(&c);
                                     }
                                 }
                             }
@@ -783,7 +793,7 @@ pub const Parser = struct {
                                     .syntax_id = end_syn.id,
                                 };
                                 @memcpy(c.scope[0..name.len], name);
-                                proc.closeTag(c);
+                                proc.closeTag(&c);
                             }
 
                             // std.debug.print("pop {s}\n", .{end_syn.getName()});
@@ -802,11 +812,10 @@ pub const Parser = struct {
                             if (match_syn.rx_end.expr != null) {
                                 // std.debug.print("push {s}\n", .{match_syn.getName()});
                                 if (pattern_match.regex) |rx| {
-
                                     if (last_push_pos != start_ or last_push_syntax != match_syn.id) {
                                         state.push(match_syn, rx, block, pattern_match, "patttern") catch {};
                                         last_push_pos = start_;
-                                        last_push_syntax = match_syn.id; 
+                                        last_push_syntax = match_syn.id;
                                     }
                                     // fail silently?
                                 }
@@ -822,7 +831,7 @@ pub const Parser = struct {
                                     if (pattern_match.regex) |rx| {
                                         c.retain = (rx.is_string_block or rx.is_comment_block);
                                     }
-                                    proc.openTag(c);
+                                    proc.openTag(&c);
                                 }
 
                                 self.collectMatch(match_syn, &pattern_match, block);

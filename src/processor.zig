@@ -23,9 +23,9 @@ pub const Processor = struct {
     end_document_fn: ?*const fn (*Processor) void = null,
     start_line_fn: ?*const fn (*Processor, block: []const u8) void = null,
     end_line_fn: ?*const fn (*Processor) void = null,
-    open_tag_fn: ?*const fn (*Processor, ParseCapture) void = null,
-    close_tag_fn: ?*const fn (*Processor, ParseCapture) void = null,
-    capture_fn: ?*const fn (*Processor, ParseCapture) void = null,
+    open_tag_fn: ?*const fn (*Processor, *ParseCapture) void = null,
+    close_tag_fn: ?*const fn (*Processor, *ParseCapture) void = null,
+    capture_fn: ?*const fn (*Processor, *ParseCapture) void = null,
 
     pub fn startDocument(self: *Processor) void {
         if (self.start_document_fn) |f| {
@@ -72,7 +72,7 @@ pub const Processor = struct {
         }
     }
 
-    pub fn openTag(self: *Processor, cap: ParseCapture) void {
+    pub fn openTag(self: *Processor, cap: *ParseCapture) void {
         var c = cap;
         if (self.block) |b| {
             if (c.start > b.len and b.len > 0) {
@@ -83,13 +83,13 @@ pub const Processor = struct {
             // TODO retain only string and comment blocks?
             // set retention at Parser, since capture only has syntax_id
         }
-        self.captures.append(c) catch {};
+        self.captures.append(c.*) catch {};
         if (self.open_tag_fn) |f| {
             f(self, c);
         }
     }
 
-    pub fn closeTag(self: *Processor, cap: ParseCapture) void {
+    pub fn closeTag(self: *Processor, cap: *ParseCapture) void {
         var c = cap;
         if (self.block) |b| {
             // this happens if parser adds '\n' at every parse
@@ -115,7 +115,7 @@ pub const Processor = struct {
         }
     }
 
-    pub fn capture(self: *Processor, cap: ParseCapture) void {
+    pub fn capture(self: *Processor, cap: *ParseCapture) void {
         var c = cap;
         if (self.block) |b| {
             // this happens if parser adds '\n' at every parse
@@ -127,7 +127,7 @@ pub const Processor = struct {
             }
         }
 
-        self.captures.append(c) catch {};
+        self.captures.append(c.*) catch {};
         if (self.capture_fn) |f| {
             f(self, c);
         }
@@ -151,21 +151,21 @@ pub const DumpProcessor = struct {
         std.debug.print("----------------------------------]]\n\n", .{});
     }
 
-    pub fn openTag(self: *Processor, cap: ParseCapture) void {
+    pub fn openTag(self: *Processor, cap: *ParseCapture) void {
         if (self.block) |b| {
             const text = b[cap.start..cap.end];
             std.debug.print("open: {s} {}-{} {s}\n", .{ text, cap.start, cap.end, cap.scope });
         }
     }
 
-    pub fn closeTag(self: *Processor, cap: ParseCapture) void {
+    pub fn closeTag(self: *Processor, cap: *ParseCapture) void {
         if (self.block) |b| {
             const text = b[cap.start..cap.end];
             std.debug.print("close: {s} {}-{} {s}\n", .{ text, cap.start, cap.end, cap.scope });
         }
     }
 
-    pub fn capture(self: *Processor, cap: ParseCapture) void {
+    pub fn capture(self: *Processor, cap: *ParseCapture) void {
         if (self.block) |b| {
             if (cap.start >= b.len) return;
             const text = b[cap.start..cap.end];
@@ -340,6 +340,8 @@ pub const RenderHtmlProcessor = struct {
                 // _ = ch;
                 if (ch == '<') {
                     stdout.print("&lt;", .{}) catch {};
+                } else if (ch == ' ') {
+                    stdout.print("&nbsp;", .{}) catch {};
                 } else if (ch == '\t') {
                     stdout.print("&nbsp;&nbsp;", .{}) catch {};
                 } else {

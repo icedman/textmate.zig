@@ -153,8 +153,6 @@ pub const Syntax = struct {
         hasher.update(syntax.getName());
         syntax.scope_hash = hasher.final();
 
-        // std.debug.print("{s} {}\n", .{syntax.getName(), syntax.scope_hash});
-
         syntax.compileAllRegexes() catch {
             std.debug.print("Failed to compile regex: // TODO which one?\n", .{});
         };
@@ -195,18 +193,10 @@ pub const Syntax = struct {
         };
 
         const entries = [_]Entry{
-            .{
-                .rx_ptr = &self.rx_match,
-            },
-            .{
-                .rx_ptr = &self.rx_begin,
-            },
-            .{
-                .rx_ptr = &self.rx_while,
-            },
-            .{
-                .rx_ptr = &self.rx_end,
-            },
+            .{ .rx_ptr = &self.rx_match },
+            .{ .rx_ptr = &self.rx_begin },
+            .{ .rx_ptr = &self.rx_while },
+            .{ .rx_ptr = &self.rx_end },
         };
 
         // free regexes
@@ -264,18 +254,10 @@ pub const Syntax = struct {
         };
 
         const entries = [_]Entry{
-            .{
-                .rx_ptr = &self.rx_match,
-            },
-            .{
-                .rx_ptr = &self.rx_begin,
-            },
-            .{
-                .rx_ptr = &self.rx_while,
-            },
-            .{
-                .rx_ptr = &self.rx_end,
-            },
+            .{ .rx_ptr = &self.rx_match },
+            .{ .rx_ptr = &self.rx_begin },
+            .{ .rx_ptr = &self.rx_while },
+            .{ .rx_ptr = &self.rx_end },
         };
 
         for (entries, 0..) |entry, i| {
