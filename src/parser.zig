@@ -7,7 +7,8 @@ const Regex = grammar.Regex;
 
 // TODO move to config.. smallcaps
 const ENABLE_MATCH_CACHING = true;
-const ENABLE_END_MATCH_CACHING = true;
+const ENABLE_END_CACHING = true;
+const ENABLE_EXEC_CACHING = true;
 
 const MAX_LINE_LEN = 1024; // and line longer will not be parsed
 const MAX_MATCH_RANGES = 10; // max $1 in grammar files is just 8
@@ -40,7 +41,7 @@ const MatchRange = struct {
     end: usize = 0,
 };
 
-// every execRegex productes a Match, with MatchRanges holding the captured groups
+// every findMatch productes a Match, with MatchRanges holding the captured groups
 const Match = struct {
     syntax: ?*Syntax = null,
     regex: ?*Regex = null,
@@ -52,7 +53,7 @@ const Match = struct {
     start: usize = 0,
     end: usize = 0,
 
-    // search anchors are the start and end of block sliced passed to execRegex
+    // search anchors are the start and end of block sliced passed to findMatch
     anchor_start: usize = 0,
     anchor_end: usize = 0,
 
@@ -122,6 +123,7 @@ const StateContext = struct {
     // The match position of the character relative to the line start
     anchor: usize = 0,
 
+    // TODO convert to grammar.Regex
     // These dynamic regexes should be cached
     // 1. to allow restoration from serialized copy
     // 2. and minimize recompilation
@@ -189,8 +191,8 @@ pub const ParseState = struct {
         if (rx.has_references) {
             if (match) |m| {
                 // compile regex_end
-                if (syntax.regex_end == null) {
-                    if (syntax.regexs_end) |regexs| {
+                if (syntax.rx_end.valid != .Valid) {
+                    if (syntax.rx_end.expr) |regexs| {
                         var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
                         _ = m.applyReferences(block, regexs, &output);
                         {
@@ -206,8 +208,8 @@ pub const ParseState = struct {
                     }
                 }
                 // compile regex_while
-                if (syntax.regex_while == null) {
-                    if (syntax.regexs_while) |regexs| {
+                if (syntax.rx_while.expr != null) {
+                    if (syntax.rx_while.expr) |regexs| {
                         var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
                         _ = m.applyReferences(block, regexs, &output);
                         {
@@ -263,8 +265,11 @@ pub const Parser = struct {
     lang: *grammar.Grammar,
 
     // line parse data
-    match_cache: std.AutoHashMap(u64, Match),
-    end_match_cache: std.AutoHashMap(u64, Match),
+    // syntax level cache
+    match_cache: std.AutoHashMap(u32, Match),
+    end_cache: std.AutoHashMap(u32, Match),
+    // regex level cache
+    exec_cache: std.AutoHashMap(u64, Match),
 
     // processor
     processor: ?*processor.Processor = null,
@@ -279,14 +284,16 @@ pub const Parser = struct {
         return Parser{
             .allocator = allocator,
             .lang = lang,
-            .match_cache = std.AutoHashMap(u64, Match).init(allocator),
-            .end_match_cache = std.AutoHashMap(u64, Match).init(allocator),
+            .match_cache = std.AutoHashMap(u32, Match).init(allocator),
+            .end_cache = std.AutoHashMap(u32, Match).init(allocator),
+            .exec_cache = std.AutoHashMap(u64, Match).init(allocator),
         };
     }
 
     pub fn deinit(self: *Parser) void {
         self.match_cache.deinit();
-        self.end_match_cache.deinit();
+        self.end_cache.deinit();
+        self.exec_cache.deinit();
     }
 
     fn getCurrentAnchor(self: *Parser) usize {
@@ -299,23 +306,32 @@ pub const Parser = struct {
         return 0;
     }
 
-    // ExecRegex. Regular expression matching. This is where all the CPU usage goes.
-    fn execRegex(self: *Parser, syntax: *Syntax, rx: *Regex, regex: ?oni.Regex, regexs: ?[]const u8, block: []const u8, start: usize, end: usize) Match {
+    // findMatch. Regular expression matching. This is where all the CPU usage goes.
+    fn findMatch(self: *Parser, syntax: *Syntax, rx: *Regex, regex: ?oni.Regex, block: []const u8, start: usize, end: usize) Match {
         if (block.len == 0) {
             return Match{};
         }
 
-        // std.debug.print("execRegex {s}\n", .{regexs orelse ""});
+        // std.debug.print("findMatch {s} {}\n", .{regexs orelse "", rx.id});
+        // std.debug.print("findMatch {}\n", .{rx.id});
+
         if (regex) |*re| {
+
+            // check cache
+            var should_cache = false;
+            if (rx.valid == .Valid and ENABLE_EXEC_CACHING) {
+                should_cache = true;
+                if (self.exec_cache.get(rx.id)) |m| {
+                    if (m.anchor_start == start and m.anchor_end == end) {
+                        return m;
+                    }
+                }
+            }
+
             syntax.execs += 1;
             self.regex_execs += 1;
             var hard_start: usize = start;
-            var is_anchored = false;
-            if (rx.is_anchored) {
-                if (regexs) |rs| {
-                    is_anchored = grammar.Syntax.patternHasAnchor(rs);
-                }
-            }
+            const is_anchored = rx.is_anchored;
             if (is_anchored) {
                 // TODO is this correct?
                 // \G in oniguruma means start of previous match
@@ -380,11 +396,14 @@ pub const Parser = struct {
                     // std.debug.print("{s}\n", .{syntax.content_name});
                 }
 
+                if (should_cache) {
+                    self.exec_cache.put(rx.id, m) catch {};
+                }
+
                 return m;
             }
         }
 
-        _ = .{regexs};
         return Match{};
     }
 
@@ -415,7 +434,7 @@ pub const Parser = struct {
                 // check of matching has been previously cached (for the same position in the buffer)
                 var should_cache = false;
                 const m = blk: {
-                    const mm = self.match_cache.get(syntax.rx_match.id) orelse {
+                    const mm = self.match_cache.get(syntax.id) orelse {
                         should_cache = true;
                         break :blk null;
                     };
@@ -428,9 +447,10 @@ pub const Parser = struct {
                         break :blk mm;
                     }
                     break :blk null;
-                } orelse self.execRegex(syntax, &syntax.rx_match, regex, syntax.rx_match.expr, block, start, end);
+                } orelse self.findMatch(syntax, &syntax.rx_match, regex, block, start, end);
                 if (should_cache and ENABLE_MATCH_CACHING) {
-                    _ = self.match_cache.put(syntax.rx_match.id, m) catch {};
+                    if (syntax.rx_match.id != 0)
+                        _ = self.match_cache.put(syntax.id, m) catch {};
                 }
                 if (m.count > 0) {
                     return m;
@@ -446,7 +466,7 @@ pub const Parser = struct {
                 // check of matching has been previously cached (for the same position in the buffer)
                 var should_cache = false;
                 const m = blk: {
-                    const mm = self.match_cache.get(syntax.rx_begin.id) orelse {
+                    const mm = self.match_cache.get(syntax.id) orelse {
                         should_cache = true;
                         break :blk null;
                     };
@@ -459,10 +479,9 @@ pub const Parser = struct {
                         break :blk mm;
                     }
                     break :blk null;
-                } orelse self.execRegex(syntax, &syntax.rx_begin, regex, syntax.rx_begin.expr, block, start, end);
-
+                } orelse self.findMatch(syntax, &syntax.rx_begin, regex, block, start, end);
                 if (should_cache and ENABLE_MATCH_CACHING) {
-                    _ = self.match_cache.put(syntax.rx_begin.id, m) catch {};
+                    _ = self.match_cache.put(syntax.id, m) catch {};
                 }
                 if (m.count > 0) {
                     return m;
@@ -490,33 +509,24 @@ pub const Parser = struct {
                             // not caching or result in this case
                             // TODO caching is possible though
                             self.regex_compile += 1;
-                            const m = self.execRegex(@constCast(syn), @constCast(&syn.rx_while), r, syn.regexs_while, block, start, end);
+                            const m = self.findMatch(@constCast(syn), @constCast(&syn.rx_while), r, block, start, end);
                             break :blk m;
                         }
 
                         // while_match without caching
-                        if (syn.regex_while) |r| {
-                            const m = self.execRegex(@constCast(syn), @constCast(&syn.rx_while), r, syn.regexs_while, block, start, end);
+                        if (syn.rx_while.regex) |r| {
+                            const m = self.findMatch(@constCast(syn), @constCast(&syn.rx_while), r, block, start, end);
                             break :blk m;
                         }
                         break :blk Match{ .count = 1 };
                     };
 
                     if (m.count == 0) {
-                        std.debug.print("while! {s}\n", .{syn.regexs_while orelse "?"});
+                        // std.debug.print("while! {s}\n", .{syn.syn.rx_while.expr orelse "?"});
                         while (state.size() >= state_depth) {
                             state.pop("matchWhile");
                         }
                     }
-
-                    // if (syn.regex_while) |regex| {
-                    //     const m = self.execRegex(@constCast(syn), regex, syn.regexs_while, block, start, end);
-                    //     if (m.count == 0) {
-                    //         while (state.size() >= state_depth) {
-                    //             state.pop("matchWhile");
-                    //         }
-                    //     }
-                    // }
                 }
             }
         }
@@ -547,17 +557,14 @@ pub const Parser = struct {
                         // use dynamic end_regex here if one was compiled
                         // not caching or result in this case
                         self.regex_compile += 1;
-                        const m = self.execRegex(@constCast(syn), @constCast(&syn.rx_end), r, syn.regexs_end, block, start, end);
+                        const m = self.findMatch(@constCast(syn), @constCast(&syn.rx_end), r, block, start, end);
                         break :blk m;
                     }
-
-                    // end_match without caching
-                    // const m = self.execRegex(@constCast(syn), @constCast(syn.regex_end), syn.regexs_end, block, start, end);
 
                     // end_match with caching
                     var should_cache = false;
                     const m = inner_blk: {
-                        const mm = self.end_match_cache.get(syn.rx_end.id) orelse {
+                        const mm = self.end_cache.get(syn.id) orelse {
                             should_cache = true;
                             break :inner_blk null;
                         };
@@ -570,9 +577,9 @@ pub const Parser = struct {
                             break :inner_blk mm;
                         }
                         break :inner_blk null;
-                    } orelse self.execRegex(@constCast(syn), @constCast(&syn.rx_end), syn.regex_end, syn.regexs_end, block, start, end);
-                    if (should_cache and ENABLE_END_MATCH_CACHING) {
-                        _ = self.end_match_cache.put(syn.rx_end.id, m) catch {};
+                    } orelse self.findMatch(@constCast(syn), @constCast(&syn.rx_end), syn.rx_end.regex, block, start, end);
+                    if (should_cache and ENABLE_END_CACHING) {
+                        _ = self.end_cache.put(syn.id, m) catch {};
                     }
 
                     break :blk m;
@@ -662,7 +669,7 @@ pub const Parser = struct {
                         if (p.rx_match.regex) |regex| {
                             // std.debug.print(">> {s} <<\n", .{p.regexs_match orelse ""});
                             // std.debug.print(">> {s} <<\n", .{block[ps..pe]});
-                            const m = self.execRegex(p, &p.rx_match, regex, p.rx_match.expr, block, ps, pe);
+                            const m = self.findMatch(p, &p.rx_match, regex, block, ps, pe);
                             if (m.count > 0) {
                                 // std.debug.print("count {}\n", .{m.count});
                                 if (p.captures) |*pc| {
@@ -697,7 +704,8 @@ pub const Parser = struct {
 
         self.current_state = state;
         self.match_cache.clearRetainingCapacity();
-        self.end_match_cache.clearRetainingCapacity();
+        self.end_cache.clearRetainingCapacity();
+        self.exec_cache.clearRetainingCapacity();
 
         var start: usize = 0;
         var end = block.len;
@@ -769,7 +777,7 @@ pub const Parser = struct {
                             start = pattern_match.start;
                             end = pattern_match.end;
 
-                            if (match_syn.regexs_end != null) {
+                            if (match_syn.rx_end.expr != null) {
                                 // if it has a regexs_end.. it is a begin and should cause a push
                                 // std.debug.print("push {s}\n", .{match_syn.getName()});
                                 if (pattern_match.regex) |rx| {

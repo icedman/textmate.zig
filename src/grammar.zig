@@ -45,15 +45,6 @@ pub const Syntax = struct {
 
     parent: ?*Syntax = null,
 
-    // regex strings
-    regexs_match: ?[]const u8 = null,
-    regexs_while: ?[]const u8 = null,
-    regexs_end: ?[]const u8 = null,
-
-    regex_match: ?oni.Regex = null,
-    regex_while: ?oni.Regex = null,
-    regex_end: ?oni.Regex = null,
-
     // TODO these will replace regexs_ and regex_ pairing above
     // Wrap oni.Regex into a struct R{ id, regex_str, regex } for better caching, and sharing
     // cached compiles will be saved at the Parser?
@@ -151,10 +142,6 @@ pub const Syntax = struct {
             .name = if (obj.get("name")) |v| v.string else "",
             .content_name = if (obj.get("contentName")) |v| v.string else "",
             .scope_name = if (obj.get("scopeName")) |v| v.string else "",
-            // .regexs_match = if (obj.get("match")) |v| v.string else null,
-            // .regexs_begin = if (obj.get("begin")) |v| v.string else null,
-            .regexs_while = if (obj.get("while")) |v| v.string else null,
-            .regexs_end = if (obj.get("end")) |v| v.string else null,
             .rx_match = Regex{ .expr = if (obj.get("match")) |v| v.string else null },
             .rx_begin = Regex{ .expr = if (obj.get("begin")) |v| v.string else null },
             .rx_while = Regex{ .expr = if (obj.get("while")) |v| v.string else null },
@@ -197,15 +184,22 @@ pub const Syntax = struct {
     pub fn deinit(self: *Syntax) void {
         // std.debug.print("deinit syntax address {*}-{*}\n", .{self, self.parent});
         const Entry = struct {
-            string: *const ?[]const u8,
-            regex_ptr: *?oni.Regex,
+            rx_ptr: *Regex,
         };
 
         const entries = [_]Entry{
-            .{ .string = &self.regexs_match, .regex_ptr = &self.regex_match },
-            .{ .string = &self.regexs_begin, .regex_ptr = &self.regex_begin },
-            .{ .string = &self.regexs_while, .regex_ptr = &self.regex_while },
-            .{ .string = &self.regexs_end, .regex_ptr = &self.regex_end },
+            .{
+                .rx_ptr = &self.rx_match,
+            },
+            .{
+                .rx_ptr = &self.rx_begin,
+            },
+            .{
+                .rx_ptr = &self.rx_while,
+            },
+            .{
+                .rx_ptr = &self.rx_end,
+            },
         };
 
         // free regexes
@@ -259,37 +253,26 @@ pub const Syntax = struct {
     pub fn compileAllRegexes(self: *Syntax) !void {
         // TODO, compilation will now be done a load but only when required
         const Entry = struct {
-            string: *const ?[]const u8,
-            regex_ptr: *?oni.Regex,
             rx_ptr: *Regex,
         };
 
         const entries = [_]Entry{
             .{
-                .string = &self.regexs_match,
-                .regex_ptr = &self.regex_match,
                 .rx_ptr = &self.rx_match,
             },
             .{
-                .string = &self.regexs_match,
-                .regex_ptr = &self.regex_match,
                 .rx_ptr = &self.rx_begin,
             },
             .{
-                .string = &self.regexs_while,
-                .regex_ptr = &self.regex_while,
                 .rx_ptr = &self.rx_while,
             },
             .{
-                .string = &self.regexs_end,
-                .regex_ptr = &self.regex_end,
                 .rx_ptr = &self.rx_end,
             },
         };
 
         for (entries, 0..) |entry, i| {
             if (entry.rx_ptr.*.expr) |regex| {
-                entry.rx_ptr.*.hash();
                 if (Syntax.patternHasAnchor(regex)) {
                     entry.rx_ptr.*.is_anchored = true;
                 }
@@ -318,9 +301,9 @@ pub const Syntax = struct {
                     return err;
                 };
                 errdefer re.deinit();
-                entry.regex_ptr.* = re;
                 entry.rx_ptr.*.regex = re;
                 entry.rx_ptr.*.valid = .Valid;
+                entry.rx_ptr.*.hash();
             }
         }
     }
