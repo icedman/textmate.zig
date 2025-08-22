@@ -3,6 +3,7 @@ const oni = @import("oniguruma");
 const grammar = @import("grammar.zig");
 const processor = @import("processor.zig");
 const Syntax = grammar.Syntax;
+const Regex = grammar.Regex;
 
 // TODO move to config.. smallcaps
 const ENABLE_MATCH_CACHING = true;
@@ -42,6 +43,7 @@ const MatchRange = struct {
 // every execRegex productes a Match, with MatchRanges holding the captured groups
 const Match = struct {
     syntax: ?*Syntax = null,
+    regex: ?*Regex = null,
 
     ranges: [MAX_MATCH_RANGES]MatchRange = [_]MatchRange{MatchRange{ .group = 0, .start = 0, .end = 0 }} ** MAX_MATCH_RANGES,
     count: u8 = 0,
@@ -178,13 +180,13 @@ pub const ParseState = struct {
     }
 
     // TODO why optional match?
-    pub fn push(self: *ParseState, syntax: *Syntax, block: []const u8, match: ?Match, where: []const u8) !void {
+    pub fn push(self: *ParseState, syntax: *Syntax, rx: *Regex, block: []const u8, match: ?Match, where: []const u8) !void {
         const anchor = (match orelse Match{ .start = 0 }).start;
         var sc = StateContext{
             .syntax = syntax,
             .anchor = anchor,
         };
-        if (syntax.has_back_references) {
+        if (rx.has_references) {
             if (match) |m| {
                 // compile regex_end
                 if (syntax.regex_end == null) {
@@ -298,7 +300,7 @@ pub const Parser = struct {
     }
 
     // ExecRegex. Regular expression matching. This is where all the CPU usage goes.
-    fn execRegex(self: *Parser, syntax: *Syntax, regex: ?oni.Regex, regexs: ?[]const u8, block: []const u8, start: usize, end: usize) Match {
+    fn execRegex(self: *Parser, syntax: *Syntax, rx: *Regex, regex: ?oni.Regex, regexs: ?[]const u8, block: []const u8, start: usize, end: usize) Match {
         if (block.len == 0) {
             return Match{};
         }
@@ -309,7 +311,7 @@ pub const Parser = struct {
             self.regex_execs += 1;
             var hard_start: usize = start;
             var is_anchored = false;
-            if (syntax.is_anchored) {
+            if (rx.is_anchored) {
                 if (regexs) |rs| {
                     is_anchored = grammar.Syntax.patternHasAnchor(rs);
                 }
@@ -335,6 +337,7 @@ pub const Parser = struct {
             if (reg) |r| {
                 var m = Match{
                     .syntax = syntax,
+                    .regex = rx,
                     .anchor_start = hard_start,
                     .anchor_end = hard_end,
                 };
@@ -400,7 +403,7 @@ pub const Parser = struct {
         }
 
         // if all this syntax has are patterns, check patterns
-        if (syntax.regex_match == null and syntax.regex_begin == null) {
+        if (syntax.rx_match.valid != .Valid and syntax.rx_begin.valid != .Valid) {
             return self.matchPatterns(syntax, syntax.patterns, block, start, end);
         }
 
@@ -425,7 +428,7 @@ pub const Parser = struct {
                         break :blk mm;
                     }
                     break :blk null;
-                } orelse self.execRegex(syntax, regex, syntax.regexs_match, block, start, end);
+                } orelse self.execRegex(syntax, &syntax.rx_match, regex, syntax.rx_match.expr, block, start, end);
                 if (should_cache and ENABLE_MATCH_CACHING) {
                     _ = self.match_cache.put(syntax.rx_match.id, m) catch {};
                 }
@@ -456,7 +459,8 @@ pub const Parser = struct {
                         break :blk mm;
                     }
                     break :blk null;
-                } orelse self.execRegex(syntax, regex, syntax.regexs_begin, block, start, end);
+                } orelse self.execRegex(syntax, &syntax.rx_begin, regex, syntax.rx_begin.expr, block, start, end);
+
                 if (should_cache and ENABLE_MATCH_CACHING) {
                     _ = self.match_cache.put(syntax.rx_begin.id, m) catch {};
                 }
@@ -486,13 +490,13 @@ pub const Parser = struct {
                             // not caching or result in this case
                             // TODO caching is possible though
                             self.regex_compile += 1;
-                            const m = self.execRegex(@constCast(syn), r, syn.regexs_while, block, start, end);
+                            const m = self.execRegex(@constCast(syn), @constCast(&syn.rx_while), r, syn.regexs_while, block, start, end);
                             break :blk m;
                         }
 
                         // while_match without caching
                         if (syn.regex_while) |r| {
-                            const m = self.execRegex(@constCast(syn), r, syn.regexs_while, block, start, end);
+                            const m = self.execRegex(@constCast(syn), @constCast(&syn.rx_while), r, syn.regexs_while, block, start, end);
                             break :blk m;
                         }
                         break :blk Match{ .count = 1 };
@@ -543,12 +547,12 @@ pub const Parser = struct {
                         // use dynamic end_regex here if one was compiled
                         // not caching or result in this case
                         self.regex_compile += 1;
-                        const m = self.execRegex(@constCast(syn), r, syn.regexs_end, block, start, end);
+                        const m = self.execRegex(@constCast(syn), @constCast(&syn.rx_end), r, syn.regexs_end, block, start, end);
                         break :blk m;
                     }
 
                     // end_match without caching
-                    // const m = self.execRegex(@constCast(syn), syn.regex_end, syn.regexs_end, block, start, end);
+                    // const m = self.execRegex(@constCast(syn), @constCast(syn.regex_end), syn.regexs_end, block, start, end);
 
                     // end_match with caching
                     var should_cache = false;
@@ -566,7 +570,7 @@ pub const Parser = struct {
                             break :inner_blk mm;
                         }
                         break :inner_blk null;
-                    } orelse self.execRegex(@constCast(syn), syn.regex_end, syn.regexs_end, block, start, end);
+                    } orelse self.execRegex(@constCast(syn), @constCast(&syn.rx_end), syn.regex_end, syn.regexs_end, block, start, end);
                     if (should_cache and ENABLE_END_MATCH_CACHING) {
                         _ = self.end_match_cache.put(syn.rx_end.id, m) catch {};
                     }
@@ -655,10 +659,10 @@ pub const Parser = struct {
                     const ps = match.start; // should be range.start and range.end?
                     const pe = match.end;
                     for (pats) |p| {
-                        if (p.regex_match) |regex| {
+                        if (p.rx_match.regex) |regex| {
                             // std.debug.print(">> {s} <<\n", .{p.regexs_match orelse ""});
                             // std.debug.print(">> {s} <<\n", .{block[ps..pe]});
-                            const m = self.execRegex(p, regex, p.regexs_match, block, ps, pe);
+                            const m = self.execRegex(p, &p.rx_match, regex, p.rx_match.expr, block, ps, pe);
                             if (m.count > 0) {
                                 // std.debug.print("count {}\n", .{m.count});
                                 if (p.captures) |*pc| {
@@ -768,9 +772,10 @@ pub const Parser = struct {
                             if (match_syn.regexs_end != null) {
                                 // if it has a regexs_end.. it is a begin and should cause a push
                                 // std.debug.print("push {s}\n", .{match_syn.getName()});
-                                state.push(match_syn, block, pattern_match, "patttern") catch {
+                                if (pattern_match.regex) |rx| {
+                                    state.push(match_syn, rx, block, pattern_match, "patttern") catch {};
                                     // fail silently?
-                                };
+                                }
 
                                 if (self.processor) |proc| {
                                     const name = match_syn.getName();
@@ -780,7 +785,9 @@ pub const Parser = struct {
                                         .syntax_id = match_syn.id,
                                     };
                                     @memcpy(c.scope[0..name.len], name);
-                                    c.retain = (match_syn.is_string_block or match_syn.is_comment_block);
+                                    if (pattern_match.regex) |rx| {
+                                        c.retain = (rx.is_string_block or rx.is_comment_block);
+                                    }
                                     proc.openTag(c);
                                 }
 

@@ -12,7 +12,7 @@ var regex_id: u32 = 1;
 // It adds an idenfier and points to the expression string
 // It also holds other cached information
 
-const Regex = struct {
+pub const Regex = struct {
     id: u64 = 0,
     expr: ?[]const u8 = null,
     regex: ?oni.Regex = null,
@@ -47,12 +47,10 @@ pub const Syntax = struct {
 
     // regex strings
     regexs_match: ?[]const u8 = null,
-    regexs_begin: ?[]const u8 = null,
     regexs_while: ?[]const u8 = null,
     regexs_end: ?[]const u8 = null,
 
     regex_match: ?oni.Regex = null,
-    regex_begin: ?oni.Regex = null,
     regex_while: ?oni.Regex = null,
     regex_end: ?oni.Regex = null,
 
@@ -77,12 +75,6 @@ pub const Syntax = struct {
     // include
     include_path: ?[]const u8 = null,
     include: ?*Syntax = null,
-
-    // other internals
-    is_anchored: bool = false,
-    is_comment_block: bool = false,
-    is_string_block: bool = false,
-    has_back_references: bool = false,
 
     // stats
     execs: u32 = 0,
@@ -159,8 +151,8 @@ pub const Syntax = struct {
             .name = if (obj.get("name")) |v| v.string else "",
             .content_name = if (obj.get("contentName")) |v| v.string else "",
             .scope_name = if (obj.get("scopeName")) |v| v.string else "",
-            .regexs_match = if (obj.get("match")) |v| v.string else null,
-            .regexs_begin = if (obj.get("begin")) |v| v.string else null,
+            // .regexs_match = if (obj.get("match")) |v| v.string else null,
+            // .regexs_begin = if (obj.get("begin")) |v| v.string else null,
             .regexs_while = if (obj.get("while")) |v| v.string else null,
             .regexs_end = if (obj.get("end")) |v| v.string else null,
             .rx_match = Regex{ .expr = if (obj.get("match")) |v| v.string else null },
@@ -168,24 +160,6 @@ pub const Syntax = struct {
             .rx_while = Regex{ .expr = if (obj.get("while")) |v| v.string else null },
             .rx_end = Regex{ .expr = if (obj.get("end")) |v| v.string else null },
         };
-
-        // special cases for retaining captures across lines
-        if (syntax.regexs_match) |_| {
-            if (std.mem.indexOf(u8, syntax.getName(), "string")) |_| {
-                syntax.is_string_block = true;
-            }
-            if (std.mem.indexOf(u8, syntax.getName(), "comment")) |_| {
-                syntax.is_comment_block = true;
-            }
-        }
-        if (syntax.regexs_begin) |_| {
-            if (std.mem.indexOf(u8, syntax.getName(), "string")) |_| {
-                syntax.is_string_block = true;
-            }
-            if (std.mem.indexOf(u8, syntax.getName(), "comment")) |_| {
-                syntax.is_comment_block = true;
-            }
-        }
 
         syntax.compileAllRegexes() catch {
             std.debug.print("Failed to compile regex: // TODO which one?\n", .{});
@@ -297,8 +271,8 @@ pub const Syntax = struct {
                 .rx_ptr = &self.rx_match,
             },
             .{
-                .string = &self.regexs_begin,
-                .regex_ptr = &self.regex_begin,
+                .string = &self.regexs_match,
+                .regex_ptr = &self.regex_match,
                 .rx_ptr = &self.rx_begin,
             },
             .{
@@ -314,15 +288,23 @@ pub const Syntax = struct {
         };
 
         for (entries, 0..) |entry, i| {
-            if (entry.string.*) |regex| {
+            if (entry.rx_ptr.*.expr) |regex| {
+                entry.rx_ptr.*.hash();
+                if (Syntax.patternHasAnchor(regex)) {
+                    entry.rx_ptr.*.is_anchored = true;
+                }
+                const scopeName = self.getName();
+                if (std.mem.indexOf(u8, scopeName, "string")) |_| {
+                    entry.rx_ptr.*.is_string_block = true;
+                }
+                if (std.mem.indexOf(u8, scopeName, "comment")) |_| {
+                    entry.rx_ptr.*.is_comment_block = true;
+                }
                 if (i > 1 and Syntax.patternHasBackReference(regex)) {
                     // deal with back references for while and end
                     // do not compile now, this has to be recompiled at every matched begin (applying one or more captures to the pattern)
-                    self.has_back_references = true;
+                    entry.rx_ptr.*.has_references = true;
                     continue;
-                }
-                if (Syntax.patternHasAnchor(regex)) {
-                    self.is_anchored = true;
                 }
                 const re = oni.Regex.init(
                     regex,
@@ -337,10 +319,8 @@ pub const Syntax = struct {
                 };
                 errdefer re.deinit();
                 entry.regex_ptr.* = re;
-
                 entry.rx_ptr.*.regex = re;
                 entry.rx_ptr.*.valid = .Valid;
-                entry.rx_ptr.*.hash();
             }
         }
     }
