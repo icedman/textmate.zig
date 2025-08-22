@@ -28,8 +28,21 @@ pub const Regex = struct {
         Invalid,
     };
 
-    pub fn hash(self: *Regex) void {
+    pub fn compile(self: *Regex) !void {
         if (self.expr) |s| {
+            const re = oni.Regex.init(
+                s,
+                .{},
+                oni.Encoding.utf8,
+                oni.Syntax.default,
+                null,
+            ) catch |err| {
+                self.valid = .Invalid;
+                return err;
+            };
+            errdefer re.deinit();
+            self.regex = re;
+            self.valid = .Valid;
             var hasher = std.hash.Fnv1a_64.init();
             hasher.update(s);
             self.id = hasher.final();
@@ -278,21 +291,9 @@ pub const Syntax = struct {
                     entry.rx_ptr.*.has_references = true;
                     continue;
                 }
-                const re = oni.Regex.init(
-                    regex,
-                    .{},
-                    oni.Encoding.utf8,
-                    oni.Syntax.default,
-                    null,
-                ) catch |err| {
-                    entry.rx_ptr.*.valid = .Invalid;
-                    std.debug.print("{} regex compile error {s}\n", .{ i, regex });
-                    return err;
+                entry.rx_ptr.*.compile() catch {
+                    // fail silently
                 };
-                errdefer re.deinit();
-                entry.rx_ptr.*.regex = re;
-                entry.rx_ptr.*.valid = .Valid;
-                entry.rx_ptr.*.hash();
             }
         }
     }

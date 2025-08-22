@@ -6,7 +6,7 @@ const Syntax = grammar.Syntax;
 const Regex = grammar.Regex;
 
 // TODO move to config.. smallcaps
-// is exec level (findMatch) caching is slower as it caches everything -- even resolving captures?)
+// is exec level (findMatch) caching slower as it caches everything -- even resolving captures?)
 const ENABLE_MATCH_CACHING = true;
 
 // redundant to enable match-end cache with exec cache
@@ -269,15 +269,17 @@ pub const Parser = struct {
     allocator: std.mem.Allocator,
     lang: *grammar.Grammar,
 
-    // line parse data
+    // processor
+    processor: ?*processor.Processor = null,
+
+    // Cache for line parsing
     // syntax level cache
     match_cache: std.AutoHashMap(u64, Match),
-    // end_cache: std.AutoHashMap(u64, Match),
     // regex level cache
     exec_cache: std.AutoHashMap(u64, Match),
 
-    // processor
-    processor: ?*processor.Processor = null,
+    // runtime-compiled (with dynamic patterns) are save for sharing a (de)serialization
+    regex_map: std.AutoHashMap(u64, grammar.Regex),
 
     // stats
     regex_execs: u32 = 0,
@@ -290,8 +292,8 @@ pub const Parser = struct {
             .allocator = allocator,
             .lang = lang,
             .match_cache = std.AutoHashMap(u64, Match).init(allocator),
-            // .end_cache = std.AutoHashMap(u64, Match).init(allocator),
             .exec_cache = std.AutoHashMap(u64, Match).init(allocator),
+            .regex_map = std.AutoHashMap(u64, grammar.Regex).init(allocator),
         };
     }
 
