@@ -20,6 +20,7 @@ fn printUsage() void {
     std.debug.print("Usage: textmate_zig [options] filename\n", .{});
     std.debug.print(" -s printout stats\n", .{});
     std.debug.print(" -m html output\n", .{});
+    std.debug.print(" -n null output\n", .{});
     std.debug.print(" -d dump parsed scopes\n", .{});
     std.debug.print(" -g <grammar name> provide grammar by name\n", .{});
     std.debug.print(" -t <theme name> provide theme by name\n", .{});
@@ -36,6 +37,7 @@ pub fn main() !void {
     try oni.testing.ensureInit();
 
     var dump: bool = false;
+    var nllu: bool = false;
     var html: bool = false;
     var list: bool = false;
     var stats: bool = false;
@@ -55,6 +57,8 @@ pub fn main() !void {
             extra_resources_path = args.next();
         } else if (std.mem.eql(u8, arg.?, "-m")) {
             html = true;
+        } else if (std.mem.eql(u8, arg.?, "-n")) {
+            nllu = true;
         } else if (std.mem.eql(u8, arg.?, "-d")) {
             dump = true;
         } else if (std.mem.eql(u8, arg.?, "-g")) {
@@ -69,11 +73,6 @@ pub fn main() !void {
         } else {
             file_path = arg;
         }
-    }
-
-    if (file_path == null) {
-        printUsage();
-        return;
     }
 
     const warm_start = std.time.nanoTimestamp();
@@ -124,6 +123,11 @@ pub fn main() !void {
         return;
     }
 
+    if (file_path == null) {
+        printUsage();
+        return;
+    }
+
     // var thm = Theme.init(allocator, theme_path orelse "data/tests/dracula.json") catch {
     //     std.debug.print("unable to open theme {s}\n", .{theme_path orelse ""});
     //     return;
@@ -169,6 +173,8 @@ pub fn main() !void {
     var proc = blk: {
         if (dump) {
             break :blk try DumpProcessor.init(allocator);
+        } else if (nllu) {
+            break :blk try NullProcessor.init(allocator);
         } else if (html) {
             break :blk try RenderHtmlProcessor.init(allocator);
         } else {

@@ -352,15 +352,19 @@ pub const Theme = struct {
         return theme;
     }
 
-    pub fn getScope(self: *Theme, scope: []const u8, colors: ?*Settings) ?*const Scope {
+    pub fn getScope(self: *Theme, scope: []const u8, scope_hash: u64, colors: ?*Settings) ?*const Scope {
         if (scope.len == 0) {
             return null;
         }
 
+        // TODO - scope_hash not correctly passed
+        _ = scope_hash;
+
         // This caching should be done per grammar, not per theme.
         // Otherwise the cache hashmap would grow too large.
-        const enable_cache = ENABLE_SCOPE_CACHING and scope.len > 16;
+        const enable_cache = ENABLE_SCOPE_CACHING;
         if (enable_cache) {
+            // std.debug.print("{}\n", .{scope_hash});
             if (self.cache.get(scope)) |cached| {
                 if (colors) |c| {
                     if (cached.token) |token| {

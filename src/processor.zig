@@ -219,7 +219,7 @@ pub const RenderProcessor = struct {
                         cap = captures.items[ci];
 
                         var colors = theme.Settings{};
-                        const scope = thm.getScope(cap.scope[0..cap.scope.len], &colors);
+                        const scope = thm.getScope(cap.scope[0..cap.scope.len], cap.scope_hash, &colors);
                         _ = scope;
                         // std.debug.print("?", .{});
 
@@ -320,7 +320,7 @@ pub const RenderHtmlProcessor = struct {
                         cap = captures.items[ci];
 
                         var colors = theme.Settings{};
-                        const scope = thm.getScope(cap.scope[0..cap.scope.len], &colors);
+                        const scope = thm.getScope(cap.scope[0..cap.scope.len], cap.scope_hash, &colors);
                         _ = scope;
                         if (colors.foreground) |fg| {
                             const scope_len = for (0..64) |si| {
@@ -344,7 +344,7 @@ pub const RenderHtmlProcessor = struct {
                 for (0..captures.items.len) |ci| {
                     if (i == captures.items[ci].end) {
                         var colors = theme.Settings{};
-                        const scope = thm.getScope(cap.scope[0..cap.scope.len], &colors);
+                        const scope = thm.getScope(cap.scope[0..cap.scope.len], cap.scope_hash, &colors);
                         _ = scope;
                         if (colors.foreground) |fg| {
                             _ = fg;

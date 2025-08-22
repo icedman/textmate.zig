@@ -8,7 +8,8 @@ const Regex = grammar.Regex;
 // TODO move to config.. smallcaps
 const ENABLE_MATCH_CACHING = true;
 const ENABLE_END_CACHING = true;
-const ENABLE_EXEC_CACHING = true;
+// redundant to enable match-end cache with exec cache
+const ENABLE_EXEC_CACHING = false;
 
 const MAX_LINE_LEN = 1024; // and line longer will not be parsed
 const MAX_MATCH_RANGES = 10; // max $1 in grammar files is just 8
@@ -24,6 +25,7 @@ pub const ParseCapture = struct {
 
     // is this expensive to pass around (copy)
     scope: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN,
+    scope_hash: u64 = 0,
 
     // open block and strings will be retained across line parsing
     // syntax_id will be the identifier (not pointers)
@@ -57,8 +59,8 @@ const Match = struct {
     anchor_start: usize = 0,
     anchor_end: usize = 0,
 
-    fn applyRef(self: *const Match, block: []const u8, target: []const u8, escape_character: u8, output: *[MAX_SCOPE_LEN]u8) []const u8 {
-        var output_idx: usize = 0;
+    fn applyRef(self: *const Match, block: []const u8, target: []const u8, escape_character: u8, output: *[MAX_SCOPE_LEN]u8) u8 {
+        var output_idx: u8 = 0;
         var escape = false;
         var skip: usize = 0;
         for (target, 0..) |ch, idx| {
@@ -89,27 +91,27 @@ const Match = struct {
                             output[output_idx] = block[bi];
                             output_idx += 1;
                             // this cuts off any overflow
-                            if (output_idx >= output.len) return output;
+                            if (output_idx >= output.len) return output_idx;
                         }
                     }
                 }
             } else {
                 output[output_idx] = ch;
                 output_idx += 1;
-                if (output_idx >= output.len) return output;
+                if (output_idx >= output.len) return output_idx;
             }
             escape = (!escape) and (ch == escape_character);
         }
 
         // std.debug.print("{s}\n", .{output});
-        return output;
+        return output_idx;
     }
 
-    pub fn applyReferences(self: *const Match, block: []const u8, target: []const u8, output: *[MAX_SCOPE_LEN]u8) []const u8 {
+    pub fn applyReferences(self: *const Match, block: []const u8, target: []const u8, output: *[MAX_SCOPE_LEN]u8) u8 {
         return self.applyRef(block, target, '\\', output);
     }
 
-    pub fn applyCaptures(self: *const Match, block: []const u8, target: []const u8, output: *[MAX_SCOPE_LEN]u8) []const u8 {
+    pub fn applyCaptures(self: *const Match, block: []const u8, target: []const u8, output: *[MAX_SCOPE_LEN]u8) u8 {
         return self.applyRef(block, target, '$', output);
     }
 };
@@ -266,8 +268,8 @@ pub const Parser = struct {
 
     // line parse data
     // syntax level cache
-    match_cache: std.AutoHashMap(u32, Match),
-    end_cache: std.AutoHashMap(u32, Match),
+    match_cache: std.AutoHashMap(u64, Match),
+    // end_cache: std.AutoHashMap(u64, Match),
     // regex level cache
     exec_cache: std.AutoHashMap(u64, Match),
 
@@ -284,15 +286,15 @@ pub const Parser = struct {
         return Parser{
             .allocator = allocator,
             .lang = lang,
-            .match_cache = std.AutoHashMap(u32, Match).init(allocator),
-            .end_cache = std.AutoHashMap(u32, Match).init(allocator),
+            .match_cache = std.AutoHashMap(u64, Match).init(allocator),
+            // .end_cache = std.AutoHashMap(u64, Match).init(allocator),
             .exec_cache = std.AutoHashMap(u64, Match).init(allocator),
         };
     }
 
     pub fn deinit(self: *Parser) void {
         self.match_cache.deinit();
-        self.end_cache.deinit();
+        // self.end_cache.deinit();
         self.exec_cache.deinit();
     }
 
@@ -321,9 +323,17 @@ pub const Parser = struct {
             var should_cache = false;
             if (rx.valid == .Valid and ENABLE_EXEC_CACHING) {
                 should_cache = true;
-                if (self.exec_cache.get(rx.id)) |m| {
-                    if (m.anchor_start == start and m.anchor_end == end) {
-                        return m;
+                if (self.exec_cache.get(rx.id)) |mm| {
+                    if (mm.anchor_start <= start and mm.start > start) {
+
+                        // std.debug.print("findMatch cache {s} {} {}-{}\n", .{rx.expr orelse "", start, mm.start, mm.end});
+
+                        self.regex_skips += 1;
+                        return mm;
+                    }
+                    if (mm.anchor_start <= start and mm.count == 0) {
+                        self.regex_skips += 1;
+                        return mm;
                     }
                 }
             }
@@ -434,7 +444,7 @@ pub const Parser = struct {
                 // check of matching has been previously cached (for the same position in the buffer)
                 var should_cache = false;
                 const m = blk: {
-                    const mm = self.match_cache.get(syntax.id) orelse {
+                    const mm = self.match_cache.get(syntax.rx_match.id) orelse {
                         should_cache = true;
                         break :blk null;
                     };
@@ -450,7 +460,7 @@ pub const Parser = struct {
                 } orelse self.findMatch(syntax, &syntax.rx_match, regex, block, start, end);
                 if (should_cache and ENABLE_MATCH_CACHING) {
                     if (syntax.rx_match.id != 0)
-                        _ = self.match_cache.put(syntax.id, m) catch {};
+                        _ = self.match_cache.put(syntax.rx_match.id, m) catch {};
                 }
                 if (m.count > 0) {
                     return m;
@@ -466,7 +476,7 @@ pub const Parser = struct {
                 // check of matching has been previously cached (for the same position in the buffer)
                 var should_cache = false;
                 const m = blk: {
-                    const mm = self.match_cache.get(syntax.id) orelse {
+                    const mm = self.match_cache.get(syntax.rx_begin.id) orelse {
                         should_cache = true;
                         break :blk null;
                     };
@@ -481,7 +491,7 @@ pub const Parser = struct {
                     break :blk null;
                 } orelse self.findMatch(syntax, &syntax.rx_begin, regex, block, start, end);
                 if (should_cache and ENABLE_MATCH_CACHING) {
-                    _ = self.match_cache.put(syntax.id, m) catch {};
+                    _ = self.match_cache.put(syntax.rx_begin.id, m) catch {};
                 }
                 if (m.count > 0) {
                     return m;
@@ -564,7 +574,7 @@ pub const Parser = struct {
                     // end_match with caching
                     var should_cache = false;
                     const m = inner_blk: {
-                        const mm = self.end_cache.get(syn.id) orelse {
+                        const mm = self.match_cache.get(syn.rx_end.id) orelse {
                             should_cache = true;
                             break :inner_blk null;
                         };
@@ -579,7 +589,7 @@ pub const Parser = struct {
                         break :inner_blk null;
                     } orelse self.findMatch(@constCast(syn), @constCast(&syn.rx_end), syn.rx_end.regex, block, start, end);
                     if (should_cache and ENABLE_END_CACHING) {
-                        _ = self.end_cache.put(syn.id, m) catch {};
+                        _ = self.match_cache.put(syn.rx_end.id, m) catch {};
                     }
 
                     break :blk m;
@@ -635,7 +645,9 @@ pub const Parser = struct {
                 .start = match.start,
                 .end = match.end,
             };
-            _ = match.applyCaptures(block, name, &c.scope);
+            if (match.applyCaptures(block, name, &c.scope) == 0) {
+                c.scope_hash = syntax.scope_hash;
+            }
             proc.capture(c);
         }
     }
@@ -656,7 +668,9 @@ pub const Parser = struct {
                         .start = range.start,
                         .end = range.end,
                     };
-                    _ = match.applyCaptures(block, syn.name, &c.scope);
+                    if (match.applyCaptures(block, syn.name, &c.scope) == 0) {
+                        c.scope_hash = syn.scope_hash;
+                    }
                     proc.capture(c);
                 }
 
@@ -681,7 +695,9 @@ pub const Parser = struct {
                                             .start = range.start,
                                             .end = range.end,
                                         };
-                                        _ = m.applyCaptures(block, p.name, &c.scope);
+                                        if (m.applyCaptures(block, p.name, &c.scope) == 0) {
+                                            c.scope_hash = p.scope_hash;
+                                        }
                                         proc.capture(c);
                                     }
                                 }
@@ -704,13 +720,17 @@ pub const Parser = struct {
 
         self.current_state = state;
         self.match_cache.clearRetainingCapacity();
-        self.end_cache.clearRetainingCapacity();
+        // self.end_cache.clearRetainingCapacity();
         self.exec_cache.clearRetainingCapacity();
 
         var start: usize = 0;
         var end = block.len;
         var last_start: usize = 0;
-        var last_syntax: ?*Syntax = null;
+        var last_syntax: u32 = 0;
+
+        // hacky way to escape push-pop infinite loop
+        var last_push_pos: usize = 0;
+        var last_push_syntax: u32 = 0;
 
         // handle while
         // todo track while count
@@ -774,14 +794,20 @@ pub const Parser = struct {
                     } else if (pattern_match.count > 0) {
                         if (pattern_match.syntax) |match_syn| {
                             // pattern has been matched
+                            const start_ = start;
                             start = pattern_match.start;
                             end = pattern_match.end;
 
+                            // if it has a regexs_end.. it is a begin and should cause a push
                             if (match_syn.rx_end.expr != null) {
-                                // if it has a regexs_end.. it is a begin and should cause a push
                                 // std.debug.print("push {s}\n", .{match_syn.getName()});
                                 if (pattern_match.regex) |rx| {
-                                    state.push(match_syn, rx, block, pattern_match, "patttern") catch {};
+
+                                    if (last_push_pos != start_ or last_push_syntax != match_syn.id) {
+                                        state.push(match_syn, rx, block, pattern_match, "patttern") catch {};
+                                        last_push_pos = start_;
+                                        last_push_syntax = match_syn.id; 
+                                    }
                                     // fail silently?
                                 }
 
@@ -823,11 +849,11 @@ pub const Parser = struct {
                 }
 
                 // endless loop?
-                if (last_start == start and last_syntax == ts) {
+                if (last_start == start and last_syntax == ts.id) {
                     break;
                 }
 
-                last_syntax = ts;
+                last_syntax = ts.id;
                 last_start = start;
                 start = end;
             } else {

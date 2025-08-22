@@ -42,6 +42,7 @@ pub const Syntax = struct {
     name: []const u8,
     content_name: []const u8,
     scope_name: []const u8,
+    scope_hash: u64 = 0,
 
     parent: ?*Syntax = null,
 
@@ -147,6 +148,12 @@ pub const Syntax = struct {
             .rx_while = Regex{ .expr = if (obj.get("while")) |v| v.string else null },
             .rx_end = Regex{ .expr = if (obj.get("end")) |v| v.string else null },
         };
+
+        var hasher = std.hash.Fnv1a_64.init();
+        hasher.update(syntax.getName());
+        syntax.scope_hash = hasher.final();
+
+        // std.debug.print("{s} {}\n", .{syntax.getName(), syntax.scope_hash});
 
         syntax.compileAllRegexes() catch {
             std.debug.print("Failed to compile regex: // TODO which one?\n", .{});
