@@ -16,7 +16,7 @@ const MAX_STATE_STACK_DEPTH = 200; // if the state depth is too deep .. just pru
 const STATE_STACK_PRUNE = 120; // prune off states from the stack
 
 // capture is like MatchRange.. but atomic and should be serializable
-pub const Capture = struct {
+pub const ParseCapture = struct {
     start: usize = 0,
     end: usize = 0,
 
@@ -30,12 +30,16 @@ pub const Capture = struct {
     retain: bool = false,
 };
 
+pub const Capture = ParseCapture;
+
+// the lighter version of Capture, used internally
 const MatchRange = struct {
     group: u16 = 0,
     start: usize = 0,
     end: usize = 0,
 };
 
+// every execRegex productes a Match, with MatchRanges holding the captured groups
 const Match = struct {
     syntax: ?*Syntax = null,
 
@@ -107,9 +111,13 @@ const Match = struct {
     }
 };
 
-// this should be serializable as this is what the parse state stack contains
+// StateContext holds the context of a single character match is made for a Syntax
+// It is store only if the Syntax would require further matching with its children patterns
+// This should be serializable as this is what the parse state stack contains
 const StateContext = struct {
     syntax: *Syntax,
+
+    // The match position of the character relative to the line start
     anchor: usize = 0,
 
     // These dynamic regexes should be cached
@@ -246,6 +254,8 @@ pub const ParseState = struct {
     }
 };
 
+// Parser is where the heavy work is done
+// It parses a single line but can receive ParseState from a previous line parse for continuance
 pub const Parser = struct {
     allocator: std.mem.Allocator,
     lang: *grammar.Grammar,
@@ -287,6 +297,7 @@ pub const Parser = struct {
         return 0;
     }
 
+    // ExecRegex. Regular expression matching. This is where all the CPU usage goes.
     fn execRegex(self: *Parser, syntax: *Syntax, regex: ?oni.Regex, regexs: ?[]const u8, block: []const u8, start: usize, end: usize) Match {
         if (block.len == 0) {
             return Match{};
@@ -374,11 +385,13 @@ pub const Parser = struct {
         return Match{};
     }
 
-    /// matchBegin is where the regex patterns are matchBegin. It is also where caching would(should) be done
+    /// matchBegin is where the regex patterns are checked.
+    /// It is also where caching would(should) be done
+    /// Caching is based on:
     /// 1. position-expression.
     ///     - Cache the result of expression executed against a block at a specific position
     ///     - Some rules may have nested loops hence expressions may be checked more than once
-    /// 2. >result position-expression.
+    /// 2. > position-expression.
     ///     - Cache also matches with match position ahead of current position
     ///     - Matched expression may be defeated by earlier matches but it may be usefyl as current position moves forward
     fn matchBegin(self: *Parser, syntax: *Syntax, block: []const u8, start: usize, end: usize) Match {
@@ -386,7 +399,7 @@ pub const Parser = struct {
             return Match{};
         }
 
-        // if all this syntax has are patterns.. check patterns
+        // if all this syntax has are patterns, check patterns
         if (syntax.regex_match == null and syntax.regex_begin == null) {
             return self.matchPatterns(syntax, syntax.patterns, block, start, end);
         }

@@ -21,13 +21,16 @@ var theThemeLibrary: ?*ThemeLibrary = null;
 pub const ThemeLibrary = struct {
     allocator: std.mem.Allocator = undefined,
     themes: std.ArrayList(ThemeInfo) = undefined,
+    cache: std.AutoHashMap(u16, Theme) = undefined,
 
     fn init(self: *ThemeLibrary) !void {
         self.themes = std.ArrayList(ThemeInfo).init(self.allocator);
+        self.cache = std.AutoHashMap(u16, Theme).init(self.allocator);
     }
 
     fn deinit(self: *ThemeLibrary) void {
         self.themes.deinit();
+        self.cache.deinit();
     }
 
     pub fn addThemes(self: *ThemeLibrary, path: []const u8) !void {
@@ -47,31 +50,33 @@ pub const ThemeLibrary = struct {
                     return Theme.initWithData(self.allocator, file);
                 }
                 const p: []const u8 = &item.full_path;
-                return Theme.init(self.allocator, util.toSlice([]const u8, p));
+                const t = try Theme.init(self.allocator, util.toSlice([]const u8, p));
+                try self.cache.put(item.id, t);
+                return t;
             }
         }
         return error.NotFound;
     }
+
+    pub fn initLibrary(allocator: std.mem.Allocator) !void {
+        theThemeLibrary = try allocator.create(ThemeLibrary);
+        if (theThemeLibrary) |lib| {
+            lib.allocator = allocator;
+            try lib.init();
+        }
+    }
+
+    pub fn deinitLibrary() void {
+        if (theThemeLibrary) |lib| {
+            lib.deinit();
+            theThemeLibrary = null;
+        }
+    }
+
+    pub fn getLibrary() ?*ThemeLibrary {
+        return theThemeLibrary;
+    }
 };
-
-pub fn initThemeLibrary(allocator: std.mem.Allocator) !void {
-    theThemeLibrary = try allocator.create(ThemeLibrary);
-    if (theThemeLibrary) |lib| {
-        lib.allocator = allocator;
-        try lib.init();
-    }
-}
-
-pub fn deinitThemeLibrary() void {
-    if (theThemeLibrary) |lib| {
-        lib.deinit();
-        theThemeLibrary = null;
-    }
-}
-
-pub fn getThemeLibrary() ?*ThemeLibrary {
-    return theThemeLibrary;
-}
 
 pub const Scope = struct {
     atom: Atom = Atom{},

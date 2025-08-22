@@ -21,6 +21,7 @@ pub const Syntax = struct {
     regexs_while: ?[]const u8 = null,
     regexs_end: ?[]const u8 = null,
 
+    // TODO wrap this into a struct R{ id, regex_str, regex } for better caching, and sharing
     regex_match: ?oni.Regex = null,
     regex_begin: ?oni.Regex = null,
     regex_while: ?oni.Regex = null,
@@ -285,57 +286,69 @@ pub const Syntax = struct {
 
     pub fn resolve(self: *Syntax, syntax: *Syntax) ?*const Syntax {
         if (syntax.include_path) |include_path| {
-            // syntax having include_path will be resolved by finding the name on appropriate repositories
-            // TODO handle external grammar repositories (source.md could require loading source.js)
+            if (include_path.len == 0) return null;
 
-            // this one has previously been resolved
+            // Syntax having include_path will be resolved by finding the name on appropriate repositories
+            // Some refer to external grammars repositories (source.md could require loading source.js)
+
+            // This one has previously been resolved
             if (syntax.include) |inc_syn| {
                 return inc_syn;
             }
 
-            // TODO understand $self, $base
-            if (std.mem.indexOf(u8, include_path, "$self") == 0) {
-                // root?
-                var root = self;
-                while (root.parent) |p| {
-                    root = p;
+            if (include_path[0] == '$') {
+                // TODO understand $self, $base
+                if (std.mem.indexOf(u8, include_path, "$self") == 0) {
+                    // root?
+                    var root = self;
+                    while (root.parent) |p| {
+                        root = p;
+                    }
+                    syntax.include = root;
+                    return root;
                 }
-                syntax.include = root;
-                return root;
+
+                if (std.mem.indexOf(u8, include_path, "$base") == 0) {
+                    // base grammar?
+                    var root = self;
+                    while (root.parent) |p| {
+                        root = p;
+                    }
+                    syntax.include = root;
+                    return root;
+                }
             }
-            if (std.mem.indexOf(u8, include_path, "$base") == 0) {
-                // base grammar?
-                var root = self;
-                while (root.parent) |p| {
-                    root = p;
+
+            // include another grammar
+            if (include_path[0] == 's' and (std.mem.indexOf(u8, include_path, "source.") orelse 1) == 0) {
+                // TODO Some may point to specific a syntax (source.js#comments)
+                // Further resolve '#comments' in this situation
+                if (GrammarLibrary.getLibrary()) |gml| {
+                    const gmr = gml.grammarFromScopeName(include_path) catch {
+                        return null;
+                    };
+                    return gmr.syntax;
                 }
-                syntax.include = root;
-                return root;
             }
 
             const key_start = 1 + (std.mem.indexOf(u8, include_path, "#") orelse 0);
-            // this is where other grammar reference is checked.. ie source.js or source.js#pattern-name
-
             // std.debug.print("s:{s} find include {s}\n", .{ syntax.name, include_path });
             if (self.repository) |repo| {
-                // std.debug.print("check repo\n", .{});
                 if (include_path.len > key_start) {
                     const name = include_path[key_start..];
-                    // std.debug.print("finding {s}\n", .{name});
                     const ls = repo.get(name);
                     if (ls) |s| {
-                        // std.debug.print("{s} found!\n", .{name});
                         syntax.include = ls;
                         return s;
                     }
                     return null;
                 } else {
-                    //std.debug.print("(name too short)\n", .{});
                     return syntax;
                 }
             } else {
                 // std.debug.print("no repository!\n", .{});
             }
+
             if (self.parent) |p| {
                 // std.debug.print("check parent\n", .{});
                 return p.resolve(syntax);
@@ -403,13 +416,16 @@ var theGrammarLibrary: ?*GrammarLibrary = null;
 pub const GrammarLibrary = struct {
     allocator: std.mem.Allocator = undefined,
     grammars: std.ArrayList(GrammarInfo) = undefined,
+    cache: std.AutoHashMap(u16, Grammar) = undefined,
 
     fn init(self: *GrammarLibrary) !void {
         self.grammars = std.ArrayList(GrammarInfo).init(self.allocator);
+        self.cache = std.AutoHashMap(u16, Grammar).init(self.allocator);
     }
 
     fn deinit(self: *GrammarLibrary) void {
         self.grammars.deinit();
+        self.cache.deinit();
     }
 
     pub fn addGrammars(self: *GrammarLibrary, path: []const u8) !void {
@@ -417,7 +433,6 @@ pub const GrammarLibrary = struct {
     }
 
     pub fn addEmbeddedGrammars(self: *GrammarLibrary) !void {
-        // _ = self;
         try embedded.listGrammars(self.allocator, &self.grammars);
     }
 
@@ -426,12 +441,17 @@ pub const GrammarLibrary = struct {
         for (self.grammars.items) |item| {
             const np: []const u8 = &item.scope_name;
             if (std.mem.eql(u8, util.toSlice([]const u8, np), name)) {
+                if (self.cache.get(item.id)) |g| {
+                    return g;
+                }
                 // std.debug.print("found!\n", .{});
                 if (item.embedded_file) |file| {
                     return Grammar.initWithData(self.allocator, file);
                 }
                 const p: []const u8 = &item.full_path;
-                return Grammar.init(self.allocator, util.toSlice([]const u8, p));
+                const g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
+                try self.cache.put(item.id, g);
+                return g;
             }
         }
         return error.NotFound;
@@ -445,7 +465,7 @@ pub const GrammarLibrary = struct {
         const ext = dot_ext[1..];
         if (ext.len >= 16) return error.NotFound;
 
-        // most grammar definitions don't provide fileTypes
+        // Most grammar definitions don't provide fileTypes
         // check against scope name instead .. using "source.{ext}"
         var scope_name: [64]u8 = [_]u8{0} ** 64;
         var scope_name_len = "source".len;
@@ -456,51 +476,62 @@ pub const GrammarLibrary = struct {
         for (self.grammars.items) |item| {
             if (item.inject_only) continue;
             if (item.file_types_count > 0) {
-                // check against file types
+                // Check against file types
                 for (0..item.file_types_count) |fi| {
                     const np: []const u8 = &item.file_types[fi];
                     if (std.mem.eql(u8, util.toSlice([]const u8, np), ext[0..ext.len])) {
+                        if (self.cache.get(item.id)) |g| {
+                            return g;
+                        }
                         if (item.embedded_file) |file| {
                             return Grammar.initWithData(self.allocator, file);
                         }
                         const p: []const u8 = &item.full_path;
-                        return Grammar.init(self.allocator, util.toSlice([]const u8, p));
+                        const g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
+                        try self.cache.put(item.id, g);
+                        return g;
                     }
                 }
             } else {
-                // check against scope
+                // Check against scope
+                // TODO move this somewhere. getByExtension is intentful, no fallback
                 const np: []const u8 = &item.scope_name;
                 if (std.mem.eql(u8, util.toSlice([]const u8, np), scope_name[0..scope_name_len])) {
+                    if (self.cache.get(item.id)) |g| {
+                        return g;
+                    }
                     if (item.embedded_file) |file| {
                         return Grammar.initWithData(self.allocator, file);
                     }
                     const p: []const u8 = &item.full_path;
-                    return Grammar.init(self.allocator, util.toSlice([]const u8, p));
+                    const g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
+                    try self.cache.put(item.id, g);
+                    return g;
                 }
             }
         }
         return error.NotFound;
     }
+
+    pub fn initLibrary(allocator: std.mem.Allocator) !void {
+        theGrammarLibrary = try allocator.create(GrammarLibrary);
+        if (theGrammarLibrary) |lib| {
+            lib.allocator = allocator;
+            try lib.init();
+        }
+    }
+
+    pub fn deinitLibrary() void {
+        if (theGrammarLibrary) |lib| {
+            lib.deinit();
+            theGrammarLibrary = null;
+        }
+    }
+
+    pub fn getLibrary() ?*GrammarLibrary {
+        return theGrammarLibrary;
+    }
 };
-
-pub fn initGrammarLibrary(allocator: std.mem.Allocator) !void {
-    theGrammarLibrary = try allocator.create(GrammarLibrary);
-    if (theGrammarLibrary) |lib| {
-        lib.allocator = allocator;
-        try lib.init();
-    }
-}
-
-pub fn deinitGrammarLibrary() void {
-    if (theGrammarLibrary) |lib| {
-        lib.deinit();
-        theGrammarLibrary = null;
-    }
-}
-
-pub fn getGrammarLibrary() ?*GrammarLibrary {
-    return theGrammarLibrary;
-}
 
 pub const Grammar = struct {
     allocator: std.mem.Allocator,
