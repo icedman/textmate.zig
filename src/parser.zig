@@ -230,7 +230,7 @@ pub const ParseState = struct {
             const ctx = self.at(i);
             if (ctx) |t| {
                 const ts = t.syntax;
-                const ls = ts.resolve(ts);
+                const ls = ts.resolve(ts, self.lang.syntax);
                 if (ls) |syn| {
                     std.debug.print("{} {*} {s}\n", .{ i, syn, syn.getName() });
                     if (syn.regexs_match) |r| {
@@ -461,7 +461,7 @@ pub const Parser = struct {
             const top = state.at(state_depth - 1);
             if (top) |t| {
                 const ts = t.syntax;
-                const ls = ts.resolve(ts);
+                const ls = ts.resolve(ts, self.lang.syntax);
                 if (ls) |syn| {
                     const m: Match = blk: {
                         if (t.while_regex) |r| {
@@ -519,7 +519,7 @@ pub const Parser = struct {
         const top = state.top();
         if (top) |t| {
             const ts = t.syntax;
-            const ls = ts.resolve(ts);
+            const ls = ts.resolve(ts, self.lang.syntax);
             if (ls) |syn| {
                 const end_match: Match = blk: {
                     if (t.end_regex) |r| {
@@ -570,7 +570,7 @@ pub const Parser = struct {
         var earliest_match = Match{};
         if (patterns) |pats| {
             for (pats) |p| {
-                const ls = p.resolve(p);
+                const ls = p.resolve(p, self.lang.syntax);
                 if (ls) |syn| {
                     const m = self.matchBegin(@constCast(syn), block, start, end);
                     if (m.count > 0) {
@@ -700,7 +700,7 @@ pub const Parser = struct {
             const top = state.top();
             if (top) |t| {
                 const ts = t.syntax;
-                const ls = ts.resolve(ts);
+                const ls = ts.resolve(ts, self.lang.syntax);
                 if (ls) |syn| {
                     const end_match: Match = self.matchEnd(state, block, start, end);
                     var pattern_match: Match = Match{};

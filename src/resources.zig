@@ -162,7 +162,7 @@ pub fn listThemes(allocator: std.mem.Allocator, path: []const u8, list: *std.Arr
     }
 }
 
-// Use at build time to generate embedded_themes.zig
+// This is only used at build time to generate embedded.zig
 pub fn generateEmbeddedThemesFile(allocator: std.mem.Allocator, writer: anytype, prefix: []const u8, path: []const u8) !void {
     var list = std.ArrayList(ThemeInfo).init(allocator);
     defer list.deinit();
@@ -204,7 +204,6 @@ pub fn generateEmbeddedThemesFile(allocator: std.mem.Allocator, writer: anytype,
     try writer.print("{c}\n", .{'}'});
 }
 
-// Use at build time to generate embedded_grammars.zig
 pub fn generateEmbeddedGrammarsFile(allocator: std.mem.Allocator, writer: anytype, prefix: []const u8, path: []const u8) !void {
     var list = std.ArrayList(GrammarInfo).init(allocator);
     defer list.deinit();
@@ -263,7 +262,7 @@ test "get themes" {
 
     const writer = assets_buffer.writer();
 
-    // try generateEmbeddedThemesFile(allocator, writer, "theme_", "./src/themes");
+    try generateEmbeddedThemesFile(allocator, writer, "theme_", "./src/themes");
     try generateEmbeddedGrammarsFile(allocator, writer, "grammar_", "./src/grammars");
 
     std.debug.print("{s}\n", .{assets_buffer.items});

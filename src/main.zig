@@ -10,18 +10,17 @@ const processor = lib.processor;
 const TEST_VERBOSELY = false;
 
 fn printUsage() void {
-        std.debug.print("Usage: textmate_zig [options] filename\n", .{});
-        std.debug.print(" -s printout stats\n", .{});
-        std.debug.print(" -m html output\n", .{});
-        std.debug.print(" -d dump parsed scopes\n", .{});
-        std.debug.print(" -g <grammar name> provide grammar by name\n", .{});
-        std.debug.print(" -t <theme name> provide theme by name\n", .{});
-        std.debug.print(" -r <path> resources path containing themes or grammars folder\n", .{});
-        std.debug.print(" -l list avaiable themes and grammars\n", .{});
+    std.debug.print("Usage: textmate_zig [options] filename\n", .{});
+    std.debug.print(" -s printout stats\n", .{});
+    std.debug.print(" -m html output\n", .{});
+    std.debug.print(" -d dump parsed scopes\n", .{});
+    std.debug.print(" -g <grammar name> provide grammar by name\n", .{});
+    std.debug.print(" -t <theme name> provide theme by name\n", .{});
+    std.debug.print(" -r <path> resources path containing themes or grammars folder\n", .{});
+    std.debug.print(" -l list avaiable themes and grammars\n", .{});
 }
 
-fn listResources() void {
-}
+fn listResources() void {}
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
@@ -31,6 +30,7 @@ pub fn main() !void {
 
     var dump: bool = false;
     var html: bool = false;
+    var list: bool = false;
     var stats: bool = false;
     var grammar_path: ?[]const u8 = null;
     var theme_path: ?[]const u8 = null;
@@ -54,20 +54,14 @@ pub fn main() !void {
             grammar_path = args.next();
         } else if (std.mem.eql(u8, arg.?, "-t")) {
             theme_path = args.next();
+        } else if (std.mem.eql(u8, arg.?, "-l")) {
+            list = true;
         } else if (std.mem.eql(u8, arg.?, "-h")) {
             printUsage();
-            return;
-        } else if (std.mem.eql(u8, arg.?, "-l")) {
-            listResources();
             return;
         } else {
             file_path = arg;
         }
-    }
-
-    if (file_path == null) {
-        printUsage();
-        return;
     }
 
     const warm_start = std.time.nanoTimestamp();
@@ -80,12 +74,17 @@ pub fn main() !void {
         thl.addEmbeddedThemes() catch {
             std.debug.print("unable to add embedded themes\n", .{});
         };
-        // for (thl.themes.items) |item| {
-        //     std.debug.print("{s}\n", .{item.name});
-        // }
         // thl.addThemes("./src/themes") catch {
         //     std.debug.print("unable to add themes directory\n", .{});
         // };
+        if (list) {
+            std.debug.print("\nThemes:\n", .{});
+            for (thl.themes.items, 0..) |item, i| {
+                std.debug.print("{s}  ", .{item.name});
+                if ((i + 1) % 8 == 0) std.debug.print("\n", .{});
+            }
+            std.debug.print("\n", .{});
+        }
     }
 
     grammar.initGrammarLibrary(allocator) catch {
@@ -99,6 +98,18 @@ pub fn main() !void {
         // gml.addGrammars("./src/grammars") catch {
         //     std.debug.print("unable to add grammars directory\n", .{});
         // };
+        if (list) {
+            std.debug.print("\nGrammars:\n", .{});
+            for (gml.grammars.items, 0..) |item, i| {
+                std.debug.print("{s}  ", .{item.name});
+                if ((i + 1) % 8 == 0) std.debug.print("\n", .{});
+            }
+            std.debug.print("\n", .{});
+        }
+    }
+
+    if (list) {
+        return;
     }
 
     // var thm = theme.Theme.init(allocator, theme_path orelse "data/tests/dracula.json") catch {
@@ -113,6 +124,11 @@ pub fn main() !void {
         };
     }
     defer thm.deinit();
+
+    if (file_path == null) {
+        printUsage();
+        return;
+    }
 
     // var gmr = grammar.Grammar.init(allocator, grammar_path orelse "data/tests/zig.tmLanguage.json") catch {
     //     std.debug.print("unable to open grammar {s}\n", .{grammar_path orelse ""});

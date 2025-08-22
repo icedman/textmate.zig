@@ -283,7 +283,7 @@ pub const Syntax = struct {
         }
     }
 
-    pub fn resolve(self: *Syntax, syntax: *Syntax) ?*const Syntax {
+    pub fn resolve(self: *Syntax, syntax: *Syntax, base: ?*Syntax) ?*const Syntax {
         if (syntax.include_path) |include_path| {
             // syntax having include_path will be resolved by finding the name on appropriate repositories
             // TODO handle external grammar repositories (source.md could require loading source.js)
@@ -305,7 +305,7 @@ pub const Syntax = struct {
             }
             if (std.mem.indexOf(u8, include_path, "$base") == 0) {
                 // base grammar?
-                var root = self;
+                var root = base orelse self;
                 while (root.parent) |p| {
                     root = p;
                 }
@@ -338,7 +338,7 @@ pub const Syntax = struct {
             }
             if (self.parent) |p| {
                 // std.debug.print("check parent\n", .{});
-                return p.resolve(syntax);
+                return p.resolve(syntax, base);
             } else {
                 return null;
             }
