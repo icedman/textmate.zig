@@ -272,4 +272,4 @@ pub fn main() !void {
 const std = @import("std");
 
 /// This imports the separate module containing `root.zig`. Take a look in `build.zig` for details.
-const lib = @import("textmate_zig_lib");
+const lib = @import("textmate_lib");

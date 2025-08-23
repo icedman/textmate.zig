@@ -69,6 +69,7 @@ pub const ThemeLibrary = struct {
     pub fn deinitLibrary() void {
         if (theThemeLibrary) |lib| {
             lib.deinit();
+            lib.allocator.destroy(lib);
             theThemeLibrary = null;
         }
     }

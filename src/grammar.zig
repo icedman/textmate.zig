@@ -551,6 +551,7 @@ pub const GrammarLibrary = struct {
     pub fn deinitLibrary() void {
         if (theGrammarLibrary) |lib| {
             lib.deinit();
+            lib.allocator.destroy(lib);
             theGrammarLibrary = null;
         }
     }
