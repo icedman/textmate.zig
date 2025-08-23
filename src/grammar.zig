@@ -48,7 +48,7 @@ pub const Regex = struct {
 };
 
 pub const Syntax = struct {
-    id: u32 = 0,
+    id: u64 = 0,
     name: []const u8,
     content_name: []const u8,
     scope_name: []const u8,
@@ -132,14 +132,11 @@ pub const Syntax = struct {
         if (json != .object) return error.InvalidSyntax;
         const obj = json.object;
 
-        const id = syntax_id;
-        syntax_id += 1;
-
         var syntax = try allocator.create(Syntax);
         const include = obj.get("include");
         if (include) |path| {
             syntax.* = Syntax{
-                .id = id,
+                .id = @intFromPtr(syntax),
                 .name = "",
                 .content_name = "",
                 .scope_name = "",
@@ -149,7 +146,7 @@ pub const Syntax = struct {
         }
 
         syntax.* = Syntax{
-            .id = id,
+            .id = @intFromPtr(syntax),
             .name = if (obj.get("name")) |v| v.string else "",
             .content_name = if (obj.get("contentName")) |v| v.string else "",
             .scope_name = if (obj.get("scopeName")) |v| v.string else "",
@@ -159,10 +156,7 @@ pub const Syntax = struct {
             .rx_end = Regex{ .expr = if (obj.get("end")) |v| v.string else null },
         };
 
-        var hasher = std.hash.Fnv1a_64.init();
-        hasher.update(syntax.getName());
-        syntax.scope_hash = hasher.final();
-
+        syntax.scope_hash = util.toHash(syntax.getName());
         syntax.compileAllRegexes() catch {
             std.debug.print("Failed to compile regex: // TODO which one?\n", .{});
         };
@@ -321,12 +315,13 @@ pub const Syntax = struct {
 
                 if (std.mem.indexOf(u8, include_path, "$base") == 0) {
                     // base grammar?
-                    var root = self;
-                    while (root.parent) |p| {
-                        root = p;
-                    }
-                    syntax.include = root;
-                    return root;
+                    // var root = self;
+                    // while (root.parent) |p| {
+                    //     root = p;
+                    // }
+                    // syntax.include = root;
+                    // return root;
+                    return base;
                 }
             }
 

@@ -218,6 +218,9 @@ pub fn main() !void {
         _ = try par.parseLine(&state, slice);
         line_no += 1;
 
+        // const ser = par.serialize(&state); 
+        // par.deserialize(&state, ser);
+        // defer ser.deinit();
         // if (line_no > 50000) break;
     }
     proc.endDocument();

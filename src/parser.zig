@@ -32,7 +32,7 @@ pub const ParseCapture = struct {
     // open block and strings will be retained across line parsing
     // syntax_id will be the identifier (not pointers)
     // by default, every syntax pushed to the stack will be retained until end is matched
-    syntax_id: u32 = 0,
+    syntax_id: u64 = 0,
     retain: bool = false,
 };
 
@@ -126,18 +126,23 @@ const StateContext = struct {
     syntax: *Syntax,
 
     // The match position of the character relative to the line start
-    anchor: usize = 0,
-
-    // TODO convert to grammar.Regex
-    // These dynamic regexes should be cached
-    // 1. to allow restoration from serialized copy
-    // 2. and minimize recompilation
-    // while_regex: ?oni.Regex = null,
-    // end_regex: ?oni.Regex = null,
+    anchor: u64= 0,
 
     // Parser owns these at regex_map and responsible for oni.Regex.deinit not Self
     rx_while: Regex = Regex{},
     rx_end: Regex = Regex{},
+
+    pub fn serialize(self: *StateContext, parser: *Parser) struct { u64, u64, u64, u64 } {
+        _ = parser;
+        return .{ self.syntax.id, self.anchor, self.rx_while.id, self.rx_end.id };
+    }
+
+    pub fn deserialize(self: *StateContext, parser: *Parser, serial: struct { u64, u64, u64, u64 }) !void {
+        self.syntax = @ptrFromInt(serial[0]);
+        self.anchor = serial[1];
+        self.rx_while = parser.regex_map.get(serial[2]) orelse Regex{};
+        self.rx_end = parser.regex_map.get(serial[3]) orelse Regex{};
+    }
 };
 
 /// ParseState is a StateContext stack
@@ -258,6 +263,7 @@ pub const ParseState = struct {
             }
         }
     }
+
 };
 
 // Parser is where the heavy work is done
@@ -740,11 +746,11 @@ pub const Parser = struct {
         var start: usize = 0;
         var end = block.len;
         var last_start: usize = 0;
-        var last_syntax: u32 = 0;
+        var last_syntax: u64 = 0;
 
         // hacky way to escape push-pop infinite loop
         var last_push_pos: usize = 0;
-        var last_push_syntax: u32 = 0;
+        var last_push_syntax: u64 = 0;
 
         // handle while
         // todo track while count
@@ -883,6 +889,23 @@ pub const Parser = struct {
     pub fn begin(self: *Parser) void {
         self.regex_execs = 0;
         self.regex_skips = 0;
+    }
+    
+    pub fn serialize(self: *Parser, state: *ParseState) std.ArrayList(struct { u64, u64, u64, u64 }) {
+        var res = std.ArrayList(struct { u64, u64, u64, u64 }).init(self.allocator);
+        for (state.stack.items) |*item| {
+            res.append(item.serialize(self)) catch {};
+        }
+        return res;
+    }
+
+    pub fn deserialize(self: *Parser, state: *ParseState, serial: std.ArrayList(struct { u64, u64, u64, u64 })) void {
+        state.stack.clearRetainingCapacity();
+        for (serial.items) |item| {
+            var sc = StateContext{ .syntax = self.lang.syntax.? };
+            sc.deserialize(self, item) catch {};
+            state.stack.append(sc) catch {};
+        }
     }
 };
 
