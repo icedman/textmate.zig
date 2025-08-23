@@ -126,7 +126,7 @@ const StateContext = struct {
     syntax: *Syntax,
 
     // The match position of the character relative to the line start
-    anchor: u64= 0,
+    anchor: u64 = 0,
 
     // Parser owns these at regex_map and responsible for oni.Regex.deinit not Self
     rx_while: Regex = Regex{},
@@ -263,7 +263,6 @@ pub const ParseState = struct {
             }
         }
     }
-
 };
 
 // Parser is where the heavy work is done
@@ -890,7 +889,7 @@ pub const Parser = struct {
         self.regex_execs = 0;
         self.regex_skips = 0;
     }
-    
+
     pub fn serialize(self: *Parser, state: *ParseState) std.ArrayList(struct { u64, u64, u64, u64 }) {
         var res = std.ArrayList(struct { u64, u64, u64, u64 }).init(self.allocator);
         for (state.stack.items) |*item| {

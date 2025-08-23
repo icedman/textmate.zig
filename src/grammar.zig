@@ -442,6 +442,27 @@ pub const GrammarLibrary = struct {
         try embedded.listGrammars(self.allocator, &self.grammars);
     }
 
+    pub fn grammarFromName(self: *GrammarLibrary, name: []const u8) !Grammar {
+        if (name.len >= 128) return error.NotFound;
+        for (self.grammars.items) |item| {
+            const np: []const u8 = &item.name;
+            if (std.mem.eql(u8, util.toSlice([]const u8, np), name)) {
+                if (self.cache.get(item.id)) |g| {
+                    return g;
+                }
+                // std.debug.print("found!\n", .{});
+                if (item.embedded_file) |file| {
+                    return Grammar.initWithData(self.allocator, file);
+                }
+                const p: []const u8 = &item.full_path;
+                const g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
+                try self.cache.put(item.id, g);
+                return g;
+            }
+        }
+        return error.NotFound;
+    }
+
     pub fn grammarFromScopeName(self: *GrammarLibrary, name: []const u8) !Grammar {
         if (name.len >= 128) return error.NotFound;
         for (self.grammars.items) |item| {
@@ -460,7 +481,7 @@ pub const GrammarLibrary = struct {
                 return g;
             }
         }
-        return error.NotFound;
+        return self.grammarFromName(name);
     }
 
     pub fn grammarFromExtension(self: *GrammarLibrary, name: []const u8) !Grammar {
