@@ -90,7 +90,7 @@ pub fn build(b: *std.Build) void {
     // for actually invoking the compiler.
     const lib = b.addLibrary(.{
         .linkage = .static,
-        .name = "textmate_zig",
+        .name = "textmate",
         .root_module = lib_mod,
     });
 
@@ -102,7 +102,7 @@ pub fn build(b: *std.Build) void {
     // This creates another `std.Build.Step.Compile`, but this one builds an executable
     // rather than a static library.
     const exe = b.addExecutable(.{
-        .name = "textmate_zig",
+        .name = "txmt_cat",
         .root_module = exe_mod,
     });
 
