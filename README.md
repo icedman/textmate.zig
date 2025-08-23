@@ -2,6 +2,12 @@
 
 This is textmate parser implementation in Zig based on my tiny-textmate parser (in C).
 
+Based on:
+The C version [tiny-textmate](https://github.com/icedman/tiny-textmate/)
+The C++ version from Macromate [tm-parser](https://github.com/icedman/tm-parser)
+
+** THIS LIBRARY IS NOT YET READY FOR CONSUMPTION **
+
 # Themes and Grammars
 
 Themes and grammars were taken from the ShijiJs project:
