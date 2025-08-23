@@ -13,6 +13,8 @@ const processor = @import("processor.zig");
 // Types
 pub const ThemeLibrary = theme.ThemeLibrary;
 pub const Theme = theme.Theme;
+pub const ThemeColors = theme.ThemeColors;
+pub const Rgb = theme.Rgb;
 
 pub const GrammarLibrary = grammar.GrammarLibrary;
 pub const Grammar = grammar.Grammar;

@@ -122,6 +122,8 @@ const Match = struct {
 // StateContext holds the context of a single character match is made for a Syntax
 // It is store only if the Syntax would require further matching with its children patterns
 // This should be serializable as this is what the parse state stack contains
+
+const SerialQuad = struct { a: u64, b: u64, c: u64, d: u64 };
 const StateContext = struct {
     syntax: *Syntax,
 
@@ -890,15 +892,14 @@ pub const Parser = struct {
         self.regex_skips = 0;
     }
 
-    pub fn serialize(self: *Parser, state: *ParseState) std.ArrayList(struct { u64, u64, u64, u64 }) {
-        var res = std.ArrayList(struct { u64, u64, u64, u64 }).init(self.allocator);
+    pub fn serialize(self: *Parser, state: *ParseState, serial: *std.ArrayList(struct { u64, u64, u64, u64 })) !void {
+        serial.clearRetainingCapacity();
         for (state.stack.items) |*item| {
-            res.append(item.serialize(self)) catch {};
+            serial.append(item.serialize(self)) catch {};
         }
-        return res;
     }
 
-    pub fn deserialize(self: *Parser, state: *ParseState, serial: std.ArrayList(struct { u64, u64, u64, u64 })) void {
+    pub fn deserialize(self: *Parser, state: *ParseState, serial: *std.ArrayList(struct { u64, u64, u64, u64 })) !void {
         state.stack.clearRetainingCapacity();
         for (serial.items) |item| {
             var sc = StateContext{ .syntax = self.lang.syntax.? };

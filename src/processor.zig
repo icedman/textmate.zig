@@ -16,6 +16,11 @@ pub const Processor = struct {
     block: ?[]const u8 = null,
     theme: ?*theme.Theme = null,
 
+    // TODO remove retained_captures
+    // retained_captures are primarily for block styling (comments and strings) that cross multiple-lines
+    // Idea doesn't work well with continuing parse from a deserialized ParseState
+    // Alternative deduce from the current state
+    // Or move to ParseState so they can be serialized and saved
     captures: std.ArrayList(ParseCapture),
     retained_captures: std.ArrayList(ParseCapture),
 
@@ -135,6 +140,7 @@ pub const Processor = struct {
 
     pub fn deinit(self: *Processor) void {
         self.captures.deinit();
+        self.retained_captures.deinit();
     }
 };
 

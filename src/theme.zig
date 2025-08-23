@@ -99,6 +99,7 @@ pub const Rgb = struct {
     r: u8 = 0,
     g: u8 = 0,
     b: u8 = 0,
+    a: u8 = 0,
 
     pub fn fromHex(hex: []const u8) Rgb {
         if (hex.len < 7 or hex[0] != '#') {
@@ -113,7 +114,23 @@ pub const Rgb = struct {
         const b = std.fmt.parseInt(u8, hex[5..7], 16) catch {
             return Rgb{};
         };
-        return Rgb{ .r = r, .g = g, .b = b };
+        return Rgb{ .r = r, .g = g, .b = b, .a = 255 };
+    }
+
+    pub fn pack(self: Rgb) u32 {
+        return (@as(u32, self.r) << 24) |
+            (@as(u32, self.g) << 16) |
+            (@as(u32, self.b) << 8) |
+            (@as(u32, self.a));
+    }
+
+    pub fn unpack(value: u32) Rgb {
+        return Rgb{
+            .r = @intCast((value >> 24) & 0xFF),
+            .g = @intCast((value >> 16) & 0xFF),
+            .b = @intCast((value >> 8) & 0xFF),
+            .a = @intCast(value & 0xFF),
+        };
     }
 };
 
@@ -133,6 +150,8 @@ pub const Settings = struct {
         }
     }
 };
+
+pub const ThemeColors = Settings;
 
 pub const Theme = struct {
     allocator: std.mem.Allocator,
