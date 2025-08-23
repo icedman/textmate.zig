@@ -12,7 +12,11 @@ The C++ version from Macromate [tm-parser](https://github.com/icedman/tm-parser)
 
 Themes and grammars were taken from the ShijiJs project:
 
-git clone https://github.com/shikijs/textmate-grammars-themes
+https://github.com/shikijs/textmate-grammars-themes
+
+# Oniguruma Package
+
+Copied from Ghostty
 
 # build
 
