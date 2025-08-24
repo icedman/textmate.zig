@@ -6,6 +6,8 @@ const util = @import("util.zig");
 const Syntax = grammar.Syntax;
 const Regex = grammar.Regex;
 
+const Allocator = std.mem.Allocator;
+
 // TODO move to config.. smallcaps
 // is exec level (findMatch) caching slower as it caches everything -- even resolving captures?)
 const ENABLE_EXEC_CACHING = true;
@@ -124,7 +126,7 @@ const Match = struct {
 // It is store only if the Syntax would require further matching with its children patterns
 // This should be serializable as this is what the parse state stack contains
 
-const StateContextPack = struct { syntax: u64, line: u32, anchor: u32, rx_while: u64, rx_end: u64 };
+const StateContextPack = packed struct { syntax: u64, line: u32, anchor: u32, rx_while: u64, rx_end: u64 };
 const StateContext = struct {
     syntax: *Syntax,
 
@@ -153,11 +155,11 @@ const StateContext = struct {
 /// ParseState is a StateContext stack
 /// This should be (de)serializable
 pub const ParseState = struct {
-    allocator: std.mem.Allocator,
+    allocator: Allocator,
     stack: std.ArrayList(StateContext),
     owner: *Parser = undefined,
 
-    pub fn init(owner: *Parser, allocator: std.mem.Allocator, syntax: *Syntax) !ParseState {
+    pub fn init(owner: *Parser, allocator: Allocator, syntax: *Syntax) !ParseState {
         var stack = try std.ArrayList(StateContext).initCapacity(allocator, 32);
         try stack.append(allocator, StateContext{
             .syntax = syntax,
@@ -271,7 +273,7 @@ pub const ParseState = struct {
 // Parser is where the heavy work is done
 // It parses a single line but can receive ParseState from a previous line parse for continuance
 pub const Parser = struct {
-    allocator: std.mem.Allocator,
+    allocator: Allocator,
     lang: *grammar.Grammar,
 
     // processor
@@ -291,7 +293,7 @@ pub const Parser = struct {
     regex_skips: u32 = 0,
     current_state: ?*ParseState = null,
 
-    pub fn init(allocator: std.mem.Allocator, lang: *grammar.Grammar) !Parser {
+    pub fn init(allocator: Allocator, lang: *grammar.Grammar) !Parser {
         return Parser{
             .allocator = allocator,
             .lang = lang,
