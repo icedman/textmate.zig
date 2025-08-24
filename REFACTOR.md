@@ -6,6 +6,39 @@ O(n) ~ Time is linear to number of lines
 
 ## Release mode runs
 
+commit b98ec9c92c956ba8907a865c58e933c9c84a602e
+
+* moved over to zig 0.15.0
+
+CPU: Intel(R) Core(TM) i5-6200U (4) @ 2.80 GHz
+
+sqlite3.c
+
+lines: 222905
+execs: 14979682
+execs/line: 67
+skips: 51924484
+warmup in 0.011335s
+done in 44.042181s
+state depth: 1
+retained: 1
+grammar: c
+theme: dracula-soft
+theme atoms: 208
+
+tinywl.c
+
+lines: 1001
+execs: 75056
+execs/line: 74
+skips: 272128
+warmup in 0.010196s
+done in 0.232547s
+state depth: 1
+retained: 1
+grammar: c
+theme: dracula-soft
+theme atoms: 208
 
 ## Debug mode runs
 

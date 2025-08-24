@@ -26,6 +26,7 @@ pub const ParseCapture = struct {
     end: usize = 0,
 
     // is this expensive to pass around (copy)
+    // TODO convert scope to atoms (scope_hash) ...
     scope: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN,
     scope_hash: u64 = 0,
 
@@ -746,6 +747,8 @@ pub const Parser = struct {
 
         var start: usize = 0;
         var end = block.len;
+
+        // hacky way to escape unexplained lookp :) .. can't escape push-pop infinite loop
         var last_start: usize = 0;
         var last_syntax: u64 = 0;
 

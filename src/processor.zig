@@ -196,16 +196,11 @@ pub const DumpProcessor = struct {
 
 const Rgb = theme.Rgb;
 
-const BufferedWriter = struct {
-    pub fn print(comptime fmt: []const u8, args: anytype) !void {
-        std.debug.print(fmt, args);
-    }
-};
-
 pub const RenderProcessor = struct {
     pub fn endLine(self: *Processor) void {
-        // var bw = std.io.bufferedWriter(std.io.getStdOut().writer());
-        const stdout = BufferedWriter; // bw.writer();
+        var stdout_buffer: [1024]u8 = undefined;
+        var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+        const stdout = &stdout_writer.interface;
 
         if (self.theme) |thm| {
             // const defaultColor: ?theme.Settings = theme.Settings{.foreground_rgb = theme.Rgb {.r = 255 }};
@@ -285,7 +280,7 @@ pub const RenderProcessor = struct {
             stdout.print("theme is not set\n", .{}) catch {};
         }
 
-        // bw.flush() catch {};
+        stdout.flush() catch {};
     }
 
     pub fn init(allocator: std.mem.Allocator) !Processor {
@@ -301,8 +296,9 @@ pub const RenderProcessor = struct {
 
 pub const RenderHtmlProcessor = struct {
     pub fn startDocument(self: *Processor) void {
-        // const stdout = std.io.getStdOut().writer();
-        const stdout = BufferedWriter; // bw.writer();
+        var stdout_buffer: [1024]u8 = undefined;
+        var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+        const stdout = &stdout_writer.interface;
         if (self.theme) |thm| {
             const default_color = thm.getColor("editor.background") orelse
                 thm.getColor("background");
@@ -312,18 +308,23 @@ pub const RenderHtmlProcessor = struct {
                 }
             }
         }
+
+        stdout.flush() catch {};
     }
 
     pub fn endDocument(self: *Processor) void {
-        // const stdout = std.io.getStdOut().writer();
-        const stdout = BufferedWriter; // bw.writer();
+        var stdout_buffer: [1024]u8 = undefined;
+        var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+        const stdout = &stdout_writer.interface;
         stdout.print("</body></html>", .{}) catch {};
         _ = self;
+        stdout.flush() catch {};
     }
 
     pub fn endLine(self: *Processor) void {
-        // const stdout = std.io.getStdOut().writer();
-        const stdout = BufferedWriter; // bw.writer();
+        var stdout_buffer: [1024]u8 = undefined;
+        var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+        const stdout = &stdout_writer.interface;
         if (self.theme) |thm| {
             // const defaultColor: ?theme.Settings = theme.Settings{.foreground_rgb = theme.Rgb {.r = 255 }};
             // const default_color = (thm.getColor("editor.foreground") orelse
@@ -379,6 +380,7 @@ pub const RenderHtmlProcessor = struct {
         } else {
             stdout.print("theme is not set\n", .{}) catch {};
         }
+        stdout.flush() catch {};
     }
 
     pub fn init(allocator: std.mem.Allocator) !Processor {

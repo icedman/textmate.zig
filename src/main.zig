@@ -17,21 +17,29 @@ const RenderHtmlProcessor = lib.RenderHtmlProcessor;
 const TEST_VERBOSELY = false;
 
 fn printUsage() void {
-    std.debug.print("Usage: textmate_zig [options] filename\n", .{});
-    std.debug.print(" -s printout stats\n", .{});
-    std.debug.print(" -m html output\n", .{});
-    std.debug.print(" -n null output\n", .{});
-    std.debug.print(" -d dump parsed scopes\n", .{});
-    std.debug.print(" -g <grammar name> provide grammar by name\n", .{});
-    std.debug.print(" -t <theme name> provide theme by name\n", .{});
-    std.debug.print(" -r <path> resources path containing themes or grammars folder\n", .{});
-    std.debug.print(" -l list avaiable themes and grammars\n", .{});
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
+    stdout.print("Usage: textmate_zig [options] filename\n", .{}) catch {};
+    stdout.print(" -s printout stats\n", .{}) catch {};
+    stdout.print(" -m html output\n", .{}) catch {};
+    stdout.print(" -n null output\n", .{}) catch {};
+    stdout.print(" -d dump parsed scopes\n", .{}) catch {};
+    stdout.print(" -g <grammar name> provide grammar by name\n", .{}) catch {};
+    stdout.print(" -t <theme name> provide theme by name\n", .{}) catch {};
+    stdout.print(" -r <path> resources path containing 'themes' and/or 'grammars' folder\n", .{}) catch {};
+    stdout.print(" -l list avaiable themes and grammars\n", .{}) catch {};
+    stdout.flush() catch {};
 }
 
 pub fn main() !void {
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
+
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
-    
+
     const allocator = switch (builtin.mode) {
         .Debug => gpa.allocator(),
         else => std.heap.smp_allocator,
@@ -48,7 +56,7 @@ pub fn main() !void {
     var grammar_path: ?[]const u8 = null;
     var theme_path: ?[]const u8 = null;
     var file_path: ?[]const u8 = null;
-    var extra_resources_path: ?[]const u8 = null;
+    var resources_path: ?[]const u8 = null;
 
     var args = std.process.args();
     var arg = args.next(); // skips the executable name
@@ -58,7 +66,7 @@ pub fn main() !void {
         if (std.mem.eql(u8, arg.?, "-s")) {
             stats = true;
         } else if (std.mem.eql(u8, arg.?, "-r")) {
-            extra_resources_path = args.next();
+            resources_path = args.next();
         } else if (std.mem.eql(u8, arg.?, "-m")) {
             html = true;
         } else if (std.mem.eql(u8, arg.?, "-n")) {
@@ -89,9 +97,12 @@ pub fn main() !void {
         thl.addEmbeddedThemes() catch {
             std.debug.print("unable to add embedded themes\n", .{});
         };
-        // thl.addThemes("./src/themes") catch {
-        //     std.debug.print("unable to add themes directory\n", .{});
-        // };
+        if (resources_path) |rp| {
+            const themes_path = try std.fs.path.join(allocator, &.{ rp, "themes" });
+            thl.addThemes(themes_path) catch {
+                std.debug.print("unable to add themes directory\n", .{});
+            };
+        }
         if (list) {
             std.debug.print("\nThemes ({}):\n", .{thl.themes.items.len});
             for (thl.themes.items, 0..) |item, i| {
@@ -110,9 +121,12 @@ pub fn main() !void {
         gml.addEmbeddedGrammars() catch {
             std.debug.print("unable to add embedded grammars\n", .{});
         };
-        // gml.addGrammars("./src/grammars") catch {
-        //     std.debug.print("unable to add grammars directory\n", .{});
-        // };
+        if (resources_path) |rp| {
+            const grammars_path = try std.fs.path.join(allocator, &.{ rp, "grammars" });
+            gml.addGrammars(grammars_path) catch {
+                std.debug.print("unable to add grammars directory\n", .{});
+            };
+        }
         if (list) {
             std.debug.print("\nGrammars ({}):\n", .{gml.grammars.items.len});
             for (gml.grammars.items, 0..) |item, i| {
@@ -211,6 +225,10 @@ pub fn main() !void {
     const start = std.time.nanoTimestamp();
     proc.startDocument();
 
+    // while (reader.interface.takeDelimiterExclusive('\n')) |line| {
+    //     std.debug.print("{s}]\n", .{line});
+    // } else |err| if (err != error.EndOfStream) return err;
+
     var line_writer = std.Io.Writer.Allocating.init(allocator);
     defer line_writer.deinit();
 
@@ -218,8 +236,7 @@ pub fn main() !void {
         try line_writer.writer.print("\n", .{});
         const slice: []u8 = line_writer.written();
         line_writer.clearRetainingCapacity();
-
-        _ = try par.parseLine(&state, slice); 
+        _ = try par.parseLine(&state, slice);
         line_no += 1;
         reader.interface.toss(1);
     } else |err| if (err != error.EndOfStream) return err;
@@ -229,21 +246,22 @@ pub fn main() !void {
     const elapsed = @as(f64, @floatFromInt(end - start)) / 1_000_000_000.0;
 
     if (stats) {
-        std.debug.print("==================\n", .{});
-        std.debug.print("lines: {}\n", .{line_no - 1});
-        std.debug.print("execs: {}\n", .{par.regex_execs});
+        stdout.print("==================\n", .{}) catch {};
+        stdout.print("lines: {}\n", .{line_no - 1}) catch {};
+        stdout.print("execs: {}\n", .{par.regex_execs}) catch {};
         if (line_no > 0) {
-            std.debug.print("execs/line: {}\n", .{par.regex_execs / line_no});
+            stdout.print("execs/line: {}\n", .{par.regex_execs / line_no}) catch {};
         }
-        std.debug.print("skips: {}\n", .{par.regex_skips});
-        std.debug.print("warmup in {d:.6}s\n", .{warm_elapsed});
-        std.debug.print("done in {d:.6}s\n", .{elapsed});
-        std.debug.print("state depth: {}\n", .{state.size()});
-        std.debug.print("retained: {}\n", .{proc.retained_captures.items.len});
-        std.debug.print("grammar: {s}\n", .{gmr.name});
-        std.debug.print("theme: {s}\n", .{thm.name});
-        std.debug.print("theme atoms: {}\n", .{thm.atoms.count()});
+        stdout.print("skips: {}\n", .{par.regex_skips}) catch {};
+        stdout.print("warmup in {d:.6}s\n", .{warm_elapsed}) catch {};
+        stdout.print("done in {d:.6}s\n", .{elapsed}) catch {};
+        stdout.print("state depth: {}\n", .{state.size()}) catch {};
+        stdout.print("retained: {}\n", .{proc.retained_captures.items.len}) catch {};
+        stdout.print("grammar: {s}\n", .{gmr.name}) catch {};
+        stdout.print("theme: {s}\n", .{thm.name}) catch {};
+        stdout.print("theme atoms: {}\n", .{thm.atoms.count()}) catch {};
         // state.dump();
+        stdout.flush() catch {};
     }
 }
 
