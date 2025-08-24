@@ -6,6 +6,22 @@ O(n) ~ Time is linear to number of lines
 
 ## Release mode runs
 
+CPU: AMD Ryzen AI 9 HX 370 (24) @ 5.16 GHz
+
+sqlite3.c
+
+lines: 222905
+execs: 14979682
+execs/line: 67
+skips: 51924484
+warmup in 0.004230s
+done in 5.049519s
+state depth: 1
+retained: 1
+grammar: c
+theme: dracula-soft
+theme atoms: 208
+
 commit b98ec9c92c956ba8907a865c58e933c9c84a602e
 
 * moved over to zig 0.15.0

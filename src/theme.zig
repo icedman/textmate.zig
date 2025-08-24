@@ -3,9 +3,9 @@ const resources = @import("resources.zig");
 const embedded = @import("embedded.zig");
 const ThemeInfo = resources.ThemeInfo;
 
-const scope_ = @import("scope.zig");
+const atoms = @import("atoms.zig");
 const util = @import("util.zig");
-const Atom = scope_.Atom;
+const Atom = atoms.Atom;
 
 const setColorHex = util.setColorHex;
 const setColorRgb = util.setColorRgb;
@@ -350,7 +350,7 @@ pub const Theme = struct {
 
             if (scopes) |outer| {
                 for (outer) |sc| {
-                    scope_.extractAtom(sc, &theme.atoms);
+                    atoms.extractAtom(sc, &theme.atoms);
                 }
             }
         }

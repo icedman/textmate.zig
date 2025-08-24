@@ -124,27 +124,29 @@ const Match = struct {
 // It is store only if the Syntax would require further matching with its children patterns
 // This should be serializable as this is what the parse state stack contains
 
-const SerialQuad = struct { a: u64, b: u64, c: u64, d: u64 };
+const StateContextPack = struct { syntax: u64, line: u32, anchor: u32, rx_while: u64, rx_end: u64 };
 const StateContext = struct {
     syntax: *Syntax,
 
     // The match position of the character relative to the line start
-    anchor: u64 = 0,
+    line: u32 = 0,
+    anchor: u32 = 0,
 
     // Parser owns these at regex_map and responsible for oni.Regex.deinit not Self
     rx_while: Regex = Regex{},
     rx_end: Regex = Regex{},
 
-    pub fn serialize(self: *StateContext, parser: *Parser) struct { u64, u64, u64, u64 } {
+    pub fn serialize(self: *StateContext, parser: *Parser) StateContextPack {
         _ = parser;
-        return .{ self.syntax.id, self.anchor, self.rx_while.id, self.rx_end.id };
+        return .{ self.syntax.id, self.line, self.anchor, self.rx_while.id, self.rx_end.id };
     }
 
-    pub fn deserialize(self: *StateContext, parser: *Parser, serial: struct { u64, u64, u64, u64 }) !void {
-        self.syntax = @ptrFromInt(serial[0]);
-        self.anchor = serial[1];
-        self.rx_while = parser.regex_map.get(serial[2]) orelse Regex{};
-        self.rx_end = parser.regex_map.get(serial[3]) orelse Regex{};
+    pub fn deserialize(self: *StateContext, parser: *Parser, serial: StateContextPack) !void {
+        self.syntax = @ptrFromInt(serial.syntax);
+        self.line = serial.line;
+        self.anchor = serial.anchor;
+        self.rx_while = parser.regex_map.get(serial.rx_while) orelse Regex{};
+        self.rx_end = parser.regex_map.get(serial.rx_end) orelse Regex{};
     }
 };
 
@@ -200,11 +202,11 @@ pub const ParseState = struct {
         const anchor = (match orelse Match{ .start = 0 }).start;
         var sc = StateContext{
             .syntax = syntax,
-            .anchor = anchor,
+            .line = 0,
+            .anchor = @intCast(anchor),
         };
         if (rx.has_references) {
             if (match) |m| {
-                // compile StateContext.rx_end
                 if (syntax.rx_end.expr) |regexs| {
                     var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
                     _ = m.applyReferences(block, regexs, &output);
@@ -219,7 +221,6 @@ pub const ParseState = struct {
                         }
                     }
                 }
-                // compile StateContext.rx_while
                 if (syntax.rx_while.expr) |regexs| {
                     var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
                     _ = m.applyReferences(block, regexs, &output);
@@ -238,7 +239,6 @@ pub const ParseState = struct {
         }
         _ = self.stack.append(self.allocator, sc) catch {};
         _ = where;
-        // std.debug.print("state push {} {s}\n", .{self.size(), where});
     }
 
     pub fn size(self: *ParseState) usize {
@@ -895,14 +895,14 @@ pub const Parser = struct {
         self.regex_skips = 0;
     }
 
-    pub fn serialize(self: *Parser, state: *ParseState, serial: *std.ArrayList(struct { u64, u64, u64, u64 })) !void {
+    pub fn serialize(self: *Parser, state: *ParseState, serial: *std.ArrayList(StateContextPack)) !void {
         serial.clearRetainingCapacity();
         for (state.stack.items) |*item| {
             serial.append(item.serialize(self)) catch {};
         }
     }
 
-    pub fn deserialize(self: *Parser, state: *ParseState, serial: *std.ArrayList(struct { u64, u64, u64, u64 })) !void {
+    pub fn deserialize(self: *Parser, state: *ParseState, serial: *std.ArrayList(StateContextPack)) !void {
         state.stack.clearRetainingCapacity();
         for (serial.items) |item| {
             var sc = StateContext{ .syntax = self.lang.syntax.? };
