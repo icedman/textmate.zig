@@ -29,7 +29,13 @@ fn printUsage() void {
 }
 
 pub fn main() !void {
-    const allocator = std.heap.page_allocator;
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    
+    const allocator = switch (builtin.mode) {
+        .Debug => gpa.allocator(),
+        else => std.heap.smp_allocator,
+    };
 
     try oni.init(&.{oni.Encoding.utf8});
     try oni.testing.ensureInit();
@@ -126,10 +132,6 @@ pub fn main() !void {
         return;
     }
 
-    // var thm = Theme.init(allocator, theme_path orelse "data/tests/dracula.json") catch {
-    //     std.debug.print("unable to open theme {s}\n", .{theme_path orelse ""});
-    //     return;
-    // };
     var thm: Theme = undefined;
     if (ThemeLibrary.getLibrary()) |thl| {
         if (std.mem.indexOf(u8, theme_path orelse "", ".json")) |_| {
@@ -146,10 +148,6 @@ pub fn main() !void {
     }
     defer thm.deinit();
 
-    // var gmr = Grammar.init(allocator, grammar_path orelse "data/tests/zig.tmLanguage.json") catch {
-    //     std.debug.print("unable to open grammar {s}\n", .{grammar_path orelse ""});
-    //     return;
-    // };
     var gmr: Grammar = undefined;
     if (GrammarLibrary.getLibrary()) |gml| {
         if (grammar_path) |gp| {
@@ -195,7 +193,7 @@ pub fn main() !void {
     par.processor = &proc;
     proc.theme = &thm;
 
-    par.begin();
+    par.resetStats();
     const path = file_path orelse "";
     var file = std.fs.cwd().openFile(path, .{}) catch {
         std.debug.print("unable to open file {s}\n", .{file_path orelse ""});
@@ -259,6 +257,7 @@ pub fn main() !void {
 // }
 
 const std = @import("std");
+const builtin = @import("builtin");
 
 /// This imports the separate module containing `root.zig`. Take a look in `build.zig` for details.
 const lib = @import("textmate_lib");

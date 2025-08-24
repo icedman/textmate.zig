@@ -887,7 +887,7 @@ pub const Parser = struct {
     }
 
     // begin merely resets all stats
-    pub fn begin(self: *Parser) void {
+    pub fn resetStats(self: *Parser) void {
         self.regex_execs = 0;
         self.regex_skips = 0;
     }
