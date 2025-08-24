@@ -1,4 +1,4 @@
-/// This is a generated file. Do not edit manually
+// This is a generated file. Do not edit manually
 const std = @import("std");
 const res = @import("resources.zig");
 const ThemeInfo = res.ThemeInfo;
@@ -428,7 +428,6 @@ pub fn listThemes(allocator: std.mem.Allocator, list: *std.ArrayList(ThemeInfo))
 }
 
 const GrammarInfo = res.GrammarInfo;
-
 const grammar_1 = @embedFile("grammars/abap.json");
 const grammar_2 = @embedFile("grammars/actionscript-3.json");
 const grammar_3 = @embedFile("grammars/ada.json");
