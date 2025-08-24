@@ -53,7 +53,7 @@ pub const Processor = struct {
             if (self.block) |b| {
                 cap.end = b.len;
             }
-            self.captures.append(cap) catch {};
+            self.captures.append(self.allocator, cap) catch {};
         }
         if (self.start_line_fn) |f| {
             f(self, block);
@@ -72,7 +72,7 @@ pub const Processor = struct {
         for (0..self.captures.items.len) |i| {
             const cap = self.captures.items[i];
             if (cap.retain) {
-                self.retained_captures.append(cap) catch {};
+                self.retained_captures.append(self.allocator, cap) catch {};
             }
         }
     }
@@ -88,7 +88,7 @@ pub const Processor = struct {
             // TODO retain only string and comment blocks?
             // set retention at Parser, since capture only has syntax_id
         }
-        self.captures.append(c.*) catch {};
+        self.captures.append(self.allocator, c.*) catch {};
         if (self.open_tag_fn) |f| {
             f(self, c);
         }
@@ -132,15 +132,15 @@ pub const Processor = struct {
             }
         }
 
-        self.captures.append(c.*) catch {};
+        self.captures.append(self.allocator, c.*) catch {};
         if (self.capture_fn) |f| {
             f(self, c);
         }
     }
 
     pub fn deinit(self: *Processor) void {
-        self.captures.deinit();
-        self.retained_captures.deinit();
+        self.captures.deinit(self.allocator);
+        self.retained_captures.deinit(self.allocator);
     }
 };
 
@@ -188,18 +188,24 @@ pub const DumpProcessor = struct {
             .open_tag_fn = self.openTag,
             .close_tag_fn = self.closeTag,
             .capture_fn = self.capture,
-            .captures = std.ArrayList(ParseCapture).init(allocator),
-            .retained_captures = std.ArrayList(ParseCapture).init(allocator),
+            .captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
+            .retained_captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
         };
     }
 };
 
 const Rgb = theme.Rgb;
 
+const BufferedWriter = struct {
+    pub fn print(comptime fmt: []const u8, args: anytype) !void {
+        std.debug.print(fmt, args);
+    }
+};
+
 pub const RenderProcessor = struct {
     pub fn endLine(self: *Processor) void {
-        var bw = std.io.bufferedWriter(std.io.getStdOut().writer());
-        const stdout = bw.writer();
+        // var bw = std.io.bufferedWriter(std.io.getStdOut().writer());
+        const stdout = BufferedWriter; // bw.writer();
 
         if (self.theme) |thm| {
             // const defaultColor: ?theme.Settings = theme.Settings{.foreground_rgb = theme.Rgb {.r = 255 }};
@@ -279,7 +285,7 @@ pub const RenderProcessor = struct {
             stdout.print("theme is not set\n", .{}) catch {};
         }
 
-        bw.flush() catch {};
+        // bw.flush() catch {};
     }
 
     pub fn init(allocator: std.mem.Allocator) !Processor {
@@ -287,15 +293,16 @@ pub const RenderProcessor = struct {
         return Processor{
             .allocator = allocator,
             .end_line_fn = self.endLine,
-            .captures = std.ArrayList(ParseCapture).init(allocator),
-            .retained_captures = std.ArrayList(ParseCapture).init(allocator),
+            .captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
+            .retained_captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
         };
     }
 };
 
 pub const RenderHtmlProcessor = struct {
     pub fn startDocument(self: *Processor) void {
-        const stdout = std.io.getStdOut().writer();
+        // const stdout = std.io.getStdOut().writer();
+        const stdout = BufferedWriter; // bw.writer();
         if (self.theme) |thm| {
             const default_color = thm.getColor("editor.background") orelse
                 thm.getColor("background");
@@ -308,13 +315,15 @@ pub const RenderHtmlProcessor = struct {
     }
 
     pub fn endDocument(self: *Processor) void {
-        const stdout = std.io.getStdOut().writer();
+        // const stdout = std.io.getStdOut().writer();
+        const stdout = BufferedWriter; // bw.writer();
         stdout.print("</body></html>", .{}) catch {};
         _ = self;
     }
 
     pub fn endLine(self: *Processor) void {
-        const stdout = std.io.getStdOut().writer();
+        // const stdout = std.io.getStdOut().writer();
+        const stdout = BufferedWriter; // bw.writer();
         if (self.theme) |thm| {
             // const defaultColor: ?theme.Settings = theme.Settings{.foreground_rgb = theme.Rgb {.r = 255 }};
             // const default_color = (thm.getColor("editor.foreground") orelse
@@ -379,8 +388,8 @@ pub const RenderHtmlProcessor = struct {
             .start_document_fn = self.startDocument,
             .end_document_fn = self.endDocument,
             .end_line_fn = self.endLine,
-            .captures = std.ArrayList(ParseCapture).init(allocator),
-            .retained_captures = std.ArrayList(ParseCapture).init(allocator),
+            .captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
+            .retained_captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
         };
     }
 };
@@ -389,8 +398,8 @@ pub const NullProcessor = struct {
     pub fn init(allocator: std.mem.Allocator) !Processor {
         return Processor{
             .allocator = allocator,
-            .captures = std.ArrayList(ParseCapture).init(allocator),
-            .retained_captures = std.ArrayList(ParseCapture).init(allocator),
+            .captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
+            .retained_captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
         };
     }
 };

@@ -104,14 +104,14 @@ pub fn listGrammars(allocator: std.mem.Allocator, path: []const u8, list: *std.A
         //     std.debug.print("  -- {s}\n", .{gi.file_types[i]});
         // }
 
-        try list.append(gi);
+        try list.append(allocator, gi);
     }
 }
 
 test "get grammars" {
     const allocator = std.testing.allocator;
-    var list = std.ArrayList(GrammarInfo).init(allocator);
-    defer list.deinit();
+    var list = std.ArrayList(GrammarInfo).initCapacity(allocator, 256);
+    defer list.deinit(allocator);
     try listGrammars(allocator, "./src/grammars", &list);
 }
 
@@ -169,14 +169,14 @@ pub fn listThemes(allocator: std.mem.Allocator, path: []const u8, list: *std.Arr
         // std.debug.print("  {s}\n", .{ti.author});
         // std.debug.print("  {s}\n", .{ti.full_path});
 
-        try list.append(ti);
+        try list.append(allocator, ti);
     }
 }
 
 // This is only used at build time to generate embedded.zig
 pub fn generateEmbeddedThemesFile(allocator: std.mem.Allocator, writer: anytype, prefix: []const u8, path: []const u8) !void {
-    var list = std.ArrayList(ThemeInfo).init(allocator);
-    defer list.deinit();
+    var list = try std.ArrayList(ThemeInfo).initCapacity(allocator, 128);
+    defer list.deinit(allocator);
     try listThemes(allocator, path, &list);
 
     try writer.print("{s}{s}{s}{s}", .{ // :) how to do this?
@@ -198,7 +198,7 @@ pub fn generateEmbeddedThemesFile(allocator: std.mem.Allocator, writer: anytype,
 
     embed_id = 1;
 
-    try writer.print("\npub fn listThemes(allocator: std.mem.Allocator, list: *std.ArrayList(ThemeInfo)) !void {c}\n    _ = allocator;\n", .{'{'});
+    try writer.print("\npub fn listThemes(allocator: std.mem.Allocator, list: *std.ArrayList(ThemeInfo)) !void {c}\n", .{'{'});
     for (list.items) |item| {
         const np: []const u8 = &item.name;
         const nps = util.toSlice([]const u8, np);
@@ -207,7 +207,7 @@ pub fn generateEmbeddedThemesFile(allocator: std.mem.Allocator, writer: anytype,
         try writer.print("        const bytes: []const u8 = {s}{}[0..{s}{}.len];\n", .{ prefix, embed_id, prefix, embed_id });
         try writer.print("        var ti = ThemeInfo{c} .embedded_file = bytes {c};\n", .{ '{', '}' });
         try writer.print("        @memcpy(ti.name[0..\"{s}\".len], \"{s}\");\n", .{ nps, nps });
-        try writer.print("        try list.append(ti);\n", .{});
+        try writer.print("        try list.append(allocator, ti);\n", .{});
         try writer.print("    {c}\n", .{'}'});
         embed_id += 1;
     }
@@ -216,8 +216,8 @@ pub fn generateEmbeddedThemesFile(allocator: std.mem.Allocator, writer: anytype,
 }
 
 pub fn generateEmbeddedGrammarsFile(allocator: std.mem.Allocator, writer: anytype, prefix: []const u8, path: []const u8) !void {
-    var list = std.ArrayList(GrammarInfo).init(allocator);
-    defer list.deinit();
+    var list = try std.ArrayList(GrammarInfo).initCapacity(allocator, 256);
+    defer list.deinit(allocator);
     try listGrammars(allocator, path, &list);
 
     try writer.print("{s}", .{ // :) how to do this?
@@ -236,7 +236,7 @@ pub fn generateEmbeddedGrammarsFile(allocator: std.mem.Allocator, writer: anytyp
 
     embed_id = 1;
 
-    try writer.print("\npub fn listGrammars(allocator: std.mem.Allocator, list: *std.ArrayList(GrammarInfo)) !void {c}\n    _ = allocator;\n", .{'{'});
+    try writer.print("\npub fn listGrammars(allocator: std.mem.Allocator, list: *std.ArrayList(GrammarInfo)) !void {c}\n", .{'{'});
     for (list.items) |item| {
         const np: []const u8 = &item.name;
         const nps = util.toSlice([]const u8, np);
@@ -257,7 +257,7 @@ pub fn generateEmbeddedGrammarsFile(allocator: std.mem.Allocator, writer: anytyp
             const fps = util.toSlice([]const u8, fp);
             try writer.print("        @memcpy(gi.file_types[{}][0..\"{s}\".len], \"{s}\");\n", .{ fi, fps, fps });
         }
-        try writer.print("        try list.append(gi);\n", .{});
+        try writer.print("        try list.append(allocator, gi);\n", .{});
         try writer.print("    {c}\n", .{'}'});
         embed_id += 1;
     }
@@ -268,8 +268,8 @@ pub fn generateEmbeddedGrammarsFile(allocator: std.mem.Allocator, writer: anytyp
 test "get themes" {
     const allocator = std.testing.allocator;
 
-    var assets_buffer = std.ArrayList(u8).init(allocator);
-    defer assets_buffer.deinit();
+    var assets_buffer = std.ArrayList(u8).initCapacity(allocator, 128);
+    defer assets_buffer.deinit(allocator);
 
     const writer = assets_buffer.writer();
 

@@ -425,12 +425,12 @@ pub const GrammarLibrary = struct {
     cache: std.AutoHashMap(u16, Grammar) = undefined,
 
     fn init(self: *GrammarLibrary) !void {
-        self.grammars = std.ArrayList(GrammarInfo).init(self.allocator);
+        self.grammars = try std.ArrayList(GrammarInfo).initCapacity(self.allocator, 256);
         self.cache = std.AutoHashMap(u16, Grammar).init(self.allocator);
     }
 
     fn deinit(self: *GrammarLibrary) void {
-        self.grammars.deinit();
+        self.grammars.deinit(self.allocator);
         self.cache.deinit();
     }
 
@@ -594,14 +594,14 @@ pub const Grammar = struct {
 
     pub fn deinit(self: *Grammar) void {
         // TODO arena - makes allocation really abstract.. remove
-        self.inject_to.deinit();
+        self.inject_to.deinit(self.allocator);
         self.arena.deinit();
     }
 
     fn parse(allocator: std.mem.Allocator, source: []const u8) !Grammar {
         var grammar = Grammar{
             .allocator = allocator,
-            .inject_to = std.ArrayList([]const u8).init(allocator),
+            .inject_to = try std.ArrayList([]const u8).initCapacity(allocator, 2048),
             .arena = std.heap.ArenaAllocator.init(allocator),
             .name = "",
         };
@@ -622,7 +622,7 @@ pub const Grammar = struct {
 
         if (obj.get("injectTo")) |inject| {
             if (inject == .array) {
-                try grammar.inject_to.append("-- placeholder --");
+                try grammar.inject_to.append(allocator, "-- placeholder --");
             }
         }
 

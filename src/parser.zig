@@ -155,8 +155,8 @@ pub const ParseState = struct {
     owner: *Parser = undefined,
 
     pub fn init(owner: *Parser, allocator: std.mem.Allocator, syntax: *Syntax) !ParseState {
-        var stack = std.ArrayList(StateContext).init(allocator);
-        try stack.append(StateContext{
+        var stack = try std.ArrayList(StateContext).initCapacity(allocator, 32);
+        try stack.append(allocator, StateContext{
             .syntax = syntax,
         });
         return ParseState{
@@ -167,7 +167,7 @@ pub const ParseState = struct {
     }
 
     pub fn deinit(self: *ParseState) void {
-        self.stack.deinit();
+        self.stack.deinit(self.allocator);
     }
 
     pub fn top(self: *ParseState) ?StateContext {
@@ -235,7 +235,7 @@ pub const ParseState = struct {
                 }
             }
         }
-        _ = self.stack.append(sc) catch {};
+        _ = self.stack.append(self.allocator, sc) catch {};
         _ = where;
         // std.debug.print("state push {} {s}\n", .{self.size(), where});
     }
@@ -764,7 +764,7 @@ pub const Parser = struct {
             // {
             //     const text = block[start..end];
             //     std.debug.print("====================================\n", .{});
-            //     std.debug.print("s:{} e:{} {s}\n", .{ start, end, text });
+            //     std.debug.print("s:{} e:{} [{s}]\n", .{ start, end, text });
             // }
 
             const top = state.top();

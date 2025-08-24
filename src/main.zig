@@ -203,10 +203,9 @@ pub fn main() !void {
     };
     defer file.close();
 
-    var reader = file.reader();
-
     var buf: [1024]u8 = undefined;
     var line_no: usize = 1;
+    var reader = file.reader(&buf);
 
     const warm_end = std.time.nanoTimestamp();
     const warm_elapsed = @as(f64, @floatFromInt(warm_end - warm_start)) / 1_000_000_000.0;
@@ -214,29 +213,19 @@ pub fn main() !void {
     const start = std.time.nanoTimestamp();
     proc.startDocument();
 
-    while (try reader.readUntilDelimiterOrEof(&buf, '\n')) |line| {
-        var slice = line;
+    var line_writer = std.Io.Writer.Allocating.init(allocator);
+    defer line_writer.deinit();
 
-        // Trim trailing \r if present
-        if (slice.len > 0 and slice[slice.len - 1] == '\r') {
-            slice = slice[0 .. slice.len - 1];
-        }
+    while (reader.interface.streamDelimiter(&line_writer.writer, '\n')) |_| {
+        try line_writer.writer.print("\n", .{});
+        const slice: []u8 = line_writer.written();
+        line_writer.clearRetainingCapacity();
 
-        // Ensure it ends with '\n'
-        if (slice.len == 0 or slice[slice.len - 1] != '\n') {
-            // safe since readUntilDelimiterOrEof strips the delimiter, leaving room
-            slice = buf[0 .. slice.len + 1];
-            slice[slice.len - 1] = '\n';
-        }
-
-        _ = try par.parseLine(&state, slice);
+        _ = try par.parseLine(&state, slice); 
         line_no += 1;
+        reader.interface.toss(1);
+    } else |err| if (err != error.EndOfStream) return err;
 
-        // const ser = par.serialize(&state);
-        // par.deserialize(&state, ser);
-        // defer ser.deinit();
-        // if (line_no > 50000) break;
-    }
     proc.endDocument();
     const end = std.time.nanoTimestamp();
     const elapsed = @as(f64, @floatFromInt(end - start)) / 1_000_000_000.0;

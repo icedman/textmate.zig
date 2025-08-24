@@ -26,14 +26,14 @@ pub fn build(b: *std.Build) void {
                 const bb = step.owner;
                 _ = opts;
 
-                var assets_buffer = std.ArrayList(u8).init(bb.allocator);
-                defer assets_buffer.deinit();
+                var assets_buffer = try std.ArrayList(u8).initCapacity(bb.allocator, 2048);
+                defer assets_buffer.deinit(bb.allocator);
 
                 const themes_path = try bb.build_root.join(bb.allocator, &.{"src/themes"});
-                try res.generateEmbeddedThemesFile(bb.allocator, assets_buffer.writer(), "theme_", themes_path);
+                try res.generateEmbeddedThemesFile(bb.allocator, assets_buffer.writer(bb.allocator), "theme_", themes_path);
 
                 const grammars_path = try bb.build_root.join(bb.allocator, &.{"src/grammars"});
-                try res.generateEmbeddedGrammarsFile(bb.allocator, assets_buffer.writer(), "grammar_", grammars_path);
+                try res.generateEmbeddedGrammarsFile(bb.allocator, assets_buffer.writer(bb.allocator), "grammar_", grammars_path);
 
                 const embed_path = try bb.cache_root.join(bb.allocator, &.{"embedded.zig"});
                 std.debug.print("{s}\n", .{embed_path});
@@ -45,7 +45,7 @@ pub fn build(b: *std.Build) void {
         }.make,
     });
 
-    const update_embedded = b.addUpdateSourceFiles();
+    var update_embedded = b.addUpdateSourceFiles();
     update_embedded.addCopyFileToSource(
         b.path(".zig-cache/embedded.zig"),
         "src/embedded.zig",

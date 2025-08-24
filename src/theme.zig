@@ -24,12 +24,12 @@ pub const ThemeLibrary = struct {
     cache: std.AutoHashMap(u16, Theme) = undefined,
 
     fn init(self: *ThemeLibrary) !void {
-        self.themes = std.ArrayList(ThemeInfo).init(self.allocator);
+        self.themes = try std.ArrayList(ThemeInfo).initCapacity(self.allocator, 128);
         self.cache = std.AutoHashMap(u16, Theme).init(self.allocator);
     }
 
     fn deinit(self: *ThemeLibrary) void {
-        self.themes.deinit();
+        self.themes.deinit(self.allocator);
         self.cache.deinit();
     }
 
@@ -192,7 +192,7 @@ pub const Theme = struct {
 
     pub fn deinit(self: *Theme) void {
         self.atoms.deinit();
-        self.scopes.deinit();
+        self.scopes.deinit(self.allocator);
         self.cache.deinit();
         self.arena.deinit();
     }
@@ -246,7 +246,7 @@ pub const Theme = struct {
             return;
         }
 
-        try self.scopes.append(Scope{
+        try self.scopes.append(self.allocator, Scope{
             .atom = Atom.fromScopeName(scope_name, &self.atoms),
             .ascendant = ascendant,
             .exclusion = exclusion,
@@ -258,14 +258,14 @@ pub const Theme = struct {
         var theme = Theme{
             .allocator = allocator,
             .atoms = std.StringHashMap(u32).init(allocator),
-            .scopes = std.ArrayList(Scope).init(allocator),
+            .scopes = try std.ArrayList(Scope).initCapacity(allocator, 512),
             .cache = std.StringHashMap(*Scope).init(allocator),
             .arena = std.heap.ArenaAllocator.init(allocator),
             .name = "",
         };
 
         errdefer theme.atoms.deinit();
-        errdefer theme.scopes.deinit();
+        errdefer theme.scopes.deinit(allocator);
         errdefer theme.cache.deinit();
 
         // anything associated with reading the json

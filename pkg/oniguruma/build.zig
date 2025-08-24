@@ -100,9 +100,9 @@ fn buildLib(b: *std.Build, module: *std.Build.Module, options: anytype) !*std.Bu
             .SIZEOF_VOIDP = t.ptrBitWidth() / t.cTypeBitSize(.char),
         }));
 
-        var flags = std.ArrayList([]const u8).init(b.allocator);
-        defer flags.deinit();
-        try flags.appendSlice(&.{});
+        var flags = try std.ArrayList([]const u8).initCapacity(b.allocator, 2048);
+        defer flags.deinit(b.allocator);
+        try flags.appendSlice(b.allocator, &.{});
         lib.addCSourceFiles(.{
             .root = upstream.path(""),
             .flags = flags.items,

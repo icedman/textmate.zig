@@ -46,14 +46,15 @@ pub fn addPaths(
         // find the SDK path.
         const libc = try std.zig.LibCInstallation.findNative(.{
             .allocator = b.allocator,
-            .target = step.rootModuleTarget(),
+            .target = &step.rootModuleTarget(),
             .verbose = false,
         });
 
         // Render the file compatible with the `--libc` Zig flag.
-        var list: std.ArrayList(u8) = .init(b.allocator);
-        defer list.deinit();
-        try libc.render(list.writer());
+        var list: std.ArrayList(u8) = try .initCapacity(b.allocator, 512);
+        defer list.deinit(b.allocator);
+        // TODO 0.15
+        // try libc.render(list.writer(b.allocator));
 
         // Create a temporary file to store the libc path because
         // `--libc` expects a file path.
