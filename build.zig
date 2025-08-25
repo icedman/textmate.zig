@@ -86,12 +86,12 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(cat_exe);
     const run_cat_cmd = b.addRunArtifact(cat_exe);
 
-    const less_exe = b.addExecutable(.{
-        .name = "lessx",
-        .root_module = cat_exe_mod,
-    });
-    b.installArtifact(less_exe);
-    const run_less_cmd = b.addRunArtifact(less_exe);
+    // const less_exe = b.addExecutable(.{
+    //     .name = "lessx",
+    //     .root_module = cat_exe_mod,
+    // });
+    // b.installArtifact(less_exe);
+    // const run_less_cmd = b.addRunArtifact(less_exe);
 
     // oniguruma
     if (b.lazyDependency("oniguruma", .{
@@ -110,13 +110,13 @@ pub fn build(b: *std.Build) void {
     // This is not necessary, however, if the application depends on other installed
     // files, this ensures they will be present and in the expected location.
     run_cat_cmd.step.dependOn(b.getInstallStep());
-    run_less_cmd.step.dependOn(b.getInstallStep());
+    // run_less_cmd.step.dependOn(b.getInstallStep());
 
     // This allows the user to pass arguments to the application in the build
     // command itself, like this: `zig build run -- arg1 arg2 etc`
     if (b.args) |args| {
         run_cat_cmd.addArgs(args);
-        run_less_cmd.addArgs(args);
+        // run_less_cmd.addArgs(args);
     }
 
     // This creates a build step. It will be visible in the `zig build --help` menu,
@@ -125,8 +125,8 @@ pub fn build(b: *std.Build) void {
     const run_cat_step = b.step("run", "Run cat");
     run_cat_step.dependOn(&run_cat_cmd.step);
 
-    const run_less_step = b.step("less", "Run less");
-    run_less_step.dependOn(&run_less_cmd.step);
+    // const run_less_step = b.step("less", "Run less");
+    // run_less_step.dependOn(&run_less_cmd.step);
 
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.

@@ -3,6 +3,8 @@ const parser = @import("parser.zig");
 const theme = @import("theme.zig");
 const util = @import("util.zig");
 
+const Allocator = std.mem.Allocator;
+
 const setColorHex = util.setColorHex;
 const setColorRgb = util.setColorRgb;
 const setBgColorHex = util.setBgColorHex;
@@ -12,7 +14,7 @@ const resetColor = util.resetColor;
 const ParseCapture = parser.ParseCapture;
 
 pub const Processor = struct {
-    allocator: std.mem.Allocator,
+    allocator: Allocator,
     block: ?[]const u8 = null,
     theme: ?*theme.Theme = null,
 
@@ -179,7 +181,7 @@ pub const DumpProcessor = struct {
         }
     }
 
-    pub fn init(allocator: std.mem.Allocator) !Processor {
+    pub fn init(allocator: Allocator) !Processor {
         const self = DumpProcessor;
         return Processor{
             .allocator = allocator,
@@ -283,7 +285,7 @@ pub const RenderProcessor = struct {
         stdout.flush() catch {};
     }
 
-    pub fn init(allocator: std.mem.Allocator) !Processor {
+    pub fn init(allocator: Allocator) !Processor {
         const self = RenderProcessor;
         return Processor{
             .allocator = allocator,
@@ -383,7 +385,7 @@ pub const RenderHtmlProcessor = struct {
         stdout.flush() catch {};
     }
 
-    pub fn init(allocator: std.mem.Allocator) !Processor {
+    pub fn init(allocator: Allocator) !Processor {
         const self = RenderHtmlProcessor;
         return Processor{
             .allocator = allocator,
@@ -397,7 +399,7 @@ pub const RenderHtmlProcessor = struct {
 };
 
 pub const NullProcessor = struct {
-    pub fn init(allocator: std.mem.Allocator) !Processor {
+    pub fn init(allocator: Allocator) !Processor {
         return Processor{
             .allocator = allocator,
             .captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),

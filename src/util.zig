@@ -1,3 +1,4 @@
+// TODO avoid utils (too generic as per Zig docs)
 const std = @import("std");
 const theme = @import("theme.zig");
 const Rgb = theme.Rgb;

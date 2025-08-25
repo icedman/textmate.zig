@@ -7,6 +7,9 @@ const atoms = @import("atoms.zig");
 const util = @import("util.zig");
 const Atom = atoms.Atom;
 
+const Allocator = std.mem.Allocator;
+const ArenaAllocator = std.heap.ArenaAllocator;
+
 const setColorHex = util.setColorHex;
 const setColorRgb = util.setColorRgb;
 const setBgColorHex = util.setBgColorHex;
@@ -19,7 +22,7 @@ const ENABLE_SCOPE_CACHING = true;
 var theThemeLibrary: ?*ThemeLibrary = null;
 
 pub const ThemeLibrary = struct {
-    allocator: std.mem.Allocator = undefined,
+    allocator: Allocator = undefined,
     themes: std.ArrayList(ThemeInfo) = undefined,
     cache: std.AutoHashMap(u16, Theme) = undefined,
 
@@ -58,7 +61,7 @@ pub const ThemeLibrary = struct {
         return error.NotFound;
     }
 
-    pub fn initLibrary(allocator: std.mem.Allocator) !void {
+    pub fn initLibrary(allocator: Allocator) !void {
         theThemeLibrary = try allocator.create(ThemeLibrary);
         if (theThemeLibrary) |lib| {
             lib.allocator = allocator;
@@ -154,8 +157,8 @@ pub const Settings = struct {
 pub const ThemeColors = Settings;
 
 pub const Theme = struct {
-    allocator: std.mem.Allocator,
-    arena: std.heap.ArenaAllocator,
+    allocator: Allocator,
+    arena: ArenaAllocator,
 
     name: []const u8,
 
@@ -174,7 +177,7 @@ pub const Theme = struct {
     // TODO release this after parse (requires that all string values be allocated and copied)
     parsed: ?std.json.Parsed(std.json.Value) = null,
 
-    pub fn init(allocator: std.mem.Allocator, source_path: []const u8) !Theme {
+    pub fn init(allocator: Allocator, source_path: []const u8) !Theme {
         const file = std.fs.cwd().openFile(source_path, .{}) catch |err| {
             std.debug.print("unable to open {s}\n", .{source_path});
             return err;
@@ -186,7 +189,7 @@ pub const Theme = struct {
         return Theme.parse(allocator, file_contents);
     }
 
-    pub fn initWithData(allocator: std.mem.Allocator, file_contents: []const u8) !Theme {
+    pub fn initWithData(allocator: Allocator, file_contents: []const u8) !Theme {
         return Theme.parse(allocator, file_contents);
     }
 
@@ -194,6 +197,12 @@ pub const Theme = struct {
         self.atoms.deinit();
         self.scopes.deinit(self.allocator);
         self.cache.deinit();
+
+        // TODO ArenaAllocator is a bit difficult to track but this is the Rule
+        // 1. atoms, scopes, cache (all grow)
+        // 2. colors, tokenColors (do not grow - therefore arena)
+        // Rationale
+        // colors, tokenColors will have a lot of static allocated strings (which will be more conventient destroy all at once)
         self.arena.deinit();
     }
 
@@ -254,13 +263,13 @@ pub const Theme = struct {
         });
     }
 
-    fn parse(allocator: std.mem.Allocator, source: []const u8) !Theme {
+    fn parse(allocator: Allocator, source: []const u8) !Theme {
         var theme = Theme{
             .allocator = allocator,
             .atoms = std.StringHashMap(u32).init(allocator),
             .scopes = try std.ArrayList(Scope).initCapacity(allocator, 512),
             .cache = std.StringHashMap(*Scope).init(allocator),
-            .arena = std.heap.ArenaAllocator.init(allocator),
+            .arena = ArenaAllocator.init(allocator),
             .name = "",
         };
 

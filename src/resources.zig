@@ -1,6 +1,8 @@
 const std = @import("std");
 const util = @import("util.zig");
 
+const Allocator = std.mem.Allocator;
+
 // TODO move to config.. smallcaps
 const MAX_NAME_LENGTH = 128;
 const MAX_FILE_TYPES = 8;
@@ -30,7 +32,7 @@ pub const ThemeInfo = struct {
     embedded_file: ?[]const u8 = null,
 };
 
-pub fn getGrammarInfo(allocator: std.mem.Allocator, path: []const u8, full_path: []const u8) !GrammarInfo {
+pub fn getGrammarInfo(allocator: Allocator, path: []const u8, full_path: []const u8) !GrammarInfo {
     // std.debug.print("{s}\n", .{path});
     _ = path;
 
@@ -84,7 +86,7 @@ pub fn getGrammarInfo(allocator: std.mem.Allocator, path: []const u8, full_path:
 }
 
 /// read grammars from a directory
-pub fn listGrammars(allocator: std.mem.Allocator, path: []const u8, list: *std.ArrayList(GrammarInfo)) !void {
+pub fn listGrammars(allocator: Allocator, path: []const u8, list: *std.ArrayList(GrammarInfo)) !void {
     const dir = std.fs.cwd().openDir(path, .{ .iterate = true }) catch unreachable;
     var walker = dir.walk(allocator) catch unreachable;
     defer walker.deinit();
@@ -115,7 +117,7 @@ test "get grammars" {
     try listGrammars(allocator, "./src/grammars", &list);
 }
 
-pub fn getThemeInfo(allocator: std.mem.Allocator, path: []const u8, full_path: []const u8) !ThemeInfo {
+pub fn getThemeInfo(allocator: Allocator, path: []const u8, full_path: []const u8) !ThemeInfo {
     // std.debug.print("{s}\n", .{path});
     _ = path;
 
@@ -152,7 +154,7 @@ pub fn getThemeInfo(allocator: std.mem.Allocator, path: []const u8, full_path: [
 }
 
 /// read themes from a directory
-pub fn listThemes(allocator: std.mem.Allocator, path: []const u8, list: *std.ArrayList(ThemeInfo)) !void {
+pub fn listThemes(allocator: Allocator, path: []const u8, list: *std.ArrayList(ThemeInfo)) !void {
     const dir = std.fs.cwd().openDir(path, .{ .iterate = true }) catch unreachable;
     var walker = dir.walk(allocator) catch unreachable;
     defer walker.deinit();
@@ -174,7 +176,7 @@ pub fn listThemes(allocator: std.mem.Allocator, path: []const u8, list: *std.Arr
 }
 
 // This is only used at build time to generate embedded.zig
-pub fn generateEmbeddedThemesFile(allocator: std.mem.Allocator, writer: anytype, prefix: []const u8, path: []const u8) !void {
+pub fn generateEmbeddedThemesFile(allocator: Allocator, writer: anytype, prefix: []const u8, path: []const u8) !void {
     var list = try std.ArrayList(ThemeInfo).initCapacity(allocator, 128);
     defer list.deinit(allocator);
     try listThemes(allocator, path, &list);
@@ -200,10 +202,10 @@ pub fn generateEmbeddedThemesFile(allocator: std.mem.Allocator, writer: anytype,
 
     embed_id = 1;
 
-    // try writer.print("\npub fn listThemes(allocator: std.mem.Allocator, list: *std.ArrayList(ThemeInfo)) !void {c}\n", .{'{'});
+    // try writer.print("\npub fn listThemes(allocator: Allocator, list: *std.ArrayList(ThemeInfo)) !void {c}\n", .{'{'});
     try writer.print("{s}", .{
         \\
-        \\pub fn listThemes(allocator: std.mem.Allocator, list: *std.ArrayList(ThemeInfo)) !void {
+        \\pub fn listThemes(allocator: Allocator, list: *std.ArrayList(ThemeInfo)) !void {
         \\
     });
 
@@ -222,7 +224,7 @@ pub fn generateEmbeddedThemesFile(allocator: std.mem.Allocator, writer: anytype,
     try writer.print("{c}\n", .{'}'});
 }
 
-pub fn generateEmbeddedGrammarsFile(allocator: std.mem.Allocator, writer: anytype, prefix: []const u8, path: []const u8) !void {
+pub fn generateEmbeddedGrammarsFile(allocator: Allocator, writer: anytype, prefix: []const u8, path: []const u8) !void {
     var list = try std.ArrayList(GrammarInfo).initCapacity(allocator, 256);
     defer list.deinit(allocator);
     try listGrammars(allocator, path, &list);
@@ -247,7 +249,7 @@ pub fn generateEmbeddedGrammarsFile(allocator: std.mem.Allocator, writer: anytyp
 
     try writer.print("{s}", .{
         \\
-        \\pub fn listGrammars(allocator: std.mem.Allocator, list: *std.ArrayList(GrammarInfo)) !void {
+        \\pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !void {
         \\
     });
     for (list.items) |item| {

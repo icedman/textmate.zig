@@ -5,8 +5,11 @@ const embedded = @import("embedded.zig");
 const util = @import("util.zig");
 const GrammarInfo = resources.GrammarInfo;
 
+const Allocator = std.mem.Allocator;
+const ArenaAllocator = std.heap.ArenaAllocator;
+
+// TODO convert to hash or uuid
 var syntax_id: u32 = 1;
-var regex_id: u32 = 1;
 
 // Regex is merely a wrapper to oni.Regex
 // It adds an idenfier and points to the expression string
@@ -106,7 +109,7 @@ pub const Syntax = struct {
     }
 
     // a syntaxMap is where a name is mapped to a syntax node
-    fn parseSyntaxMap(allocator: std.mem.Allocator, json: std.json.Value, field_name: []const u8, parent: ?*Syntax) !?std.StringHashMap(*Syntax) {
+    fn parseSyntaxMap(allocator: Allocator, json: std.json.Value, field_name: []const u8, parent: ?*Syntax) !?std.StringHashMap(*Syntax) {
         if (json != .object) return error.InvalidSyntax;
         const obj = json.object;
         return blk: {
@@ -128,7 +131,7 @@ pub const Syntax = struct {
         };
     }
 
-    pub fn init(allocator: std.mem.Allocator, json: std.json.Value) error{ OutOfMemory, InvalidSyntax }!*Syntax {
+    pub fn init(allocator: Allocator, json: std.json.Value) error{ OutOfMemory, InvalidSyntax }!*Syntax {
         if (json != .object) return error.InvalidSyntax;
         const obj = json.object;
 
@@ -191,7 +194,12 @@ pub const Syntax = struct {
     }
 
     pub fn deinit(self: *Syntax) void {
+        // Syntax and its values are arena allocated
+        // as they are statically created a read time
+        // But match(es) and captures have oni.Regexes that have to be deinited
+
         // std.debug.print("deinit syntax address {*}-{*}\n", .{self, self.parent});
+
         const Entry = struct {
             rx_ptr: *Regex,
         };
@@ -203,14 +211,14 @@ pub const Syntax = struct {
             .{ .rx_ptr = &self.rx_end },
         };
 
-        // free regexes
+        // free oni.Regexes
         for (entries) |entry| {
-            if (entry.regex_ptr.*) |*regex| {
-                regex.deinit();
+            const r: Regex = entry.rx_ptr.*;
+            if (r.regex) |*regex| {
+                @constCast(regex).deinit();
             }
         }
 
-        // free patterns
         if (self.patterns) |pats| {
             for (pats) |*p| {
                 const v = p.*;
@@ -218,35 +226,26 @@ pub const Syntax = struct {
             }
         }
 
-        // free repository
-        if (self.repository) |repo| {
-            var it = repo.iterator();
-            while (it.next()) |kv| {
-                const v = kv.value_ptr.*;
-                v.deinit();
-            }
-        }
+        const CapturesEntry = struct {
+            map_ptr: *?std.StringHashMap(*Syntax),
+        };
 
-        // free captures
-        if (self.captures) |captures| {
-            var it = captures.iterator();
-            while (it.next()) |kv| {
-                const v = kv.value_ptr.*;
-                v.deinit();
-            }
-        }
-        if (self.begin_captures) |captures| {
-            var it = captures.iterator();
-            while (it.next()) |kv| {
-                const v = kv.value_ptr.*;
-                v.deinit();
-            }
-        }
-        if (self.end_captures) |captures| {
-            var it = captures.iterator();
-            while (it.next()) |kv| {
-                const v = kv.value_ptr.*;
-                v.deinit();
+        const capture_entries = [_]CapturesEntry{
+            .{ .map_ptr = &self.repository },
+            .{ .map_ptr = &self.captures },
+            .{
+                .map_ptr = &self.begin_captures,
+            },
+            .{ .map_ptr = &self.end_captures },
+        };
+
+        for (capture_entries) |entry| {
+            if (entry.map_ptr.*) |*repo| {
+                var it = repo.iterator();
+                while (it.next()) |kv| {
+                    const v = kv.value_ptr.*;
+                    v.deinit();
+                }
             }
         }
     }
@@ -420,7 +419,7 @@ pub const Syntax = struct {
 var theGrammarLibrary: ?*GrammarLibrary = null;
 
 pub const GrammarLibrary = struct {
-    allocator: std.mem.Allocator = undefined,
+    allocator: Allocator = undefined,
     grammars: std.ArrayList(GrammarInfo) = undefined,
     cache: std.AutoHashMap(u16, Grammar) = undefined,
 
@@ -540,7 +539,7 @@ pub const GrammarLibrary = struct {
         return error.NotFound;
     }
 
-    pub fn initLibrary(allocator: std.mem.Allocator) !void {
+    pub fn initLibrary(allocator: Allocator) !void {
         theGrammarLibrary = try allocator.create(GrammarLibrary);
         if (theGrammarLibrary) |lib| {
             lib.allocator = allocator;
@@ -562,8 +561,8 @@ pub const GrammarLibrary = struct {
 };
 
 pub const Grammar = struct {
-    allocator: std.mem.Allocator,
-    arena: std.heap.ArenaAllocator,
+    allocator: Allocator,
+    arena: ArenaAllocator,
 
     name: []const u8,
     syntax: ?*Syntax = null,
@@ -577,7 +576,7 @@ pub const Grammar = struct {
     // TODO release this after parse (requires that all string values be allocated and copied)
     parsed: ?std.json.Parsed(std.json.Value) = null,
 
-    pub fn init(allocator: std.mem.Allocator, source_path: []const u8) !Grammar {
+    pub fn init(allocator: Allocator, source_path: []const u8) !Grammar {
         const file = try std.fs.cwd().openFile(source_path, .{});
         defer file.close();
         const file_size = (try file.stat()).size;
@@ -587,22 +586,26 @@ pub const Grammar = struct {
         return Grammar.parse(allocator, file_contents);
     }
 
-    pub fn initWithData(allocator: std.mem.Allocator, file_contents: []const u8) !Grammar {
+    pub fn initWithData(allocator: Allocator, file_contents: []const u8) !Grammar {
         // TODO apply injectors
         return Grammar.parse(allocator, file_contents);
     }
 
     pub fn deinit(self: *Grammar) void {
-        // TODO arena - makes allocation really abstract.. remove
+        if (self.syntax) |syn| {
+            syn.deinit();
+        }
+
+        // TODO arena - makes allocation really abstract.. remove?
         self.inject_to.deinit(self.allocator);
         self.arena.deinit();
     }
 
-    fn parse(allocator: std.mem.Allocator, source: []const u8) !Grammar {
+    fn parse(allocator: Allocator, source: []const u8) !Grammar {
         var grammar = Grammar{
             .allocator = allocator,
             .inject_to = try std.ArrayList([]const u8).initCapacity(allocator, 2048),
-            .arena = std.heap.ArenaAllocator.init(allocator),
+            .arena = ArenaAllocator.init(allocator),
             .name = "",
         };
 

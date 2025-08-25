@@ -42,7 +42,7 @@ pub fn main() !void {
 
     const allocator = switch (builtin.mode) {
         .Debug => gpa.allocator(),
-        else => std.heap.smp_allocator,
+        else => std.heap.page_allocator,
     };
 
     try oni.init(&.{oni.Encoding.utf8});
