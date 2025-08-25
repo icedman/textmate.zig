@@ -1,9 +1,11 @@
 // TODO
 // scope selection needs to be accurate for rendering to be accurate
 const std = @import("std");
-const resources = @import("resources.zig");
 const theme = @import("theme.zig");
 const util = @import("util.zig");
+
+// TODO for testing only
+const resources = @import("resources/resources.zig");
 const ThemeInfo = resources.ThemeInfo;
 
 // TODO

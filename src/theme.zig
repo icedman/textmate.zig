@@ -1,6 +1,6 @@
 const std = @import("std");
-const resources = @import("resources.zig");
-const embedded = @import("embedded.zig");
+const resources = @import("resources/resources.zig");
+const embedded = @import("resources/embedded.zig");
 const ThemeInfo = resources.ThemeInfo;
 
 const atoms = @import("atoms.zig");

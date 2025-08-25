@@ -1,7 +1,7 @@
 const std = @import("std");
 const oni = @import("oniguruma");
-const resources = @import("resources.zig");
-const embedded = @import("embedded.zig");
+const resources = @import("resources/resources.zig");
+const embedded = @import("resources/embedded.zig");
 const util = @import("util.zig");
 const GrammarInfo = resources.GrammarInfo;
 
