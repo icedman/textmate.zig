@@ -5,6 +5,7 @@ const Allocator = std.mem.Allocator;
 
 // TODO move to config.. smallcaps
 const MAX_NAME_LENGTH = 128;
+const MAX_INJECT_TO = 8;
 const MAX_FILE_TYPES = 8;
 const MAX_EXT_LENGTH = 16;
 
@@ -21,6 +22,8 @@ pub const GrammarInfo = struct {
     file_types: [MAX_FILE_TYPES][MAX_EXT_LENGTH]u8 = [_][MAX_EXT_LENGTH]u8{[_]u8{0} ** MAX_EXT_LENGTH} ** MAX_FILE_TYPES,
     file_types_count: u8 = 0,
     inject_only: bool = false,
+    inject_to: [MAX_INJECT_TO][MAX_NAME_LENGTH]u8 = [_][MAX_NAME_LENGTH]u8{[_]u8{0} ** MAX_NAME_LENGTH} ** MAX_INJECT_TO,
+    inject_to_count: u8 = 0,
     embedded_file: ?[]const u8 = null,
 };
 
@@ -76,8 +79,19 @@ pub fn getGrammarInfo(allocator: Allocator, path: []const u8, full_path: []const
         }
     }
 
-    if (obj.get("injectTo")) |_| {
+    if (obj.get("injectTo")) |gt| {
         gi.inject_only = true;
+        if (gt == .array) {
+            for (gt.array.items, 0..) |f, j| {
+                if (f.string.len < MAX_NAME_LENGTH) {
+                    @memcpy(gi.inject_to[j][0..f.string.len], f.string);
+                    gi.inject_to_count += 1;
+                    if (gi.inject_to_count >= MAX_FILE_TYPES) {
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     gi.id = grammar_id;
@@ -186,6 +200,7 @@ pub fn generateEmbeddedThemesFile(allocator: Allocator, writer: anytype, prefix:
         \\const std = @import("std");
         \\const res = @import("resources.zig");
         \\const ThemeInfo = res.ThemeInfo;
+        \\const Allocator = std.mem.Allocator;
         \\
         \\
     });
@@ -195,7 +210,8 @@ pub fn generateEmbeddedThemesFile(allocator: Allocator, writer: anytype, prefix:
     for (list.items) |item| {
         const np: []const u8 = &item.full_path;
         const nps = util.toSlice([]const u8, np);
-        const idx = (std.mem.indexOf(u8, nps, "src") orelse 0) + 4;
+        var idx = (std.mem.indexOf(u8, nps, "src") orelse 0) + "src".len + 1;
+        idx += (std.mem.indexOf(u8, nps[idx..], "resources") orelse 0) + "resources".len + 1;
         try writer.print("const {s}{} = @embedFile(\"{s}\");\n", .{ prefix, embed_id, nps[idx..] });
         embed_id += 1;
     }
@@ -240,7 +256,8 @@ pub fn generateEmbeddedGrammarsFile(allocator: Allocator, writer: anytype, prefi
     for (list.items) |item| {
         const np: []const u8 = &item.full_path;
         const nps = util.toSlice([]const u8, np);
-        const idx = (std.mem.indexOf(u8, nps, "src") orelse 0) + 4;
+        var idx = (std.mem.indexOf(u8, nps, "src") orelse 0) + "src".len + 1;
+        idx += (std.mem.indexOf(u8, nps[idx..], "resources") orelse 0) + "resources".len + 1;
         try writer.print("const {s}{} = @embedFile(\"{s}\");\n", .{ prefix, embed_id, nps[idx..] });
         embed_id += 1;
     }

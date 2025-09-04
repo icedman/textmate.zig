@@ -441,6 +441,18 @@ pub const GrammarLibrary = struct {
         try embedded.listGrammars(self.allocator, &self.grammars);
     }
 
+    pub fn applyInjectors(self: *GrammarLibrary, grammar: *Grammar) !void {
+        _ = grammar;
+        for (self.grammars.items) |item| {
+            if (!item.inject_only) continue;
+            var ig: Grammar = undefined;
+            if (self.cache.get(item.id)) |g| {
+                ig = g;
+            }
+
+        }
+    }
+
     pub fn grammarFromName(self: *GrammarLibrary, name: []const u8) !Grammar {
         if (name.len >= 128) return error.NotFound;
         for (self.grammars.items) |item| {
@@ -454,7 +466,8 @@ pub const GrammarLibrary = struct {
                     return Grammar.initWithData(self.allocator, file);
                 }
                 const p: []const u8 = &item.full_path;
-                const g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
+                var g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
+                try self.applyInjectors(&g);
                 try self.cache.put(item.id, g);
                 return g;
             }
@@ -475,7 +488,8 @@ pub const GrammarLibrary = struct {
                     return Grammar.initWithData(self.allocator, file);
                 }
                 const p: []const u8 = &item.full_path;
-                const g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
+                var g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
+                try self.applyInjectors(&g);
                 try self.cache.put(item.id, g);
                 return g;
             }
@@ -513,7 +527,8 @@ pub const GrammarLibrary = struct {
                             return Grammar.initWithData(self.allocator, file);
                         }
                         const p: []const u8 = &item.full_path;
-                        const g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
+                        var g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
+                        try self.applyInjectors(&g);
                         try self.cache.put(item.id, g);
                         return g;
                     }
@@ -530,7 +545,8 @@ pub const GrammarLibrary = struct {
                         return Grammar.initWithData(self.allocator, file);
                     }
                     const p: []const u8 = &item.full_path;
-                    const g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
+                    var g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
+                    try self.applyInjectors(&g);
                     try self.cache.put(item.id, g);
                     return g;
                 }

@@ -18,7 +18,6 @@ pub const Processor = struct {
     allocator: Allocator,
     block: ?[]const u8 = null,
     theme: ?*theme.Theme = null,
-
     state: ?*ParseState = null,
     captures: std.ArrayList(ParseCapture),
 
@@ -49,6 +48,8 @@ pub const Processor = struct {
         if (self.state) |state| {
             for (state.stack.items) |context| {
                 if (context.syntax.rx_begin.valid == .Valid) {
+                    // TODO .. use getName() to generic
+                    // const name = "comment.block";
                     if (context.syntax.rx_begin.is_comment_block) {
                         const name = "comment.block";
                         var c = ParseCapture{
@@ -110,9 +111,12 @@ pub const Processor = struct {
         }
         // close the Capture (properly set the end pos)
         var i = self.captures.items.len;
+        var close_syntax_id: u64 = 0;
         while (i > 0) : (i -= 1) {
             if (self.captures.items[i - 1].syntax_id == c.syntax_id) {
                 self.captures.items[i - 1].end = c.end;
+                close_syntax_id = c.syntax_id;
+            } else if (close_syntax_id != 0) {
                 break;
             }
         }
@@ -142,7 +146,6 @@ pub const Processor = struct {
 
     pub fn deinit(self: *Processor) void {
         self.captures.deinit(self.allocator);
-        // self.retained_captures.deinit(self.allocator);
     }
 };
 
@@ -191,7 +194,6 @@ pub const DumpProcessor = struct {
             .close_tag_fn = self.closeTag,
             .capture_fn = self.capture,
             .captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
-            // .retained_captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
         };
     }
 };
@@ -291,7 +293,6 @@ pub const RenderProcessor = struct {
             .allocator = allocator,
             .end_line_fn = self.endLine,
             .captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
-            // .retained_captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
         };
     }
 };
@@ -393,7 +394,6 @@ pub const RenderHtmlProcessor = struct {
             .end_document_fn = self.endDocument,
             .end_line_fn = self.endLine,
             .captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
-            // .retained_captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
         };
     }
 };
@@ -403,7 +403,6 @@ pub const NullProcessor = struct {
         return Processor{
             .allocator = allocator,
             .captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
-            // .retained_captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
         };
     }
 };

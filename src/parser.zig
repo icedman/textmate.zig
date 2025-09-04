@@ -19,8 +19,8 @@ const MAX_LINE_LEN = 1024; // and line longer will not be parsed
 const MAX_MATCH_RANGES = 9; // max $1 in grammar files is just 8
 const MAX_SCOPE_LEN = 98;
 
-const MAX_STATE_STACK_DEPTH = 200; // if the state depth is too deep .. just prune (this shouldn't happen though)
-const STATE_STACK_PRUNE = 120; // prune off states from the stack
+const MAX_STATE_STACK_DEPTH = 128; // if the state depth is too deep .. just prune (this shouldn't happen though)
+const STATE_STACK_PRUNE = 64; // prune off states from the stack
 
 // capture is like MatchRange.. but atomic and should be serializable
 pub const ParseCapture = struct {
@@ -130,9 +130,6 @@ const StateContext = struct {
     line: u32 = 0,
     anchor: u32 = 0,
 
-    scope: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN,
-    scope_hash: u64 = 0,
-
     // Parser owns these at regex_map and responsible for oni.Regex.deinit not Self
     rx_while: Regex = Regex{},
     rx_end: Regex = Regex{},
@@ -147,7 +144,6 @@ const StateContext = struct {
         self.line = serial.line;
         self.anchor = serial.anchor;
         self.rx_while = parser.regex_map.get(serial.rx_while) orelse Regex{};
-        self.rx_end = parser.regex_map.get(serial.rx_end) orelse Regex{};
     }
 };
 
@@ -208,14 +204,16 @@ pub const ParseState = struct {
         };
 
         // contentName
-        const name = syntax.getName();
-        @memcpy(sc.scope[0..name.len], name);
+        // const name = syntax.getName();
+        // @memcpy(sc.scope[0..name.len], name);
 
         if (rx.has_references) {
             if (match) |m| {
                 if (syntax.rx_end.expr) |regexs| {
                     var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
                     _ = m.applyReferences(block, regexs, &output);
+
+                    // TODO cache this dynamic regex
                     {
                         if (self.owner.regex_map.get(util.toHash(util.toSlice([MAX_SCOPE_LEN]u8, output)))) |r| {
                             sc.rx_end = r;
@@ -574,17 +572,17 @@ pub const Parser = struct {
     /// TODO matchEnd must also be cached. Also, some end expressions are similar (should also be cached)
     pub fn matchEnd(self: *Parser, state: *ParseState, block: []const u8, start: usize, end: usize) Match {
         // prune if the stack is already too deep like deeply nested blocks
-        // TODO investigate why this happens -- (dump end unmatched blocks, some patterns may be negatively unmatched)
-        // if (state.size() > MAX_STATE_STACK_DEPTH) {
-        //     if (state.stack.items.len >= MAX_STATE_STACK_DEPTH) {
-        //         const new_len = state.stack.items.len - STATE_STACK_PRUNE;
-        //         @memcpy(
-        //             state.stack.items[0..new_len],
-        //             state.stack.items[STATE_STACK_PRUNE..state.stack.items.len],
-        //         );
-        //         state.stack.items.len = new_len;
-        //     }
-        // }
+        // This is merely now guard against intentionally written code 
+        if (state.size() > MAX_STATE_STACK_DEPTH) {
+            if (state.stack.items.len >= MAX_STATE_STACK_DEPTH) {
+                const new_len = state.stack.items.len - STATE_STACK_PRUNE;
+                @memcpy(
+                    state.stack.items[0..new_len],
+                    state.stack.items[STATE_STACK_PRUNE..state.stack.items.len],
+                );
+                state.stack.items.len = new_len;
+            }
+        }
 
         const top = state.top();
         if (top) |t| {

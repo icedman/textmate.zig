@@ -2,6 +2,7 @@
 const std = @import("std");
 const res = @import("resources.zig");
 const ThemeInfo = res.ThemeInfo;
+const Allocator = std.mem.Allocator;
 
 const theme_1 = @embedFile("themes/andromeeda.json");
 const theme_2 = @embedFile("themes/aurora-x.json");
@@ -64,7 +65,7 @@ const theme_58 = @embedFile("themes/vitesse-black.json");
 const theme_59 = @embedFile("themes/vitesse-dark.json");
 const theme_60 = @embedFile("themes/vitesse-light.json");
 
-pub fn listThemes(allocator: std.mem.Allocator, list: *std.ArrayList(ThemeInfo)) !void {
+pub fn listThemes(allocator: Allocator, list: *std.ArrayList(ThemeInfo)) !void {
     {
         const bytes: []const u8 = theme_1[0..theme_1.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
@@ -667,7 +668,7 @@ const grammar_236 = @embedFile("grammars/yaml.json");
 const grammar_237 = @embedFile("grammars/zenscript.json");
 const grammar_238 = @embedFile("grammars/zig.json");
 
-pub fn listGrammars(allocator: std.mem.Allocator, list: *std.ArrayList(GrammarInfo)) !void {
+pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !void {
     {
         const bytes: []const u8 = grammar_1[0..grammar_1.len];
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 2, .inject_only = false };
