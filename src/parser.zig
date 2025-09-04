@@ -32,11 +32,7 @@ pub const ParseCapture = struct {
     scope: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN,
     scope_hash: u64 = 0,
 
-    // open block and strings will be retained across line parsing
-    // syntax_id will be the identifier (not pointers)
-    // by default, every syntax pushed to the stack will be retained until end is matched
     syntax_id: u64 = 0,
-    retain: bool = false,
 };
 
 const Capture = ParseCapture;
@@ -134,6 +130,9 @@ const StateContext = struct {
     line: u32 = 0,
     anchor: u32 = 0,
 
+    scope: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN,
+    scope_hash: u64 = 0,
+
     // Parser owns these at regex_map and responsible for oni.Regex.deinit not Self
     rx_while: Regex = Regex{},
     rx_end: Regex = Regex{},
@@ -207,6 +206,11 @@ pub const ParseState = struct {
             .line = 0,
             .anchor = @intCast(anchor),
         };
+
+        // contentName
+        const name = syntax.getName();
+        @memcpy(sc.scope[0..name.len], name);
+
         if (rx.has_references) {
             if (match) |m| {
                 if (syntax.rx_end.expr) |regexs| {
@@ -844,9 +848,6 @@ pub const Parser = struct {
                                         .syntax_id = match_syn.id,
                                     };
                                     @memcpy(c.scope[0..name.len], name);
-                                    if (pattern_match.regex) |rx| {
-                                        c.retain = (rx.is_string_block or rx.is_comment_block);
-                                    }
                                     proc.openTag(&c);
                                 }
 

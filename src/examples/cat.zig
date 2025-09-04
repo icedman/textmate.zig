@@ -232,6 +232,8 @@ pub fn main() !void {
     var line_writer = std.Io.Writer.Allocating.init(allocator);
     defer line_writer.deinit();
 
+    proc.state = &state;
+
     while (reader.interface.streamDelimiter(&line_writer.writer, '\n')) |_| {
         try line_writer.writer.print("\n", .{});
         const slice: []u8 = line_writer.written();
@@ -256,7 +258,7 @@ pub fn main() !void {
         stdout.print("warmup in {d:.6}s\n", .{warm_elapsed}) catch {};
         stdout.print("done in {d:.6}s\n", .{elapsed}) catch {};
         stdout.print("state depth: {}\n", .{state.size()}) catch {};
-        stdout.print("retained: {}\n", .{proc.retained_captures.items.len}) catch {};
+        // stdout.print("retained: {}\n", .{proc.retained_captures.items.len}) catch {};
         stdout.print("grammar: {s}\n", .{gmr.name}) catch {};
         stdout.print("theme: {s}\n", .{thm.name}) catch {};
         stdout.print("theme atoms: {}\n", .{thm.atoms.count()}) catch {};

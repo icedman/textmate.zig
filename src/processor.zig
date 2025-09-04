@@ -12,19 +12,15 @@ const setBgColorRgb = util.setBgColorRgb;
 const resetColor = util.resetColor;
 
 const ParseCapture = parser.ParseCapture;
+const ParseState = parser.ParseState;
 
 pub const Processor = struct {
     allocator: Allocator,
     block: ?[]const u8 = null,
     theme: ?*theme.Theme = null,
 
-    // TODO remove retained_captures
-    // retained_captures are primarily for block styling (comments and strings) that cross multiple-lines
-    // Idea doesn't work well with continuing parse from a deserialized ParseState
-    // Alternative deduce from the current state
-    // Or move to ParseState so they can be serialized and saved
+    state: ?*ParseState = null,
     captures: std.ArrayList(ParseCapture),
-    retained_captures: std.ArrayList(ParseCapture),
 
     start_document_fn: ?*const fn (*Processor) void = null,
     end_document_fn: ?*const fn (*Processor) void = null,
@@ -49,14 +45,33 @@ pub const Processor = struct {
     pub fn startLine(self: *Processor, block: []const u8) void {
         self.block = block;
         self.captures.clearRetainingCapacity();
-        for (0..self.retained_captures.items.len) |i| {
-            var cap = self.retained_captures.items[i];
-            cap.start = 0;
-            if (self.block) |b| {
-                cap.end = b.len;
+
+        if (self.state) |state| {
+            for (state.stack.items) |context| {
+                if (context.syntax.rx_begin.valid == .Valid) {
+                    if (context.syntax.rx_begin.is_comment_block) {
+                        const name = "comment.block";
+                        var c = ParseCapture{
+                            .start = 0,
+                            .end = block.len,
+                            .syntax_id = context.syntax.id,
+                        };
+                        @memcpy(c.scope[0..name.len], name);
+                        self.captures.append(self.allocator, c) catch {};
+                    } else if (context.syntax.rx_begin.is_string_block) {
+                        const name = "string.quoted";
+                        var c = ParseCapture{
+                            .start = 0,
+                            .end = block.len,
+                            .syntax_id = context.syntax.id,
+                        };
+                        @memcpy(c.scope[0..name.len], name);
+                        self.captures.append(self.allocator, c) catch {};
+                    }
+                }
             }
-            self.captures.append(self.allocator, cap) catch {};
         }
+
         if (self.start_line_fn) |f| {
             f(self, block);
         }
@@ -65,17 +80,6 @@ pub const Processor = struct {
     pub fn endLine(self: *Processor) void {
         if (self.end_line_fn) |f| {
             f(self);
-        }
-
-        // can't be inside both comment and string
-        if (self.retained_captures.items.len > 0) return;
-
-        self.retained_captures.clearRetainingCapacity();
-        for (0..self.captures.items.len) |i| {
-            const cap = self.captures.items[i];
-            if (cap.retain) {
-                self.retained_captures.append(self.allocator, cap) catch {};
-            }
         }
     }
 
@@ -86,9 +90,6 @@ pub const Processor = struct {
                 c.start = b.len;
             }
             c.end = b.len;
-            // c.retain = true;
-            // TODO retain only string and comment blocks?
-            // set retention at Parser, since capture only has syntax_id
         }
         self.captures.append(self.allocator, c.*) catch {};
         if (self.open_tag_fn) |f| {
@@ -112,7 +113,6 @@ pub const Processor = struct {
         while (i > 0) : (i -= 1) {
             if (self.captures.items[i - 1].syntax_id == c.syntax_id) {
                 self.captures.items[i - 1].end = c.end;
-                self.captures.items[i - 1].retain = false;
                 break;
             }
         }
@@ -142,7 +142,7 @@ pub const Processor = struct {
 
     pub fn deinit(self: *Processor) void {
         self.captures.deinit(self.allocator);
-        self.retained_captures.deinit(self.allocator);
+        // self.retained_captures.deinit(self.allocator);
     }
 };
 
@@ -191,7 +191,7 @@ pub const DumpProcessor = struct {
             .close_tag_fn = self.closeTag,
             .capture_fn = self.capture,
             .captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
-            .retained_captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
+            // .retained_captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
         };
     }
 };
@@ -291,7 +291,7 @@ pub const RenderProcessor = struct {
             .allocator = allocator,
             .end_line_fn = self.endLine,
             .captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
-            .retained_captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
+            // .retained_captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
         };
     }
 };
@@ -393,7 +393,7 @@ pub const RenderHtmlProcessor = struct {
             .end_document_fn = self.endDocument,
             .end_line_fn = self.endLine,
             .captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
-            .retained_captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
+            // .retained_captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
         };
     }
 };
@@ -403,7 +403,7 @@ pub const NullProcessor = struct {
         return Processor{
             .allocator = allocator,
             .captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
-            .retained_captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
+            // .retained_captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
         };
     }
 };
