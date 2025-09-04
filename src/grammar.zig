@@ -449,7 +449,7 @@ pub const GrammarLibrary = struct {
                 for (0..item.inject_to_count) |fi| {
                     const np: []const u8 = &item.inject_to[fi];
                     if (std.mem.eql(u8, util.toSlice([]const u8, np), scope_name)) {
-                        // TODO .. load the grammar later (use include?)
+                        // TODO .. lazy load the injecto grammar later (use include?)
                         // add injecto to repository
                         // add include to patterns
                         // if (self.cache.get(item.id)) |g| {
@@ -558,6 +558,26 @@ pub const GrammarLibrary = struct {
                     try self.cache.put(item.id, g);
                     return g;
                 }
+            }
+        }
+        return error.NotFound;
+    }
+
+    pub fn grammarFromId(self: *GrammarLibrary, id: usize) !Grammar {
+        for (self.grammars.items) |item| {
+            if (item.id == id) {
+                if (self.cache.get(item.id)) |g| {
+                    return g;
+                }
+                // std.debug.print("found!\n", .{});
+                if (item.embedded_file) |file| {
+                    return Grammar.initWithData(self.allocator, file);
+                }
+                const p: []const u8 = &item.full_path;
+                var g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
+                try self.applyInjectors(&g);
+                try self.cache.put(item.id, g);
+                return g;
             }
         }
         return error.NotFound;

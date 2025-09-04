@@ -128,12 +128,20 @@ pub fn main() !void {
             };
         }
         if (list) {
-            std.debug.print("\nGrammars ({}):\n", .{gml.grammars.items.len});
+            var injectors: usize = 0;
+            for (gml.grammars.items) |item| {
+                if (item.inject_only) {
+                    injectors += 1;
+                }
+            }
+            std.debug.print("\nGrammars ({}):\n", .{gml.grammars.items.len - injectors});
             for (gml.grammars.items, 0..) |item, i| {
+                if (item.inject_only) {
+                    continue;
+                }
                 std.debug.print("{s}  ", .{item.name});
                 if ((i + 1) % 8 == 0) std.debug.print("\n", .{});
             }
-            std.debug.print("\n", .{});
         }
     }
 
