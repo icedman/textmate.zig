@@ -442,14 +442,22 @@ pub const GrammarLibrary = struct {
     }
 
     pub fn applyInjectors(self: *GrammarLibrary, grammar: *Grammar) !void {
-        _ = grammar;
-        for (self.grammars.items) |item| {
-            if (!item.inject_only) continue;
-            var ig: Grammar = undefined;
-            if (self.cache.get(item.id)) |g| {
-                ig = g;
+        if (grammar.syntax) |syntax| {
+            const scope_name = syntax.scope_name;
+            for (self.grammars.items) |item| {
+                if (!item.inject_only) continue;
+                for (0..item.inject_to_count) |fi| {
+                    const np: []const u8 = &item.inject_to[fi];
+                    if (std.mem.eql(u8, util.toSlice([]const u8, np), scope_name)) {
+                        // TODO .. load the grammar later (use include?)
+                        // add injecto to repository
+                        // add include to patterns
+                        // if (self.cache.get(item.id)) |g| {
+                        // } else {
+                        // }
+                    }
+                }
             }
-
         }
     }
 
@@ -581,6 +589,7 @@ pub const Grammar = struct {
     arena: ArenaAllocator,
 
     name: []const u8,
+    scope_name: []const u8,
     syntax: ?*Syntax = null,
 
     inject_to: std.ArrayList([]const u8),
@@ -623,6 +632,7 @@ pub const Grammar = struct {
             .inject_to = try std.ArrayList([]const u8).initCapacity(allocator, 2048),
             .arena = ArenaAllocator.init(allocator),
             .name = "",
+            .scope_name = "",
         };
 
         // anything associated with reading the json
@@ -636,7 +646,8 @@ pub const Grammar = struct {
         const obj = root.object;
 
         // grammar meta
-        const name = obj.get("name").?.string;
+        const name = if (obj.get("name")) |v| v.string else "";
+        const scope_name = if (obj.get("scope_name")) |v| v.string else "";
         const syntax = try Syntax.init(aa, root);
 
         if (obj.get("injectTo")) |inject| {
@@ -646,8 +657,10 @@ pub const Grammar = struct {
         }
 
         grammar.name = name;
+        grammar.scope_name = scope_name;
         grammar.syntax = syntax;
         grammar.parsed = parsed;
+        syntax.scope_name = scope_name;
         return grammar;
     }
 };

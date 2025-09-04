@@ -572,7 +572,7 @@ pub const Parser = struct {
     /// TODO matchEnd must also be cached. Also, some end expressions are similar (should also be cached)
     pub fn matchEnd(self: *Parser, state: *ParseState, block: []const u8, start: usize, end: usize) Match {
         // prune if the stack is already too deep like deeply nested blocks
-        // This is merely now guard against intentionally written code 
+        // This is merely now guard against intentionally written code
         if (state.size() > MAX_STATE_STACK_DEPTH) {
             if (state.stack.items.len >= MAX_STATE_STACK_DEPTH) {
                 const new_len = state.stack.items.len - STATE_STACK_PRUNE;
