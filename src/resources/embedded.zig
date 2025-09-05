@@ -70,360 +70,420 @@ pub fn listThemes(allocator: Allocator, list: *std.ArrayList(ThemeInfo)) !void {
         const bytes: []const u8 = theme_1[0..theme_1.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."andromeeda".len], "andromeeda");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_2[0..theme_2.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."aurora-x".len], "aurora-x");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_3[0..theme_3.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."ayu-dark".len], "ayu-dark");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_4[0..theme_4.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."catppuccin-frappe".len], "catppuccin-frappe");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_5[0..theme_5.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."catppuccin-latte".len], "catppuccin-latte");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_6[0..theme_6.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."catppuccin-macchiato".len], "catppuccin-macchiato");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_7[0..theme_7.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."catppuccin-mocha".len], "catppuccin-mocha");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_8[0..theme_8.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."dark-plus".len], "dark-plus");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_9[0..theme_9.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."dracula-soft".len], "dracula-soft");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_10[0..theme_10.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."dracula".len], "dracula");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_11[0..theme_11.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."everforest-dark".len], "everforest-dark");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_12[0..theme_12.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."everforest-light".len], "everforest-light");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_13[0..theme_13.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."github-dark-default".len], "github-dark-default");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_14[0..theme_14.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."github-dark-dimmed".len], "github-dark-dimmed");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_15[0..theme_15.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."github-dark-high-contrast".len], "github-dark-high-contrast");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_16[0..theme_16.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."github-dark".len], "github-dark");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_17[0..theme_17.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."github-light-default".len], "github-light-default");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_18[0..theme_18.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."github-light-high-contrast".len], "github-light-high-contrast");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_19[0..theme_19.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."github-light".len], "github-light");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_20[0..theme_20.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."gruvbox-dark-hard".len], "gruvbox-dark-hard");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_21[0..theme_21.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."gruvbox-dark-medium".len], "gruvbox-dark-medium");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_22[0..theme_22.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."gruvbox-dark-soft".len], "gruvbox-dark-soft");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_23[0..theme_23.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."gruvbox-light-hard".len], "gruvbox-light-hard");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_24[0..theme_24.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."gruvbox-light-medium".len], "gruvbox-light-medium");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_25[0..theme_25.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."gruvbox-light-soft".len], "gruvbox-light-soft");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_26[0..theme_26.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."houston".len], "houston");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_27[0..theme_27.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."kanagawa-dragon".len], "kanagawa-dragon");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_28[0..theme_28.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."kanagawa-lotus".len], "kanagawa-lotus");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_29[0..theme_29.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."kanagawa-wave".len], "kanagawa-wave");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_30[0..theme_30.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."laserwave".len], "laserwave");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_31[0..theme_31.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."light-plus".len], "light-plus");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_32[0..theme_32.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."material-theme-darker".len], "material-theme-darker");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_33[0..theme_33.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."material-theme-lighter".len], "material-theme-lighter");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_34[0..theme_34.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."material-theme-ocean".len], "material-theme-ocean");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_35[0..theme_35.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."material-theme-palenight".len], "material-theme-palenight");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_36[0..theme_36.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."material-theme".len], "material-theme");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_37[0..theme_37.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."min-dark".len], "min-dark");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_38[0..theme_38.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."min-light".len], "min-light");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_39[0..theme_39.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."monokai".len], "monokai");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_40[0..theme_40.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."night-owl".len], "night-owl");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_41[0..theme_41.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."nord".len], "nord");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_42[0..theme_42.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."one-dark-pro".len], "one-dark-pro");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_43[0..theme_43.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."one-light".len], "one-light");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_44[0..theme_44.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."plastic".len], "plastic");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_45[0..theme_45.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."poimandres".len], "poimandres");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_46[0..theme_46.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."red".len], "red");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_47[0..theme_47.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."rose-pine-dawn".len], "rose-pine-dawn");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_48[0..theme_48.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."rose-pine-moon".len], "rose-pine-moon");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_49[0..theme_49.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."rose-pine".len], "rose-pine");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_50[0..theme_50.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."slack-dark".len], "slack-dark");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_51[0..theme_51.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."slack-ochin".len], "slack-ochin");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_52[0..theme_52.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."snazzy-light".len], "snazzy-light");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_53[0..theme_53.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."solarized-dark".len], "solarized-dark");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_54[0..theme_54.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."solarized-light".len], "solarized-light");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_55[0..theme_55.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."synthwave-84".len], "synthwave-84");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_56[0..theme_56.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."tokyo-night".len], "tokyo-night");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_57[0..theme_57.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."vesper".len], "vesper");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_58[0..theme_58.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."vitesse-black".len], "vitesse-black");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_59[0..theme_59.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."vitesse-dark".len], "vitesse-dark");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
     {
         const bytes: []const u8 = theme_60[0..theme_60.len];
         var ti = ThemeInfo{ .embedded_file = bytes };
         @memcpy(ti.name[0.."vitesse-light".len], "vitesse-light");
+        ti.id = list.items.len + 1;
         try list.append(allocator, ti);
     }
 }
@@ -676,6 +736,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."source.abap".len], "source.abap");
         @memcpy(gi.file_types[0][0.."abap".len], "abap");
         @memcpy(gi.file_types[1][0.."ABAP".len], "ABAP");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -684,6 +745,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."actionscript-3".len], "actionscript-3");
         @memcpy(gi.scope_name[0.."source.actionscript.3".len], "source.actionscript.3");
         @memcpy(gi.file_types[0][0.."as".len], "as");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -691,6 +753,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."ada".len], "ada");
         @memcpy(gi.scope_name[0.."source.ada".len], "source.ada");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -698,6 +761,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."angular-expression".len], "angular-expression");
         @memcpy(gi.scope_name[0.."expression.ng".len], "expression.ng");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -705,6 +769,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."angular-html".len], "angular-html");
         @memcpy(gi.scope_name[0.."text.html.derivative.ng".len], "text.html.derivative.ng");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -713,6 +778,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."angular-inline-style".len], "angular-inline-style");
         @memcpy(gi.scope_name[0.."inline-styles.ng".len], "inline-styles.ng");
         @memcpy(gi.inject_to[0][0.."source.ts.ng".len], "source.ts.ng");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -721,6 +787,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."angular-inline-template".len], "angular-inline-template");
         @memcpy(gi.scope_name[0.."inline-template.ng".len], "inline-template.ng");
         @memcpy(gi.inject_to[0][0.."source.ts.ng".len], "source.ts.ng");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -731,6 +798,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.inject_to[0][0.."text.html.derivative".len], "text.html.derivative");
         @memcpy(gi.inject_to[1][0.."text.html.derivative.ng".len], "text.html.derivative.ng");
         @memcpy(gi.inject_to[2][0.."source.ts.ng".len], "source.ts.ng");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -741,6 +809,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.inject_to[0][0.."text.html.derivative".len], "text.html.derivative");
         @memcpy(gi.inject_to[1][0.."text.html.derivative.ng".len], "text.html.derivative.ng");
         @memcpy(gi.inject_to[2][0.."source.ts.ng".len], "source.ts.ng");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -751,6 +820,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.inject_to[0][0.."text.html.derivative".len], "text.html.derivative");
         @memcpy(gi.inject_to[1][0.."text.html.derivative.ng".len], "text.html.derivative.ng");
         @memcpy(gi.inject_to[2][0.."source.ts.ng".len], "source.ts.ng");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -758,6 +828,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."angular-ts".len], "angular-ts");
         @memcpy(gi.scope_name[0.."source.ts.ng".len], "source.ts.ng");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -773,6 +844,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[5][0.."htgroups".len], "htgroups");
         @memcpy(gi.file_types[6][0.."HTGROUPS".len], "HTGROUPS");
         @memcpy(gi.file_types[7][0.."htpasswd".len], "htpasswd");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -783,6 +855,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[0][0.."apex".len], "apex");
         @memcpy(gi.file_types[1][0.."cls".len], "cls");
         @memcpy(gi.file_types[2][0.."trigger".len], "trigger");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -798,6 +871,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[5][0.."apln".len], "apln");
         @memcpy(gi.file_types[6][0.."aplo".len], "aplo");
         @memcpy(gi.file_types[7][0.."dyalog".len], "dyalog");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -808,6 +882,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[0][0.."applescript".len], "applescript");
         @memcpy(gi.file_types[1][0.."scpt".len], "scpt");
         @memcpy(gi.file_types[2][0.."script editor".len], "script editor");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -816,6 +891,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."ara".len], "ara");
         @memcpy(gi.scope_name[0.."source.ara".len], "source.ara");
         @memcpy(gi.file_types[0][0.."ara".len], "ara");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -828,6 +904,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[2][0.."adoc".len], "adoc");
         @memcpy(gi.file_types[3][0.."asciidoc".len], "asciidoc");
         @memcpy(gi.file_types[4][0.."adoc.txt".len], "adoc.txt");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -840,6 +917,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[2][0.."yasm".len], "yasm");
         @memcpy(gi.file_types[3][0.."inc".len], "inc");
         @memcpy(gi.file_types[4][0.."s".len], "s");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -848,6 +926,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."astro".len], "astro");
         @memcpy(gi.scope_name[0.."source.astro".len], "source.astro");
         @memcpy(gi.file_types[0][0.."astro".len], "astro");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -856,6 +935,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."awk".len], "awk");
         @memcpy(gi.scope_name[0.."source.awk".len], "source.awk");
         @memcpy(gi.file_types[0][0.."awk".len], "awk");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -864,6 +944,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."ballerina".len], "ballerina");
         @memcpy(gi.scope_name[0.."source.ballerina".len], "source.ballerina");
         @memcpy(gi.file_types[0][0.."bal".len], "bal");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -871,6 +952,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."bat".len], "bat");
         @memcpy(gi.scope_name[0.."source.batchfile".len], "source.batchfile");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -879,6 +961,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."beancount".len], "beancount");
         @memcpy(gi.scope_name[0.."text.beancount".len], "text.beancount");
         @memcpy(gi.file_types[0][0.."beancount".len], "beancount");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -886,6 +969,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."berry".len], "berry");
         @memcpy(gi.scope_name[0.."source.berry".len], "source.berry");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -893,6 +977,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."bibtex".len], "bibtex");
         @memcpy(gi.scope_name[0.."text.bibtex".len], "text.bibtex");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -902,6 +987,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."source.bicep".len], "source.bicep");
         @memcpy(gi.file_types[0][0..".bicep".len], ".bicep");
         @memcpy(gi.file_types[1][0..".bicepparam".len], ".bicepparam");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -910,6 +996,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."blade".len], "blade");
         @memcpy(gi.scope_name[0.."text.html.php.blade".len], "text.html.php.blade");
         @memcpy(gi.file_types[0][0.."blade.php".len], "blade.php");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -919,6 +1006,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."source.bsl".len], "source.bsl");
         @memcpy(gi.file_types[0][0.."bsl".len], "bsl");
         @memcpy(gi.file_types[1][0.."os".len], "os");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -926,6 +1014,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."c".len], "c");
         @memcpy(gi.scope_name[0.."source.c".len], "source.c");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -933,6 +1022,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."cadence".len], "cadence");
         @memcpy(gi.scope_name[0.."source.cadence".len], "source.cadence");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -940,6 +1030,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."cairo".len], "cairo");
         @memcpy(gi.scope_name[0.."source.cairo0".len], "source.cairo0");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -947,6 +1038,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."clarity".len], "clarity");
         @memcpy(gi.scope_name[0.."source.clar".len], "source.clar");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -954,6 +1046,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."clojure".len], "clojure");
         @memcpy(gi.scope_name[0.."source.clojure".len], "source.clojure");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -963,6 +1056,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."source.cmake".len], "source.cmake");
         @memcpy(gi.file_types[0][0.."cmake".len], "cmake");
         @memcpy(gi.file_types[1][0.."CMakeLists.txt".len], "CMakeLists.txt");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -978,6 +1072,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[5][0.."cblsrce".len], "cblsrce");
         @memcpy(gi.file_types[6][0.."cblcpy".len], "cblcpy");
         @memcpy(gi.file_types[7][0.."lks".len], "lks");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -985,6 +1080,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."codeowners".len], "codeowners");
         @memcpy(gi.scope_name[0.."text.codeowners".len], "text.codeowners");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -994,6 +1090,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."source.ql".len], "source.ql");
         @memcpy(gi.file_types[0][0.."ql".len], "ql");
         @memcpy(gi.file_types[1][0.."qll".len], "qll");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1001,6 +1098,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."coffee".len], "coffee");
         @memcpy(gi.scope_name[0.."source.coffee".len], "source.coffee");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1014,6 +1112,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[3][0.."cl".len], "cl");
         @memcpy(gi.file_types[4][0.."asd".len], "asd");
         @memcpy(gi.file_types[5][0.."asdf".len], "asdf");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1022,6 +1121,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."coq".len], "coq");
         @memcpy(gi.scope_name[0.."source.coq".len], "source.coq");
         @memcpy(gi.file_types[0][0.."v".len], "v");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1029,6 +1129,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."cpp-macro".len], "cpp-macro");
         @memcpy(gi.scope_name[0.."source.cpp.embedded.macro".len], "source.cpp.embedded.macro");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1036,6 +1137,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."cpp".len], "cpp");
         @memcpy(gi.scope_name[0.."source.cpp".len], "source.cpp");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1044,6 +1146,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."crystal".len], "crystal");
         @memcpy(gi.scope_name[0.."source.crystal".len], "source.crystal");
         @memcpy(gi.file_types[0][0.."cr".len], "cr");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1051,6 +1154,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."csharp".len], "csharp");
         @memcpy(gi.scope_name[0.."source.cs".len], "source.cs");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1058,6 +1162,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."css".len], "css");
         @memcpy(gi.scope_name[0.."source.css".len], "source.css");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1066,6 +1171,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."csv".len], "csv");
         @memcpy(gi.scope_name[0.."text.csv".len], "text.csv");
         @memcpy(gi.file_types[0][0.."csv".len], "csv");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1074,6 +1180,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."cue".len], "cue");
         @memcpy(gi.scope_name[0.."source.cue".len], "source.cue");
         @memcpy(gi.file_types[0][0.."cue".len], "cue");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1084,6 +1191,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[0][0.."cql".len], "cql");
         @memcpy(gi.file_types[1][0.."cyp".len], "cyp");
         @memcpy(gi.file_types[2][0.."cypher".len], "cypher");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1094,6 +1202,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[0][0.."d".len], "d");
         @memcpy(gi.file_types[1][0.."di".len], "di");
         @memcpy(gi.file_types[2][0.."dpp".len], "dpp");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1101,6 +1210,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."dart".len], "dart");
         @memcpy(gi.scope_name[0.."source.dart".len], "source.dart");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1108,6 +1218,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."dax".len], "dax");
         @memcpy(gi.scope_name[0.."source.dax".len], "source.dax");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1115,6 +1226,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."desktop".len], "desktop");
         @memcpy(gi.scope_name[0.."source.desktop".len], "source.desktop");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1122,6 +1234,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."diff".len], "diff");
         @memcpy(gi.scope_name[0.."source.diff".len], "source.diff");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1129,6 +1242,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."docker".len], "docker");
         @memcpy(gi.scope_name[0.."source.dockerfile".len], "source.dockerfile");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1136,6 +1250,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."dotenv".len], "dotenv");
         @memcpy(gi.scope_name[0.."source.dotenv".len], "source.dotenv");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1145,6 +1260,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."source.dm".len], "source.dm");
         @memcpy(gi.file_types[0][0.."dm".len], "dm");
         @memcpy(gi.file_types[1][0.."dme".len], "dme");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1152,6 +1268,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."edge".len], "edge");
         @memcpy(gi.scope_name[0.."text.html.edge".len], "text.html.edge");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1161,6 +1278,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."source.elixir".len], "source.elixir");
         @memcpy(gi.file_types[0][0.."ex".len], "ex");
         @memcpy(gi.file_types[1][0.."exs".len], "exs");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1169,6 +1287,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."elm".len], "elm");
         @memcpy(gi.scope_name[0.."source.elm".len], "source.elm");
         @memcpy(gi.file_types[0][0.."elm".len], "elm");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1184,6 +1303,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[5][0.."emacs".len], "emacs");
         @memcpy(gi.file_types[6][0.."emacs.desktop".len], "emacs.desktop");
         @memcpy(gi.file_types[7][0.."abbrev_defs".len], "abbrev_defs");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1194,6 +1314,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[0][0.."erb".len], "erb");
         @memcpy(gi.file_types[1][0.."rhtml".len], "rhtml");
         @memcpy(gi.file_types[2][0.."html.erb".len], "html.erb");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1206,6 +1327,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[2][0.."hrl".len], "hrl");
         @memcpy(gi.file_types[3][0.."xrl".len], "xrl");
         @memcpy(gi.file_types[4][0.."yrl".len], "yrl");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1223,6 +1345,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[7][0.."php".len], "php");
         @memcpy(gi.inject_to[0][0.."source.ts".len], "source.ts");
         @memcpy(gi.inject_to[1][0.."source.js".len], "source.js");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1240,6 +1363,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[7][0.."php".len], "php");
         @memcpy(gi.inject_to[0][0.."source.ts".len], "source.ts");
         @memcpy(gi.inject_to[1][0.."source.js".len], "source.js");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1257,6 +1381,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[7][0.."php".len], "php");
         @memcpy(gi.inject_to[0][0.."source.ts".len], "source.ts");
         @memcpy(gi.inject_to[1][0.."source.js".len], "source.js");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1274,6 +1399,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[7][0.."php".len], "php");
         @memcpy(gi.inject_to[0][0.."source.ts".len], "source.ts");
         @memcpy(gi.inject_to[1][0.."source.js".len], "source.js");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1291,6 +1417,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[7][0.."php".len], "php");
         @memcpy(gi.inject_to[0][0.."source.ts".len], "source.ts");
         @memcpy(gi.inject_to[1][0.."source.js".len], "source.js");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1298,6 +1425,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."fennel".len], "fennel");
         @memcpy(gi.scope_name[0.."source.fnl".len], "source.fnl");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1306,6 +1434,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."fish".len], "fish");
         @memcpy(gi.scope_name[0.."source.fish".len], "source.fish");
         @memcpy(gi.file_types[0][0.."fish".len], "fish");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1313,6 +1442,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."fluent".len], "fluent");
         @memcpy(gi.scope_name[0.."source.ftl".len], "source.ftl");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1326,6 +1456,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[3][0.."F77".len], "F77");
         @memcpy(gi.file_types[4][0.."for".len], "for");
         @memcpy(gi.file_types[5][0.."FOR".len], "FOR");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1341,6 +1472,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[5][0.."F03".len], "F03");
         @memcpy(gi.file_types[6][0.."f08".len], "f08");
         @memcpy(gi.file_types[7][0.."F08".len], "F08");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1348,6 +1480,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."fsharp".len], "fsharp");
         @memcpy(gi.scope_name[0.."source.fsharp".len], "source.fsharp");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1355,6 +1488,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."gdresource".len], "gdresource");
         @memcpy(gi.scope_name[0.."source.gdresource".len], "source.gdresource");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1363,6 +1497,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."gdscript".len], "gdscript");
         @memcpy(gi.scope_name[0.."source.gdscript".len], "source.gdscript");
         @memcpy(gi.file_types[0][0.."gd".len], "gd");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1371,6 +1506,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."gdshader".len], "gdshader");
         @memcpy(gi.scope_name[0.."source.gdshader".len], "source.gdshader");
         @memcpy(gi.file_types[0][0.."gdshader".len], "gdshader");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1379,6 +1515,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."genie".len], "genie");
         @memcpy(gi.scope_name[0.."source.genie".len], "source.genie");
         @memcpy(gi.file_types[0][0.."gs".len], "gs");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1387,6 +1524,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."gherkin".len], "gherkin");
         @memcpy(gi.scope_name[0.."text.gherkin.feature".len], "text.gherkin.feature");
         @memcpy(gi.file_types[0][0.."feature".len], "feature");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1394,6 +1532,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."git-commit".len], "git-commit");
         @memcpy(gi.scope_name[0.."text.git-commit".len], "text.git-commit");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1401,6 +1540,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."git-rebase".len], "git-rebase");
         @memcpy(gi.scope_name[0.."text.git-rebase".len], "text.git-rebase");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1409,6 +1549,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."gleam".len], "gleam");
         @memcpy(gi.scope_name[0.."source.gleam".len], "source.gleam");
         @memcpy(gi.file_types[0][0.."gleam".len], "gleam");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1416,6 +1557,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."glimmer-js".len], "glimmer-js");
         @memcpy(gi.scope_name[0.."source.gjs".len], "source.gjs");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1423,6 +1565,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."glimmer-ts".len], "glimmer-ts");
         @memcpy(gi.scope_name[0.."source.gts".len], "source.gts");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1438,6 +1581,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[5][0.."gsh".len], "gsh");
         @memcpy(gi.file_types[6][0.."vshader".len], "vshader");
         @memcpy(gi.file_types[7][0.."fshader".len], "fshader");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1449,6 +1593,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[1][0.."plt".len], "plt");
         @memcpy(gi.file_types[2][0.."plot".len], "plot");
         @memcpy(gi.file_types[3][0.."gnuplot".len], "gnuplot");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1456,6 +1601,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."go".len], "go");
         @memcpy(gi.scope_name[0.."source.go".len], "source.go");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1467,6 +1613,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[1][0.."graphqls".len], "graphqls");
         @memcpy(gi.file_types[2][0.."gql".len], "gql");
         @memcpy(gi.file_types[3][0.."graphcool".len], "graphcool");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1474,6 +1621,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."groovy".len], "groovy");
         @memcpy(gi.scope_name[0.."source.groovy".len], "source.groovy");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1484,6 +1632,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[0][0.."hh".len], "hh");
         @memcpy(gi.file_types[1][0.."php".len], "php");
         @memcpy(gi.file_types[2][0.."hack".len], "hack");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1493,6 +1642,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."text.haml".len], "text.haml");
         @memcpy(gi.file_types[0][0.."haml".len], "haml");
         @memcpy(gi.file_types[1][0.."html.haml".len], "html.haml");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1500,6 +1650,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."handlebars".len], "handlebars");
         @memcpy(gi.scope_name[0.."text.html.handlebars".len], "text.html.handlebars");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1510,6 +1661,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[0][0.."hs".len], "hs");
         @memcpy(gi.file_types[1][0.."hs-boot".len], "hs-boot");
         @memcpy(gi.file_types[2][0.."hsig".len], "hsig");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1519,6 +1671,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."source.hx".len], "source.hx");
         @memcpy(gi.file_types[0][0.."hx".len], "hx");
         @memcpy(gi.file_types[1][0.."dump".len], "dump");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1527,6 +1680,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."hcl".len], "hcl");
         @memcpy(gi.scope_name[0.."source.hcl".len], "source.hcl");
         @memcpy(gi.file_types[0][0.."hcl".len], "hcl");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1535,6 +1689,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."hjson".len], "hjson");
         @memcpy(gi.scope_name[0.."source.hjson".len], "source.hjson");
         @memcpy(gi.file_types[0][0.."hjson".len], "hjson");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1542,6 +1697,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."hlsl".len], "hlsl");
         @memcpy(gi.scope_name[0.."source.hlsl".len], "source.hlsl");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1549,6 +1705,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."html-derivative".len], "html-derivative");
         @memcpy(gi.scope_name[0.."text.html.derivative".len], "text.html.derivative");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1556,6 +1713,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."html".len], "html");
         @memcpy(gi.scope_name[0.."text.html.basic".len], "text.html.basic");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1565,6 +1723,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."source.http".len], "source.http");
         @memcpy(gi.file_types[0][0.."http".len], "http");
         @memcpy(gi.file_types[1][0.."rest".len], "rest");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1573,6 +1732,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."hxml".len], "hxml");
         @memcpy(gi.scope_name[0.."source.hxml".len], "source.hxml");
         @memcpy(gi.file_types[0][0.."hxml".len], "hxml");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1580,6 +1740,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."hy".len], "hy");
         @memcpy(gi.scope_name[0.."source.hy".len], "source.hy");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1589,6 +1750,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."source.imba".len], "source.imba");
         @memcpy(gi.file_types[0][0.."imba".len], "imba");
         @memcpy(gi.file_types[1][0.."imba2".len], "imba2");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1596,6 +1758,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."ini".len], "ini");
         @memcpy(gi.scope_name[0.."source.ini".len], "source.ini");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1603,6 +1766,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."java".len], "java");
         @memcpy(gi.scope_name[0.."source.java".len], "source.java");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1610,6 +1774,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."javascript".len], "javascript");
         @memcpy(gi.scope_name[0.."source.js".len], "source.js");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1617,6 +1782,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."jinja-html".len], "jinja-html");
         @memcpy(gi.scope_name[0.."text.html.jinja".len], "text.html.jinja");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1624,6 +1790,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."jinja".len], "jinja");
         @memcpy(gi.scope_name[0.."source.jinja".len], "source.jinja");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1632,6 +1799,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."jison".len], "jison");
         @memcpy(gi.scope_name[0.."source.jison".len], "source.jison");
         @memcpy(gi.file_types[0][0.."jison".len], "jison");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1639,6 +1807,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."json".len], "json");
         @memcpy(gi.scope_name[0.."source.json".len], "source.json");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1647,6 +1816,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."json5".len], "json5");
         @memcpy(gi.scope_name[0.."source.json5".len], "source.json5");
         @memcpy(gi.file_types[0][0.."json5".len], "json5");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1654,6 +1824,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."jsonc".len], "jsonc");
         @memcpy(gi.scope_name[0.."source.json.comments".len], "source.json.comments");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1661,6 +1832,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."jsonl".len], "jsonl");
         @memcpy(gi.scope_name[0.."source.json.lines".len], "source.json.lines");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1668,6 +1840,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."jsonnet".len], "jsonnet");
         @memcpy(gi.scope_name[0.."source.jsonnet".len], "source.jsonnet");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1677,6 +1850,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."source.jssm".len], "source.jssm");
         @memcpy(gi.file_types[0][0.."jssm".len], "jssm");
         @memcpy(gi.file_types[1][0.."jssm_state".len], "jssm_state");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1684,6 +1858,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."jsx".len], "jsx");
         @memcpy(gi.scope_name[0.."source.js.jsx".len], "source.js.jsx");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1691,6 +1866,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."julia".len], "julia");
         @memcpy(gi.scope_name[0.."source.julia".len], "source.julia");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1700,6 +1876,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."source.kotlin".len], "source.kotlin");
         @memcpy(gi.file_types[0][0.."kt".len], "kt");
         @memcpy(gi.file_types[1][0.."kts".len], "kts");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1710,6 +1887,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[0][0.."csl".len], "csl");
         @memcpy(gi.file_types[1][0.."kusto".len], "kusto");
         @memcpy(gi.file_types[2][0.."kql".len], "kql");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1717,6 +1895,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."latex".len], "latex");
         @memcpy(gi.scope_name[0.."text.tex.latex".len], "text.tex.latex");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1724,6 +1903,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."lean".len], "lean");
         @memcpy(gi.scope_name[0.."source.lean4".len], "source.lean4");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1731,6 +1911,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."less".len], "less");
         @memcpy(gi.scope_name[0.."source.css.less".len], "source.css.less");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1739,6 +1920,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."liquid".len], "liquid");
         @memcpy(gi.scope_name[0.."text.html.liquid".len], "text.html.liquid");
         @memcpy(gi.file_types[0][0.."liquid".len], "liquid");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1746,6 +1928,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."llvm".len], "llvm");
         @memcpy(gi.scope_name[0.."source.llvm".len], "source.llvm");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1754,6 +1937,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."log".len], "log");
         @memcpy(gi.scope_name[0.."text.log".len], "text.log");
         @memcpy(gi.file_types[0][0.."log".len], "log");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1761,6 +1945,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."logo".len], "logo");
         @memcpy(gi.scope_name[0.."source.logo".len], "source.logo");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1768,6 +1953,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."lua".len], "lua");
         @memcpy(gi.scope_name[0.."source.lua".len], "source.lua");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1776,6 +1962,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."luau".len], "luau");
         @memcpy(gi.scope_name[0.."source.luau".len], "source.luau");
         @memcpy(gi.file_types[0][0.."luau".len], "luau");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1783,6 +1970,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."make".len], "make");
         @memcpy(gi.scope_name[0.."source.makefile".len], "source.makefile");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1791,6 +1979,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."markdown-vue".len], "markdown-vue");
         @memcpy(gi.scope_name[0.."markdown.vue.codeblock".len], "markdown.vue.codeblock");
         @memcpy(gi.inject_to[0][0.."text.html.markdown".len], "text.html.markdown");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1798,6 +1987,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."markdown".len], "markdown");
         @memcpy(gi.scope_name[0.."text.html.markdown".len], "text.html.markdown");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1806,6 +1996,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."marko".len], "marko");
         @memcpy(gi.scope_name[0.."text.marko".len], "text.marko");
         @memcpy(gi.file_types[0][0.."marko".len], "marko");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1814,6 +2005,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."matlab".len], "matlab");
         @memcpy(gi.scope_name[0.."source.matlab".len], "source.matlab");
         @memcpy(gi.file_types[0][0.."m".len], "m");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1821,6 +2013,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."mdc".len], "mdc");
         @memcpy(gi.scope_name[0.."text.markdown.mdc.standalone".len], "text.markdown.mdc.standalone");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1829,6 +2022,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."mdx".len], "mdx");
         @memcpy(gi.scope_name[0.."source.mdx".len], "source.mdx");
         @memcpy(gi.file_types[0][0.."mdx".len], "mdx");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1836,6 +2030,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."mermaid".len], "mermaid");
         @memcpy(gi.scope_name[0.."markdown.mermaid.codeblock".len], "markdown.mermaid.codeblock");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1847,6 +2042,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[1][0.."mips".len], "mips");
         @memcpy(gi.file_types[2][0.."spim".len], "spim");
         @memcpy(gi.file_types[3][0.."asm".len], "asm");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1854,6 +2050,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."mojo".len], "mojo");
         @memcpy(gi.scope_name[0.."source.mojo".len], "source.mojo");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1861,6 +2058,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."move".len], "move");
         @memcpy(gi.scope_name[0.."source.move".len], "source.move");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1868,6 +2066,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."narrat".len], "narrat");
         @memcpy(gi.scope_name[0.."source.narrat".len], "source.narrat");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1875,6 +2074,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."nextflow".len], "nextflow");
         @memcpy(gi.scope_name[0.."source.nextflow".len], "source.nextflow");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1890,6 +2090,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[5][0.."fastcgi_params".len], "fastcgi_params");
         @memcpy(gi.file_types[6][0.."scgi_params".len], "scgi_params");
         @memcpy(gi.file_types[7][0.."uwsgi_params".len], "uwsgi_params");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1898,6 +2099,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."nim".len], "nim");
         @memcpy(gi.scope_name[0.."source.nim".len], "source.nim");
         @memcpy(gi.file_types[0][0.."nim".len], "nim");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1906,6 +2108,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."nix".len], "nix");
         @memcpy(gi.scope_name[0.."source.nix".len], "source.nix");
         @memcpy(gi.file_types[0][0.."nix".len], "nix");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1913,6 +2116,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."nushell".len], "nushell");
         @memcpy(gi.scope_name[0.."source.nushell".len], "source.nushell");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1920,6 +2124,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."objective-c".len], "objective-c");
         @memcpy(gi.scope_name[0.."source.objc".len], "source.objc");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1927,6 +2132,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."objective-cpp".len], "objective-cpp");
         @memcpy(gi.scope_name[0.."source.objcpp".len], "source.objcpp");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1936,6 +2142,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."source.ocaml".len], "source.ocaml");
         @memcpy(gi.file_types[0][0..".ml".len], ".ml");
         @memcpy(gi.file_types[1][0..".mli".len], ".mli");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1951,6 +2158,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[5][0.."dpr".len], "dpr");
         @memcpy(gi.file_types[6][0.."dpk".len], "dpk");
         @memcpy(gi.file_types[7][0.."lfm".len], "lfm");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1958,6 +2166,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."perl".len], "perl");
         @memcpy(gi.scope_name[0.."source.perl".len], "source.perl");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1965,6 +2174,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."php".len], "php");
         @memcpy(gi.scope_name[0.."source.php".len], "source.php");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1980,6 +2190,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[5][0.."pkb".len], "pkb");
         @memcpy(gi.file_types[6][0.."pck".len], "pck");
         @memcpy(gi.file_types[7][0.."pls".len], "pls");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1990,6 +2201,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[0][0.."po".len], "po");
         @memcpy(gi.file_types[1][0.."pot".len], "pot");
         @memcpy(gi.file_types[2][0.."potx".len], "potx");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -1997,6 +2209,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."polar".len], "polar");
         @memcpy(gi.scope_name[0.."source.polar".len], "source.polar");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2006,6 +2219,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."source.css.postcss".len], "source.css.postcss");
         @memcpy(gi.file_types[0][0.."pcss".len], "pcss");
         @memcpy(gi.file_types[1][0.."postcss".len], "postcss");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2015,6 +2229,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."source.powerquery".len], "source.powerquery");
         @memcpy(gi.file_types[0][0.."pq".len], "pq");
         @memcpy(gi.file_types[1][0.."pqm".len], "pqm");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2022,6 +2237,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."powershell".len], "powershell");
         @memcpy(gi.scope_name[0.."source.powershell".len], "source.powershell");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2030,6 +2246,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."prisma".len], "prisma");
         @memcpy(gi.scope_name[0.."source.prisma".len], "source.prisma");
         @memcpy(gi.file_types[0][0.."prisma".len], "prisma");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2039,6 +2256,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."source.prolog".len], "source.prolog");
         @memcpy(gi.file_types[0][0.."pl".len], "pl");
         @memcpy(gi.file_types[1][0.."pro".len], "pro");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2047,6 +2265,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."proto".len], "proto");
         @memcpy(gi.scope_name[0.."source.proto".len], "source.proto");
         @memcpy(gi.file_types[0][0.."proto".len], "proto");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2054,6 +2273,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."pug".len], "pug");
         @memcpy(gi.scope_name[0.."text.pug".len], "text.pug");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2062,6 +2282,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."puppet".len], "puppet");
         @memcpy(gi.scope_name[0.."source.puppet".len], "source.puppet");
         @memcpy(gi.file_types[0][0.."pp".len], "pp");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2070,6 +2291,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."purescript".len], "purescript");
         @memcpy(gi.scope_name[0.."source.purescript".len], "source.purescript");
         @memcpy(gi.file_types[0][0.."purs".len], "purs");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2077,6 +2299,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."python".len], "python");
         @memcpy(gi.scope_name[0.."source.python".len], "source.python");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2084,6 +2307,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."qml".len], "qml");
         @memcpy(gi.scope_name[0.."source.qml".len], "source.qml");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2091,6 +2315,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."qmldir".len], "qmldir");
         @memcpy(gi.scope_name[0.."source.qmldir".len], "source.qmldir");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2098,6 +2323,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."qss".len], "qss");
         @memcpy(gi.scope_name[0.."source.qss".len], "source.qss");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2105,6 +2331,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."r".len], "r");
         @memcpy(gi.scope_name[0.."source.r".len], "source.r");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2112,6 +2339,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."racket".len], "racket");
         @memcpy(gi.scope_name[0.."source.racket".len], "source.racket");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2119,6 +2347,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."raku".len], "raku");
         @memcpy(gi.scope_name[0.."source.perl.6".len], "source.perl.6");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2128,6 +2357,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."text.aspnetcorerazor".len], "text.aspnetcorerazor");
         @memcpy(gi.file_types[0][0.."razor".len], "razor");
         @memcpy(gi.file_types[1][0.."cshtml".len], "cshtml");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2137,6 +2367,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."source.reg".len], "source.reg");
         @memcpy(gi.file_types[0][0.."reg".len], "reg");
         @memcpy(gi.file_types[1][0.."REG".len], "REG");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2145,6 +2376,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."regexp".len], "regexp");
         @memcpy(gi.scope_name[0.."source.regexp.python".len], "source.regexp.python");
         @memcpy(gi.file_types[0][0.."re".len], "re");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2152,6 +2384,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."rel".len], "rel");
         @memcpy(gi.scope_name[0.."source.rel".len], "source.rel");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2163,6 +2396,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[1][0.."s".len], "s");
         @memcpy(gi.file_types[2][0.."riscv".len], "riscv");
         @memcpy(gi.file_types[3][0.."asm".len], "asm");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2170,6 +2404,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."rst".len], "rst");
         @memcpy(gi.scope_name[0.."source.rst".len], "source.rst");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2177,6 +2412,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."ruby".len], "ruby");
         @memcpy(gi.scope_name[0.."source.ruby".len], "source.ruby");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2184,6 +2420,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."rust".len], "rust");
         @memcpy(gi.scope_name[0.."source.rust".len], "source.rust");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2192,6 +2429,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."sas".len], "sas");
         @memcpy(gi.scope_name[0.."source.sas".len], "source.sas");
         @memcpy(gi.file_types[0][0.."sas".len], "sas");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2200,6 +2438,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."sass".len], "sass");
         @memcpy(gi.scope_name[0.."source.sass".len], "source.sass");
         @memcpy(gi.file_types[0][0.."sass".len], "sass");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2208,6 +2447,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."scala".len], "scala");
         @memcpy(gi.scope_name[0.."source.scala".len], "source.scala");
         @memcpy(gi.file_types[0][0.."scala".len], "scala");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2219,6 +2459,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[1][0.."ss".len], "ss");
         @memcpy(gi.file_types[2][0.."sch".len], "sch");
         @memcpy(gi.file_types[3][0.."rkt".len], "rkt");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2226,6 +2467,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."scss".len], "scss");
         @memcpy(gi.scope_name[0.."source.css.scss".len], "source.css.scss");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2235,6 +2477,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."source.sdbl".len], "source.sdbl");
         @memcpy(gi.file_types[0][0.."sdbl".len], "sdbl");
         @memcpy(gi.file_types[1][0.."query".len], "query");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2242,6 +2485,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."shaderlab".len], "shaderlab");
         @memcpy(gi.scope_name[0.."source.shaderlab".len], "source.shaderlab");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2249,6 +2493,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."shellscript".len], "shellscript");
         @memcpy(gi.scope_name[0.."source.shell".len], "source.shell");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2257,6 +2502,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."shellsession".len], "shellsession");
         @memcpy(gi.scope_name[0.."text.shell-session".len], "text.shell-session");
         @memcpy(gi.file_types[0][0.."sh-session".len], "sh-session");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2265,6 +2511,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."smalltalk".len], "smalltalk");
         @memcpy(gi.scope_name[0.."source.smalltalk".len], "source.smalltalk");
         @memcpy(gi.file_types[0][0.."st".len], "st");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2273,6 +2520,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."solidity".len], "solidity");
         @memcpy(gi.scope_name[0.."source.solidity".len], "source.solidity");
         @memcpy(gi.file_types[0][0.."sol".len], "sol");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2281,6 +2529,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."soy".len], "soy");
         @memcpy(gi.scope_name[0.."text.html.soy".len], "text.html.soy");
         @memcpy(gi.file_types[0][0.."soy".len], "soy");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2291,6 +2540,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[0][0.."rq".len], "rq");
         @memcpy(gi.file_types[1][0.."sparql".len], "sparql");
         @memcpy(gi.file_types[2][0.."sq".len], "sq");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2300,6 +2550,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."source.splunk_search".len], "source.splunk_search");
         @memcpy(gi.file_types[0][0.."splunk".len], "splunk");
         @memcpy(gi.file_types[1][0.."spl".len], "spl");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2307,6 +2558,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."sql".len], "sql");
         @memcpy(gi.scope_name[0.."source.sql".len], "source.sql");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2317,6 +2569,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[0][0.."ssh_config".len], "ssh_config");
         @memcpy(gi.file_types[1][0..".ssh/config".len], ".ssh/config");
         @memcpy(gi.file_types[2][0.."sshd_config".len], "sshd_config");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2327,6 +2580,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[0][0.."do".len], "do");
         @memcpy(gi.file_types[1][0.."ado".len], "ado");
         @memcpy(gi.file_types[2][0.."mata".len], "mata");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2338,6 +2592,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[1][0.."stylus".len], "stylus");
         @memcpy(gi.file_types[2][0.."css.styl".len], "css.styl");
         @memcpy(gi.file_types[3][0.."css.stylus".len], "css.stylus");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2346,6 +2601,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."svelte".len], "svelte");
         @memcpy(gi.scope_name[0.."source.svelte".len], "source.svelte");
         @memcpy(gi.file_types[0][0.."svelte".len], "svelte");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2354,6 +2610,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."swift".len], "swift");
         @memcpy(gi.scope_name[0.."source.swift".len], "source.swift");
         @memcpy(gi.file_types[0][0.."swift".len], "swift");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2365,6 +2622,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[1][0.."vh".len], "vh");
         @memcpy(gi.file_types[2][0.."sv".len], "sv");
         @memcpy(gi.file_types[3][0.."svh".len], "svh");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2372,6 +2630,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."systemd".len], "systemd");
         @memcpy(gi.scope_name[0.."source.systemd".len], "source.systemd");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2379,6 +2638,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."talonscript".len], "talonscript");
         @memcpy(gi.scope_name[0.."source.talon".len], "source.talon");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2387,6 +2647,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."tasl".len], "tasl");
         @memcpy(gi.scope_name[0.."source.tasl".len], "source.tasl");
         @memcpy(gi.file_types[0][0.."tasl".len], "tasl");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2395,6 +2656,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."tcl".len], "tcl");
         @memcpy(gi.scope_name[0.."source.tcl".len], "source.tcl");
         @memcpy(gi.file_types[0][0.."tcl".len], "tcl");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2402,6 +2664,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."templ".len], "templ");
         @memcpy(gi.scope_name[0.."source.templ".len], "source.templ");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2411,6 +2674,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."source.hcl.terraform".len], "source.hcl.terraform");
         @memcpy(gi.file_types[0][0.."tf".len], "tf");
         @memcpy(gi.file_types[1][0.."tfvars".len], "tfvars");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2418,6 +2682,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."tex".len], "tex");
         @memcpy(gi.scope_name[0.."text.tex".len], "text.tex");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2426,6 +2691,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."toml".len], "toml");
         @memcpy(gi.scope_name[0.."source.toml".len], "source.toml");
         @memcpy(gi.file_types[0][0.."toml".len], "toml");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2433,6 +2699,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."ts-tags".len], "ts-tags");
         @memcpy(gi.scope_name[0.."source.ts.tags".len], "source.ts.tags");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2442,6 +2709,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."text.tsv".len], "text.tsv");
         @memcpy(gi.file_types[0][0.."tsv".len], "tsv");
         @memcpy(gi.file_types[1][0.."tab".len], "tab");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2449,6 +2717,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."tsx".len], "tsx");
         @memcpy(gi.scope_name[0.."source.tsx".len], "source.tsx");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2459,6 +2728,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[0][0.."turtle".len], "turtle");
         @memcpy(gi.file_types[1][0.."ttl".len], "ttl");
         @memcpy(gi.file_types[2][0.."acl".len], "acl");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2468,6 +2738,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."text.html.twig".len], "text.html.twig");
         @memcpy(gi.file_types[0][0.."twig".len], "twig");
         @memcpy(gi.file_types[1][0.."html.twig".len], "html.twig");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2475,6 +2746,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."typescript".len], "typescript");
         @memcpy(gi.scope_name[0.."source.ts".len], "source.ts");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2483,6 +2755,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."typespec".len], "typespec");
         @memcpy(gi.scope_name[0.."source.tsp".len], "source.tsp");
         @memcpy(gi.file_types[0][0.."tsp".len], "tsp");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2490,6 +2763,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."typst".len], "typst");
         @memcpy(gi.scope_name[0.."source.typst".len], "source.typst");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2502,6 +2776,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[2][0..".vsh".len], ".vsh");
         @memcpy(gi.file_types[3][0..".vv".len], ".vv");
         @memcpy(gi.file_types[4][0.."v.mod".len], "v.mod");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2512,6 +2787,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[0][0.."vala".len], "vala");
         @memcpy(gi.file_types[1][0.."vapi".len], "vapi");
         @memcpy(gi.file_types[2][0.."gs".len], "gs");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2519,6 +2795,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."vb".len], "vb");
         @memcpy(gi.scope_name[0.."source.asp.vb.net".len], "source.asp.vb.net");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2528,6 +2805,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."source.verilog".len], "source.verilog");
         @memcpy(gi.file_types[0][0.."v".len], "v");
         @memcpy(gi.file_types[1][0.."vh".len], "vh");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2539,6 +2817,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[1][0.."vhdl".len], "vhdl");
         @memcpy(gi.file_types[2][0.."vho".len], "vho");
         @memcpy(gi.file_types[3][0.."vht".len], "vht");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2546,6 +2825,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."viml".len], "viml");
         @memcpy(gi.scope_name[0.."source.viml".len], "source.viml");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2557,6 +2837,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.inject_to[1][0.."text.html.markdown".len], "text.html.markdown");
         @memcpy(gi.inject_to[2][0.."text.html.derivative".len], "text.html.derivative");
         @memcpy(gi.inject_to[3][0.."text.pug".len], "text.pug");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2564,6 +2845,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."vue-html".len], "vue-html");
         @memcpy(gi.scope_name[0.."text.html.vue-html".len], "text.html.vue-html");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2575,6 +2857,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.inject_to[1][0.."text.html.markdown".len], "text.html.markdown");
         @memcpy(gi.inject_to[2][0.."text.html.derivative".len], "text.html.derivative");
         @memcpy(gi.inject_to[3][0.."text.pug".len], "text.pug");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2583,6 +2866,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."vue-sfc-style-variable-injection".len], "vue-sfc-style-variable-injection");
         @memcpy(gi.scope_name[0.."vue.sfc.style.variable.injection".len], "vue.sfc.style.variable.injection");
         @memcpy(gi.inject_to[0][0.."source.vue".len], "source.vue");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2590,6 +2874,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."vue-vine".len], "vue-vine");
         @memcpy(gi.scope_name[0.."source.vue-vine".len], "source.vue-vine");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2597,6 +2882,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."vue".len], "vue");
         @memcpy(gi.scope_name[0.."source.vue".len], "source.vue");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2604,6 +2890,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."vyper".len], "vyper");
         @memcpy(gi.scope_name[0.."source.vyper".len], "source.vyper");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2611,6 +2898,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."wasm".len], "wasm");
         @memcpy(gi.scope_name[0.."source.wat".len], "source.wat");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2618,6 +2906,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."wenyan".len], "wenyan");
         @memcpy(gi.scope_name[0.."source.wenyan".len], "source.wenyan");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2625,6 +2914,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."wgsl".len], "wgsl");
         @memcpy(gi.scope_name[0.."source.wgsl".len], "source.wgsl");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2632,6 +2922,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."wikitext".len], "wikitext");
         @memcpy(gi.scope_name[0.."source.wikitext".len], "source.wikitext");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2639,6 +2930,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."wit".len], "wit");
         @memcpy(gi.scope_name[0.."source.wit".len], "source.wit");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2651,6 +2943,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[2][0.."wls".len], "wls");
         @memcpy(gi.file_types[3][0.."wlt".len], "wlt");
         @memcpy(gi.file_types[4][0.."mt".len], "mt");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2658,6 +2951,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."xml".len], "xml");
         @memcpy(gi.scope_name[0.."text.xml".len], "text.xml");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2665,6 +2959,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         var gi = GrammarInfo{ .embedded_file = bytes, .file_types_count = 0, .inject_to_count = 0, .inject_only = false };
         @memcpy(gi.name[0.."xsl".len], "xsl");
         @memcpy(gi.scope_name[0.."text.xml.xsl".len], "text.xml.xsl");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2680,6 +2975,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.file_types[5][0.."yaml-tmlanguage".len], "yaml-tmlanguage");
         @memcpy(gi.file_types[6][0.."syntax".len], "syntax");
         @memcpy(gi.file_types[7][0.."sublime-syntax".len], "sublime-syntax");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2688,6 +2984,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.name[0.."zenscript".len], "zenscript");
         @memcpy(gi.scope_name[0.."source.zenscript".len], "source.zenscript");
         @memcpy(gi.file_types[0][0.."zs".len], "zs");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
     {
@@ -2697,6 +2994,7 @@ pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !vo
         @memcpy(gi.scope_name[0.."source.zig".len], "source.zig");
         @memcpy(gi.file_types[0][0.."zig".len], "zig");
         @memcpy(gi.file_types[1][0.."zon".len], "zon");
+        gi.id = list.items.len + 1;
         try list.append(allocator, gi);
     }
 }

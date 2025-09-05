@@ -52,19 +52,7 @@ pub const Processor = struct {
         if (self.state) |state| {
             for (state.stack.items) |context| {
                 if (context.syntax.rx_begin.valid == .Valid) {
-                    if (context.syntax.rx_begin.is_comment_block) {
-                        var c = ParseCapture{
-                            .start = 0,
-                            .end = block.len,
-                            .syntax = context.syntax,
-                            .atom = context.syntax.atom,
-                        };
-                        if (c.atom.count == 0) {
-                            const name = context.syntax.getName();
-                            @memcpy(c.scope[0..name.len], name);
-                        }
-                        self.captures.append(self.allocator, c) catch {};
-                    } else if (context.syntax.rx_begin.is_string_block) {
+                    if (context.syntax.rx_begin.is_comment_block or context.syntax.rx_begin.is_string_block) {
                         var c = ParseCapture{
                             .start = 0,
                             .end = block.len,
@@ -386,13 +374,7 @@ pub const RenderHtmlProcessor = struct {
 
                 for (0..captures.items.len) |ci| {
                     if (i == captures.items[ci].end) {
-                        var colors = theme.Settings{};
-                        const scope = thm.getScope(cap.scope[0..cap.scope.len], &atoms, &colors);
-                        _ = scope;
-                        if (colors.foreground) |fg| {
-                            _ = fg;
-                            stdout.print("</span>", .{}) catch {};
-                        }
+                        stdout.print("</span>", .{}) catch {};
                     }
                 }
             }

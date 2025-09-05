@@ -17,22 +17,28 @@ const setBgColorRgb = util.setBgColorRgb;
 const resetColor = util.resetColor;
 
 // TODO move to config.. smallcaps
-const ENABLE_SCOPE_CACHING = false;
+const ENABLE_SCOPE_CACHING = true;
 
 var theThemeLibrary: ?*ThemeLibrary = null;
 
 pub const ThemeLibrary = struct {
     allocator: Allocator = undefined,
     themes: std.ArrayList(ThemeInfo) = undefined,
-    cache: std.AutoHashMap(u16, Theme) = undefined,
+    cache: std.AutoHashMap(usize, Theme) = undefined,
 
     fn init(self: *ThemeLibrary) !void {
         self.themes = try std.ArrayList(ThemeInfo).initCapacity(self.allocator, 128);
-        self.cache = std.AutoHashMap(u16, Theme).init(self.allocator);
+        self.cache = std.AutoHashMap(usize, Theme).init(self.allocator);
     }
 
     fn deinit(self: *ThemeLibrary) void {
         self.themes.deinit(self.allocator);
+        var it = self.cache.iterator();
+        while (it.next()) |kv| {
+            // const k = kv.key_ptr.*;
+            var v = kv.value_ptr.*;
+            v.deinit();
+        }
         self.cache.deinit();
     }
 
@@ -49,8 +55,13 @@ pub const ThemeLibrary = struct {
         if (name.len >= 128) return error.NotFound;
         for (self.themes.items) |item| {
             if (std.mem.eql(u8, item.name[0..name.len], name)) {
+                if (self.cache.get(item.id)) |g| {
+                    return g;
+                }
                 if (item.embedded_file) |file| {
-                    return Theme.initWithData(self.allocator, file);
+                    const t = try Theme.initWithData(self.allocator, file);
+                    try self.cache.put(item.id, t);
+                    return t;
                 }
                 const p: []const u8 = &item.full_path;
                 const t = try Theme.init(self.allocator, util.toSlice([]const u8, p));

@@ -45,6 +45,8 @@ pub fn main() !void {
         else => std.heap.page_allocator,
     };
 
+    // const allocator = std.heap.page_allocator;
+
     try oni.init(&.{oni.Encoding.utf8});
     try oni.testing.ensureInit();
 
@@ -161,6 +163,7 @@ pub fn main() !void {
                 std.debug.print("unable to open theme file\n", .{});
                 return;
             };
+            defer thm.deinit();
         } else {
             thm = thl.themeFromName(theme_path orelse "dracula-soft") catch {
                 std.debug.print("unable to open theme\n", .{});
@@ -168,7 +171,8 @@ pub fn main() !void {
             };
         }
     }
-    defer thm.deinit();
+    // let the library deinit library-loaded thee 
+    // defer thm.deinit();
 
     var gmr: Grammar = undefined;
     if (GrammarLibrary.getLibrary()) |gml| {
@@ -178,6 +182,7 @@ pub fn main() !void {
                     std.debug.print("unable to open grammar file\n", .{});
                     return;
                 };
+                defer gmr.deinit();
             } else {
                 gmr = gml.grammarFromScopeName(gp) catch {
                     std.debug.print("unable to open grammar from scope name\n", .{});
@@ -191,7 +196,8 @@ pub fn main() !void {
             };
         }
     }
-    defer gmr.deinit();
+    // let the library deinit library-loaded grammars 
+    // defer gmr.deinit();
 
     var par = try Parser.init(allocator, &gmr);
     defer par.deinit();

@@ -15,7 +15,7 @@ var grammar_id: u16 = 1;
 // Fixed length strings for embedded resources
 // convert to []const u8 for faster embedding (avoiding memcpy)
 pub const GrammarInfo = struct {
-    id: u16 = 0, // for caching purposed
+    id: usize = 0, // for caching purposed
     name: [MAX_NAME_LENGTH]u8 = [_]u8{0} ** MAX_NAME_LENGTH,
     scope_name: [MAX_NAME_LENGTH]u8 = [_]u8{0} ** MAX_NAME_LENGTH,
     full_path: [std.fs.max_path_bytes]u8 = [_]u8{0} ** std.fs.max_path_bytes,
@@ -28,7 +28,7 @@ pub const GrammarInfo = struct {
 };
 
 pub const ThemeInfo = struct {
-    id: u16 = 0, // for caching purposes
+    id: usize = 0, // for caching purposes
     name: [MAX_NAME_LENGTH]u8 = [_]u8{0} ** MAX_NAME_LENGTH,
     author: [MAX_NAME_LENGTH]u8 = [_]u8{0} ** MAX_NAME_LENGTH,
     full_path: [std.fs.max_path_bytes]u8 = [_]u8{0} ** std.fs.max_path_bytes,
@@ -111,7 +111,9 @@ pub fn listGrammars(allocator: Allocator, path: []const u8, list: *std.ArrayList
         }
         const tmp = try std.fs.path.join(allocator, &.{ path, entry.path });
         defer allocator.free(tmp);
-        const gi = try getGrammarInfo(allocator, entry.path, tmp);
+        var gi = try getGrammarInfo(allocator, entry.path, tmp);
+
+        gi.id = list.items.len + 1;
 
         // std.debug.print("{s}\n", .{gi.name});
         // std.debug.print("  {s}\n", .{gi.scope_name});
@@ -232,6 +234,7 @@ pub fn generateEmbeddedThemesFile(allocator: Allocator, writer: anytype, prefix:
         try writer.print("        const bytes: []const u8 = {s}{}[0..{s}{}.len];\n", .{ prefix, embed_id, prefix, embed_id });
         try writer.print("        var ti = ThemeInfo{c} .embedded_file = bytes {c};\n", .{ '{', '}' });
         try writer.print("        @memcpy(ti.name[0..\"{s}\".len], \"{s}\");\n", .{ nps, nps });
+        try writer.print("        ti.id = list.items.len + 1;\n", .{});
         try writer.print("        try list.append(allocator, ti);\n", .{});
         try writer.print("    {c}\n", .{'}'});
         embed_id += 1;
@@ -295,6 +298,7 @@ pub fn generateEmbeddedGrammarsFile(allocator: Allocator, writer: anytype, prefi
             const fps = util.toSlice([]const u8, fp);
             try writer.print("        @memcpy(gi.inject_to[{}][0..\"{s}\".len], \"{s}\");\n", .{ fi, fps, fps });
         }
+        try writer.print("        gi.id = list.items.len + 1;\n", .{});
         try writer.print("        try list.append(allocator, gi);\n", .{});
         try writer.print("    {c}\n", .{'}'});
         embed_id += 1;

@@ -322,6 +322,8 @@ pub const Syntax = struct {
                     const gmr = gml.grammarFromScopeName(include_path) catch {
                         return null;
                     };
+                    // std.debug.print("{s} {s}\n", .{include_path, gmr.name});
+                    syntax.include = gmr.syntax;
                     return gmr.syntax;
                 }
             }
@@ -411,15 +413,22 @@ var theGrammarLibrary: ?*GrammarLibrary = null;
 pub const GrammarLibrary = struct {
     allocator: Allocator = undefined,
     grammars: std.ArrayList(GrammarInfo) = undefined,
-    cache: std.AutoHashMap(u16, Grammar) = undefined,
+    cache: std.AutoHashMap(usize, Grammar) = undefined,
 
     fn init(self: *GrammarLibrary) !void {
         self.grammars = try std.ArrayList(GrammarInfo).initCapacity(self.allocator, 256);
-        self.cache = std.AutoHashMap(u16, Grammar).init(self.allocator);
+        self.cache = std.AutoHashMap(usize, Grammar).init(self.allocator);
     }
 
     fn deinit(self: *GrammarLibrary) void {
         self.grammars.deinit(self.allocator);
+        var it = self.cache.iterator();
+        while (it.next()) |kv| {
+            // const k = kv.key_ptr.*;
+            // std.debug.print(">>{}\n", .{k});
+            var v = kv.value_ptr.*;
+            v.deinit();
+        }
         self.cache.deinit();
     }
 
@@ -469,7 +478,10 @@ pub const GrammarLibrary = struct {
                 }
                 // std.debug.print("found!\n", .{});
                 if (item.embedded_file) |file| {
-                    return Grammar.initWithData(self.allocator, file);
+                    var g = try Grammar.initWithData(self.allocator, file);
+                    self.applyInjectors(&g);
+                    try self.cache.put(item.id, g);
+                    return g;
                 }
                 const p: []const u8 = &item.full_path;
                 var g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
@@ -486,12 +498,15 @@ pub const GrammarLibrary = struct {
         for (self.grammars.items) |item| {
             const np: []const u8 = &item.scope_name;
             if (std.mem.eql(u8, util.toSlice([]const u8, np), name)) {
+                // std.debug.print("found grammar {s} {s} {}\n", .{name, np, item.id});
                 if (self.cache.get(item.id)) |g| {
                     return g;
                 }
-                // std.debug.print("found!\n", .{});
                 if (item.embedded_file) |file| {
-                    return Grammar.initWithData(self.allocator, file);
+                    var g = try Grammar.initWithData(self.allocator, file);
+                    self.applyInjectors(&g);
+                    try self.cache.put(item.id, g);
+                    return g;
                 }
                 const p: []const u8 = &item.full_path;
                 var g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
@@ -530,7 +545,10 @@ pub const GrammarLibrary = struct {
                             return g;
                         }
                         if (item.embedded_file) |file| {
-                            return Grammar.initWithData(self.allocator, file);
+                            var g = try Grammar.initWithData(self.allocator, file);
+                            self.applyInjectors(&g);
+                            try self.cache.put(item.id, g);
+                            return g;
                         }
                         const p: []const u8 = &item.full_path;
                         var g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
@@ -548,7 +566,10 @@ pub const GrammarLibrary = struct {
                         return g;
                     }
                     if (item.embedded_file) |file| {
-                        return Grammar.initWithData(self.allocator, file);
+                        var g = try Grammar.initWithData(self.allocator, file);
+                        self.applyInjectors(&g);
+                        try self.cache.put(item.id, g);
+                        return g;
                     }
                     const p: []const u8 = &item.full_path;
                     var g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
@@ -635,6 +656,7 @@ pub const Grammar = struct {
     }
 
     pub fn deinit(self: *Grammar) void {
+        std.debug.print("grammar deinit {*}\n", .{self});
         if (self.syntax) |syn| {
             syn.deinit();
         }
@@ -678,7 +700,7 @@ pub const Grammar = struct {
         grammar.scope_name = scope_name;
         grammar.syntax = syntax;
         grammar.parsed = parsed;
-        syntax.scope_name = scope_name;
+        syntax.scope_name = "scope_name";
         return grammar;
     }
 };
