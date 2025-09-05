@@ -156,7 +156,7 @@ pub fn main() !void {
         return;
     }
 
-    var thm: Theme = undefined;
+    var thm: *Theme = undefined;
     if (ThemeLibrary.getLibrary()) |thl| {
         if (std.mem.indexOf(u8, theme_path orelse "", ".json")) |_| {
             thm = Theme.init(allocator, theme_path orelse "") catch {
@@ -174,7 +174,7 @@ pub fn main() !void {
     // let the library deinit library-loaded thee 
     // defer thm.deinit();
 
-    var gmr: Grammar = undefined;
+    var gmr: *Grammar = undefined;
     if (GrammarLibrary.getLibrary()) |gml| {
         if (grammar_path) |gp| {
             if (std.mem.indexOf(u8, gp, ".json")) |_| {
@@ -196,10 +196,12 @@ pub fn main() !void {
             };
         }
     }
+
+
     // let the library deinit library-loaded grammars 
     // defer gmr.deinit();
 
-    var par = try Parser.init(allocator, &gmr);
+    var par = try Parser.init(allocator, gmr);
     defer par.deinit();
 
     var state = try par.initState();
@@ -220,7 +222,7 @@ pub fn main() !void {
     defer proc.deinit();
     par.processor = &proc;
     par.atoms = &thm.atoms;
-    proc.theme = &thm;
+    proc.theme = thm;
 
     par.resetStats();
     const path = file_path orelse "";

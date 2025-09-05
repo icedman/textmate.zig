@@ -24,11 +24,11 @@ var theThemeLibrary: ?*ThemeLibrary = null;
 pub const ThemeLibrary = struct {
     allocator: Allocator = undefined,
     themes: std.ArrayList(ThemeInfo) = undefined,
-    cache: std.AutoHashMap(usize, Theme) = undefined,
+    cache: std.AutoHashMap(usize, *Theme) = undefined,
 
     fn init(self: *ThemeLibrary) !void {
         self.themes = try std.ArrayList(ThemeInfo).initCapacity(self.allocator, 128);
-        self.cache = std.AutoHashMap(usize, Theme).init(self.allocator);
+        self.cache = std.AutoHashMap(usize, *Theme).init(self.allocator);
     }
 
     fn deinit(self: *ThemeLibrary) void {
@@ -51,7 +51,7 @@ pub const ThemeLibrary = struct {
         try embedded.listThemes(self.allocator, &self.themes);
     }
 
-    pub fn themeFromName(self: *ThemeLibrary, name: []const u8) !Theme {
+    pub fn themeFromName(self: *ThemeLibrary, name: []const u8) !*Theme {
         if (name.len >= 128) return error.NotFound;
         for (self.themes.items) |item| {
             if (std.mem.eql(u8, item.name[0..name.len], name)) {
@@ -189,7 +189,7 @@ pub const Theme = struct {
     // TODO release this after parse (requires that all string values be allocated and copied)
     parsed: ?std.json.Parsed(std.json.Value) = null,
 
-    pub fn init(allocator: Allocator, source_path: []const u8) !Theme {
+    pub fn init(allocator: Allocator, source_path: []const u8) !*Theme {
         const file = std.fs.cwd().openFile(source_path, .{}) catch |err| {
             std.debug.print("unable to open {s}\n", .{source_path});
             return err;
@@ -201,7 +201,7 @@ pub const Theme = struct {
         return Theme.parse(allocator, file_contents);
     }
 
-    pub fn initWithData(allocator: Allocator, file_contents: []const u8) !Theme {
+    pub fn initWithData(allocator: Allocator, file_contents: []const u8) !*Theme {
         return Theme.parse(allocator, file_contents);
     }
 
@@ -217,6 +217,8 @@ pub const Theme = struct {
         // Rationale
         // colors, tokenColors will have a lot of static allocated strings (which will be more conventient destroy all at once)
         self.arena.deinit();
+
+        self.allocator.destroy(self);
     }
 
     fn addScopeForToken(self: *Theme, scope_name: []const u8, token: *TokenColor, ascendant: Atom, exclusion: Atom) !void {
@@ -276,8 +278,9 @@ pub const Theme = struct {
         });
     }
 
-    fn parse(allocator: Allocator, source: []const u8) !Theme {
-        var theme = Theme{
+    fn parse(allocator: Allocator, source: []const u8) !*Theme {
+        var theme = try allocator.create(Theme); 
+        theme.* = Theme{
             .allocator = allocator,
             .atoms = std.StringHashMap(u32).init(allocator),
             .scopes = try std.ArrayList(Scope).initCapacity(allocator, 512),
