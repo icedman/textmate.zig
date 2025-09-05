@@ -213,6 +213,7 @@ pub fn main() !void {
 
     defer proc.deinit();
     par.processor = &proc;
+    par.atoms = &thm.atoms;
     proc.theme = &thm;
 
     par.resetStats();

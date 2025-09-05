@@ -3,9 +3,10 @@ const oni = @import("oniguruma");
 const grammar = @import("grammar.zig");
 const processor = @import("processor.zig");
 const util = @import("util.zig");
+const atoms = @import("atoms.zig");
 const Syntax = grammar.Syntax;
 const Regex = grammar.Regex;
-
+const Atom = atoms.Atom;
 const Allocator = std.mem.Allocator;
 
 // TODO move to config.. smallcaps
@@ -289,6 +290,9 @@ pub const Parser = struct {
 
     // runtime-compiled (with dynamic patterns) are save for sharing a (de)serialization
     regex_map: std.AutoHashMap(u64, grammar.Regex),
+
+    // optionally attach a theme's atoms here for faster scope resolution
+    atoms: ?*std.StringHashMap(u32) = null,
 
     // stats
     regex_execs: u32 = 0,
@@ -629,11 +633,12 @@ pub const Parser = struct {
         return Match{};
     }
 
-    fn matchPatterns(self: *Parser, syntax: *const Syntax, patterns: ?[]*Syntax, block: []const u8, start: usize, end: usize) Match {
+    // fn matchPatterns(self: *Parser, syntax: *const Syntax, patterns: ?[]*Syntax, block: []const u8, start: usize, end: usize) Match {
+    fn matchPatterns(self: *Parser, syntax: *const Syntax, patterns: ?std.ArrayList(*Syntax), block: []const u8, start: usize, end: usize) Match {
         _ = syntax;
         var earliest_match = Match{};
         if (patterns) |pats| {
-            for (pats) |p| {
+            for (pats.items) |p| {
                 const ls = p.resolve(p, self.lang.syntax);
                 if (ls) |syn| {
                     const m = self.matchBegin(@constCast(syn), block, start, end);
@@ -705,7 +710,7 @@ pub const Parser = struct {
                 if (syn.patterns) |pats| {
                     const ps = match.start; // should be range.start and range.end?
                     const pe = match.end;
-                    for (pats) |p| {
+                    for (pats.items) |p| {
                         if (p.rx_match.regex) |regex| {
                             // std.debug.print(">> {s} <<\n", .{p.regexs_match orelse ""});
                             // std.debug.print(">> {s} <<\n", .{block[ps..pe]});

@@ -71,7 +71,7 @@ pub const Syntax = struct {
     repository: ?std.StringHashMap(*Syntax) = null,
 
     // children nodes
-    patterns: ?[]*Syntax = null,
+    patterns: ?std.ArrayList(*Syntax) = null,
     captures: ?std.StringHashMap(*Syntax) = null,
     while_captures: ?std.StringHashMap(*Syntax) = null,
     begin_captures: ?std.StringHashMap(*Syntax) = null,
@@ -164,24 +164,17 @@ pub const Syntax = struct {
             std.debug.print("Failed to compile regex: // TODO which one?\n", .{});
         };
 
-        syntax.patterns = blk: {
-            const opt = obj.get("patterns");
-            if (opt) |patterns_arr| {
-                if (patterns_arr.array.items.len == 0) {
-                    break :blk null;
-                }
-                const res = try allocator.alloc(*Syntax, patterns_arr.array.items.len);
-                errdefer allocator.free(res);
-                for (patterns_arr.array.items, 0..) |item, i| {
-                    var syn = try Syntax.init(allocator, item);
-                    syn.parent = syntax;
-                    res[i] = syn;
-                }
-                break :blk res;
-            } else {
-                break :blk null;
+        syntax.patterns = try std.ArrayList(*Syntax).initCapacity(allocator, 64);
+        const opt = obj.get("patterns");
+        if (opt) |patterns_arr| {
+            const res = try allocator.alloc(*Syntax, patterns_arr.array.items.len);
+            errdefer allocator.free(res);
+            for (patterns_arr.array.items) |item| {
+                var syn = try Syntax.init(allocator, item);
+                syn.parent = syntax;
+                try syntax.patterns.?.append(allocator, syn);
             }
-        };
+        }
 
         syntax.captures = try parseSyntaxMap(allocator, json, "captures", syntax);
         syntax.begin_captures = try parseSyntaxMap(allocator, json, "beginCaptures", syntax);
@@ -220,9 +213,8 @@ pub const Syntax = struct {
         }
 
         if (self.patterns) |pats| {
-            for (pats) |*p| {
-                const v = p.*;
-                v.deinit();
+            for (pats.items) |p| {
+                p.deinit();
             }
         }
 
@@ -233,9 +225,7 @@ pub const Syntax = struct {
         const capture_entries = [_]CapturesEntry{
             .{ .map_ptr = &self.repository },
             .{ .map_ptr = &self.captures },
-            .{
-                .map_ptr = &self.begin_captures,
-            },
+            .{ .map_ptr = &self.begin_captures },
             .{ .map_ptr = &self.end_captures },
         };
 
@@ -441,7 +431,7 @@ pub const GrammarLibrary = struct {
         try embedded.listGrammars(self.allocator, &self.grammars);
     }
 
-    pub fn applyInjectors(self: *GrammarLibrary, grammar: *Grammar) !void {
+    pub fn applyInjectors(self: *GrammarLibrary, grammar: *Grammar) void {
         if (grammar.syntax) |syntax| {
             const scope_name = syntax.scope_name;
             for (self.grammars.items) |item| {
@@ -449,12 +439,20 @@ pub const GrammarLibrary = struct {
                 for (0..item.inject_to_count) |fi| {
                     const np: []const u8 = &item.inject_to[fi];
                     if (std.mem.eql(u8, util.toSlice([]const u8, np), scope_name)) {
-                        // TODO .. lazy load the injecto grammar later (use include?)
-                        // add injecto to repository
-                        // add include to patterns
-                        // if (self.cache.get(item.id)) |g| {
-                        // } else {
-                        // }
+                        const g = self.grammarFromId(item.id) catch {
+                            // only fail silently if an injector fails to load
+                            continue;
+                        };
+
+                        // TODO .. lazy load the injector grammar only on demand(use include?)
+                        if (g.syntax) |s| {
+                            if (syntax.patterns) |*p| {
+                                p.append(grammar.arena.allocator(), s) catch {
+                                    // only fail silently if an injector fails to attach
+                                    continue;
+                                };
+                            }
+                        }
                     }
                 }
             }
@@ -475,7 +473,7 @@ pub const GrammarLibrary = struct {
                 }
                 const p: []const u8 = &item.full_path;
                 var g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
-                try self.applyInjectors(&g);
+                self.applyInjectors(&g);
                 try self.cache.put(item.id, g);
                 return g;
             }
@@ -497,7 +495,7 @@ pub const GrammarLibrary = struct {
                 }
                 const p: []const u8 = &item.full_path;
                 var g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
-                try self.applyInjectors(&g);
+                self.applyInjectors(&g);
                 try self.cache.put(item.id, g);
                 return g;
             }
@@ -536,7 +534,7 @@ pub const GrammarLibrary = struct {
                         }
                         const p: []const u8 = &item.full_path;
                         var g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
-                        try self.applyInjectors(&g);
+                        self.applyInjectors(&g);
                         try self.cache.put(item.id, g);
                         return g;
                     }
@@ -554,7 +552,7 @@ pub const GrammarLibrary = struct {
                     }
                     const p: []const u8 = &item.full_path;
                     var g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
-                    try self.applyInjectors(&g);
+                    self.applyInjectors(&g);
                     try self.cache.put(item.id, g);
                     return g;
                 }
@@ -575,7 +573,7 @@ pub const GrammarLibrary = struct {
                 }
                 const p: []const u8 = &item.full_path;
                 var g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
-                try self.applyInjectors(&g);
+                self.applyInjectors(&g);
                 try self.cache.put(item.id, g);
                 return g;
             }
