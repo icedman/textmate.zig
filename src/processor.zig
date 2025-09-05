@@ -244,7 +244,7 @@ pub const RenderProcessor = struct {
 
                         var colors = theme.Settings{};
                         atoms[0] = cap.atom;
-                        const scope_name = util.toSlice([98]u8, cap.scope);
+                        const scope_name = cap.scope[0..cap.scope.len]; // util.toSlice([98]u8, cap.scope);
                         const scope = thm.getScope(scope_name, &atoms, &colors);
                         _ = scope;
                         // std.debug.print("{}? ", .{scope_name.len});
@@ -360,7 +360,8 @@ pub const RenderHtmlProcessor = struct {
 
                         var colors = theme.Settings{};
                         atoms[0] = cap.atom;
-                        const scope = thm.getScope(cap.scope[0..cap.scope.len], &atoms, &colors);
+                        const scope_name = cap.scope[0..cap.scope.len]; // util.toSlice([98]u8, cap.scope);
+                        const scope = thm.getScope(scope_name, &atoms, &colors);
                         _ = scope;
                         if (colors.foreground) |fg| {
                             const scope_len = for (0..64) |si| {

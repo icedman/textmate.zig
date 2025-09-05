@@ -17,7 +17,7 @@ const setBgColorRgb = util.setBgColorRgb;
 const resetColor = util.resetColor;
 
 // TODO move to config.. smallcaps
-const ENABLE_SCOPE_CACHING = true;
+const ENABLE_SCOPE_CACHING = false;
 
 var theThemeLibrary: ?*ThemeLibrary = null;
 
@@ -386,6 +386,8 @@ pub const Theme = struct {
 
     pub fn getScope(self: *Theme, scope: []const u8, atoms: []const Atom, colors: ?*Settings) ?*const Scope {
         var atom = atoms[0];
+
+        if (scope.len == 0 and atom.count == 0) return null;
 
         // This caching should be done per grammar, not per theme.
         // Otherwise the cache hashmap would grow too large.

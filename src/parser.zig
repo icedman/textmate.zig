@@ -16,6 +16,8 @@ const ENABLE_EXEC_CACHING = true;
 const ENABLE_MATCH_CACHING = true;
 const ENABLE_END_CACHING = true;
 
+const ENABLE_SCOPE_ATOMS = true;
+
 const MAX_LINE_LEN = 1024; // and line longer will not be parsed
 const MAX_MATCH_RANGES = 9; // max $1 in grammar files is just 8
 const MAX_SCOPE_LEN = 98;
@@ -203,11 +205,6 @@ pub const ParseState = struct {
             .line = 0,
             .anchor = @intCast(anchor),
         };
-
-        // contentName
-        // if (syntax.atom
-        // const name = syntax.getName();
-        // @memcpy(sc.scope[0..name.len], name);
 
         if (rx.has_references) {
             if (match) |m| {
@@ -678,7 +675,21 @@ pub const Parser = struct {
                 .end = match.end,
             };
             if (match.applyCaptures(block, name, &c.scope) == 0) {
-                // TODO atom
+                if (match.regex) |rx| {
+                    if (ENABLE_SCOPE_ATOMS and !rx.has_references) {
+                        if (!rx.has_references) {
+                            if (self.atoms) |at| {
+                                if (syntax.atom.count == 0 and syntax.atom.id == 0) {
+                                    @constCast(syntax).atom.compute(name, at);
+                                    if (syntax.atom.id == 0) {
+                                        @constCast(syntax).atom.id = 1;
+                                    }
+                                    c.syntax = @constCast(syntax);
+                                }
+                            }
+                        }
+                    }
+                }
             }
             proc.capture(&c);
         }
@@ -700,8 +711,21 @@ pub const Parser = struct {
                         .start = range.start,
                         .end = range.end,
                     };
+
                     if (match.applyCaptures(block, syn.name, &c.scope) == 0) {
-                        // TODO atom
+                        if (match.regex) |rx| {
+                            if (ENABLE_SCOPE_ATOMS and !rx.has_references) {
+                                if (self.atoms) |at| {
+                                    if (syn.atom.count == 0 and syn.atom.id == 0) {
+                                        syn.atom.compute(syn.getName(), at);
+                                        if (syn.atom.id == 0) {
+                                            syn.atom.id = 1;
+                                        }
+                                        c.syntax = syn;
+                                    }
+                                }
+                            }
+                        }
                     }
                     proc.capture(&c);
                 }
@@ -837,12 +861,14 @@ pub const Parser = struct {
                                 // std.debug.print("push {s}\n", .{match_syn.getName()});
                                 if (pattern_match.regex) |rx| {
                                     if (last_push_pos != start_ or last_push_syntax != match_syn.id) {
-                                        if (self.atoms) |at| {
-                                            if (match_syn.atom.count == 0) {
-                                                match_syn.atom.compute(match_syn.getName(), at);
-                                                // if (rx.is_comment_block) {
-                                                //     std.debug.print("!!{s} {}\n", .{match_syn.getName(), match_syn.getName().len});
-                                                // }
+                                        if (ENABLE_SCOPE_ATOMS and !rx.has_references) {
+                                            if (self.atoms) |at| {
+                                                if (match_syn.atom.count == 0 and match_syn.atom.id == 0) {
+                                                    match_syn.atom.compute(match_syn.getName(), at);
+                                                    if (match_syn.atom.id == 0) {
+                                                        match_syn.atom.id = 1;
+                                                    }
+                                                }
                                             }
                                         }
 
