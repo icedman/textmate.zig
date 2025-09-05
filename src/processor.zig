@@ -1,7 +1,9 @@
 const std = @import("std");
 const parser = @import("parser.zig");
+const grammar = @import("grammar.zig");
 const theme = @import("theme.zig");
 const util = @import("util.zig");
+const atms = @import("atoms.zig");
 
 const Allocator = std.mem.Allocator;
 
@@ -13,6 +15,8 @@ const resetColor = util.resetColor;
 
 const ParseCapture = parser.ParseCapture;
 const ParseState = parser.ParseState;
+const Syntax = grammar.Syntax;
+const Atom = atms.Atom;
 
 pub const Processor = struct {
     allocator: Allocator,
@@ -48,25 +52,29 @@ pub const Processor = struct {
         if (self.state) |state| {
             for (state.stack.items) |context| {
                 if (context.syntax.rx_begin.valid == .Valid) {
-                    // TODO .. use getName() to generic
-                    // const name = "comment.block";
                     if (context.syntax.rx_begin.is_comment_block) {
-                        const name = "comment.block";
                         var c = ParseCapture{
                             .start = 0,
                             .end = block.len,
-                            .syntax_id = context.syntax.id,
+                            .syntax = context.syntax,
+                            .atom = context.syntax.atom,
                         };
-                        @memcpy(c.scope[0..name.len], name);
+                        if (c.atom.count == 0) {
+                            const name = context.syntax.getName();
+                            @memcpy(c.scope[0..name.len], name);
+                        }
                         self.captures.append(self.allocator, c) catch {};
                     } else if (context.syntax.rx_begin.is_string_block) {
-                        const name = "string.quoted";
                         var c = ParseCapture{
                             .start = 0,
                             .end = block.len,
-                            .syntax_id = context.syntax.id,
+                            .syntax = context.syntax,
+                            .atom = context.syntax.atom,
                         };
-                        @memcpy(c.scope[0..name.len], name);
+                        if (c.atom.count == 0) {
+                            const name = context.syntax.getName();
+                            @memcpy(c.scope[0..name.len], name);
+                        }
                         self.captures.append(self.allocator, c) catch {};
                     }
                 }
@@ -111,12 +119,12 @@ pub const Processor = struct {
         }
         // close the Capture (properly set the end pos)
         var i = self.captures.items.len;
-        var close_syntax_id: u64 = 0;
+        var close_syntax: ?*Syntax = null;
         while (i > 0) : (i -= 1) {
-            if (self.captures.items[i - 1].syntax_id == c.syntax_id) {
+            if (self.captures.items[i - 1].syntax == c.syntax) {
                 self.captures.items[i - 1].end = c.end;
-                close_syntax_id = c.syntax_id;
-            } else if (close_syntax_id != 0) {
+                close_syntax = c.syntax;
+            } else if (close_syntax != null and close_syntax != c.syntax) {
                 break;
             }
         }
@@ -206,6 +214,8 @@ pub const RenderProcessor = struct {
         var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
         const stdout = &stdout_writer.interface;
 
+        var atoms: [4]Atom = [_]Atom{Atom{}} ** 4;
+
         if (self.theme) |thm| {
             // const defaultColor: ?theme.Settings = theme.Settings{.foreground_rgb = theme.Rgb {.r = 255 }};
             const captures = self.captures;
@@ -233,9 +243,11 @@ pub const RenderProcessor = struct {
                         cap = captures.items[ci];
 
                         var colors = theme.Settings{};
-                        const scope = thm.getScope(cap.scope[0..cap.scope.len], cap.scope_hash, &colors);
+                        atoms[0] = cap.atom;
+                        const scope_name = util.toSlice([98]u8, cap.scope);
+                        const scope = thm.getScope(scope_name, &atoms, &colors);
                         _ = scope;
-                        // std.debug.print("?", .{});
+                        // std.debug.print("{}? ", .{scope_name.len});
 
                         // if (colors.foreground) |fgs| {
                         //     std.debug.print("{s}\n", .{fgs});
@@ -328,6 +340,9 @@ pub const RenderHtmlProcessor = struct {
         var stdout_buffer: [1024]u8 = undefined;
         var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
         const stdout = &stdout_writer.interface;
+
+        var atoms: [4]Atom = [_]Atom{Atom{}} ** 4;
+
         if (self.theme) |thm| {
             // const defaultColor: ?theme.Settings = theme.Settings{.foreground_rgb = theme.Rgb {.r = 255 }};
             // const default_color = (thm.getColor("editor.foreground") orelse
@@ -344,7 +359,8 @@ pub const RenderHtmlProcessor = struct {
                         cap = captures.items[ci];
 
                         var colors = theme.Settings{};
-                        const scope = thm.getScope(cap.scope[0..cap.scope.len], cap.scope_hash, &colors);
+                        atoms[0] = cap.atom;
+                        const scope = thm.getScope(cap.scope[0..cap.scope.len], &atoms, &colors);
                         _ = scope;
                         if (colors.foreground) |fg| {
                             const scope_len = for (0..64) |si| {
@@ -370,7 +386,7 @@ pub const RenderHtmlProcessor = struct {
                 for (0..captures.items.len) |ci| {
                     if (i == captures.items[ci].end) {
                         var colors = theme.Settings{};
-                        const scope = thm.getScope(cap.scope[0..cap.scope.len], cap.scope_hash, &colors);
+                        const scope = thm.getScope(cap.scope[0..cap.scope.len], &atoms, &colors);
                         _ = scope;
                         if (colors.foreground) |fg| {
                             _ = fg;

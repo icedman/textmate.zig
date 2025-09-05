@@ -31,9 +31,9 @@ pub const ParseCapture = struct {
     // is this expensive to pass around (copy)
     // TODO convert scope to atoms (scope_hash) ...
     scope: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN,
-    scope_hash: u64 = 0,
+    atom: Atom = Atom{},
 
-    syntax_id: u64 = 0,
+    syntax: ?*Syntax = null,
 };
 
 const Capture = ParseCapture;
@@ -205,6 +205,7 @@ pub const ParseState = struct {
         };
 
         // contentName
+        // if (syntax.atom
         // const name = syntax.getName();
         // @memcpy(sc.scope[0..name.len], name);
 
@@ -677,7 +678,7 @@ pub const Parser = struct {
                 .end = match.end,
             };
             if (match.applyCaptures(block, name, &c.scope) == 0) {
-                c.scope_hash = syntax.scope_hash;
+                // TODO atom
             }
             proc.capture(&c);
         }
@@ -700,7 +701,7 @@ pub const Parser = struct {
                         .end = range.end,
                     };
                     if (match.applyCaptures(block, syn.name, &c.scope) == 0) {
-                        c.scope_hash = syn.scope_hash;
+                        // TODO atom
                     }
                     proc.capture(&c);
                 }
@@ -727,7 +728,7 @@ pub const Parser = struct {
                                             .end = range.end,
                                         };
                                         if (m.applyCaptures(block, p.name, &c.scope) == 0) {
-                                            c.scope_hash = p.scope_hash;
+                                            // TODO atom
                                         }
                                         proc.capture(&c);
                                     }
@@ -813,7 +814,7 @@ pub const Parser = struct {
                                 var c = Capture{
                                     .start = end_match.start,
                                     .end = end_match.end,
-                                    .syntax_id = end_syn.id,
+                                    .syntax = end_syn,
                                 };
                                 @memcpy(c.scope[0..name.len], name);
                                 proc.closeTag(&c);
@@ -836,6 +837,15 @@ pub const Parser = struct {
                                 // std.debug.print("push {s}\n", .{match_syn.getName()});
                                 if (pattern_match.regex) |rx| {
                                     if (last_push_pos != start_ or last_push_syntax != match_syn.id) {
+                                        if (self.atoms) |at| {
+                                            if (match_syn.atom.count == 0) {
+                                                match_syn.atom.compute(match_syn.getName(), at);
+                                                // if (rx.is_comment_block) {
+                                                //     std.debug.print("!!{s} {}\n", .{match_syn.getName(), match_syn.getName().len});
+                                                // }
+                                            }
+                                        }
+
                                         state.push(match_syn, rx, block, pattern_match, "patttern") catch {};
                                         last_push_pos = start_;
                                         last_push_syntax = match_syn.id;
@@ -848,7 +858,7 @@ pub const Parser = struct {
                                     var c = Capture{
                                         .start = pattern_match.start,
                                         .end = pattern_match.end,
-                                        .syntax_id = match_syn.id,
+                                        .syntax = match_syn,
                                     };
                                     @memcpy(c.scope[0..name.len], name);
                                     proc.openTag(&c);

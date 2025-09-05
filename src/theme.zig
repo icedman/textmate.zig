@@ -3,9 +3,9 @@ const resources = @import("resources/resources.zig");
 const embedded = @import("resources/embedded.zig");
 const ThemeInfo = resources.ThemeInfo;
 
-const atoms = @import("atoms.zig");
+const atms = @import("atoms.zig");
 const util = @import("util.zig");
-const Atom = atoms.Atom;
+const Atom = atms.Atom;
 
 const Allocator = std.mem.Allocator;
 const ArenaAllocator = std.heap.ArenaAllocator;
@@ -173,6 +173,7 @@ pub const Theme = struct {
     atoms: std.StringHashMap(u32),
     scopes: std.ArrayList(Scope),
     cache: std.StringHashMap(*Scope),
+    cache_by_atom: std.AutoHashMap(u128, *Scope),
 
     // TODO release this after parse (requires that all string values be allocated and copied)
     parsed: ?std.json.Parsed(std.json.Value) = null,
@@ -197,6 +198,7 @@ pub const Theme = struct {
         self.atoms.deinit();
         self.scopes.deinit(self.allocator);
         self.cache.deinit();
+        self.cache_by_atom.deinit();
 
         // TODO ArenaAllocator is a bit difficult to track but this is the Rule
         // 1. atoms, scopes, cache (all grow)
@@ -269,6 +271,7 @@ pub const Theme = struct {
             .atoms = std.StringHashMap(u32).init(allocator),
             .scopes = try std.ArrayList(Scope).initCapacity(allocator, 512),
             .cache = std.StringHashMap(*Scope).init(allocator),
+            .cache_by_atom = std.AutoHashMap(u128, *Scope).init(allocator),
             .arena = ArenaAllocator.init(allocator),
             .name = "",
         };
@@ -359,7 +362,7 @@ pub const Theme = struct {
 
             if (scopes) |outer| {
                 for (outer) |sc| {
-                    atoms.extractAtom(sc, &theme.atoms);
+                    atms.extractAtom(sc, &theme.atoms);
                 }
             }
         }
@@ -381,34 +384,46 @@ pub const Theme = struct {
         return theme;
     }
 
-    pub fn getScope(self: *Theme, scope: []const u8, scope_hash: u64, colors: ?*Settings) ?*const Scope {
-        if (scope.len == 0) {
-            return null;
-        }
-
-        // TODO - scope_hash not correctly passed
-        _ = scope_hash;
+    pub fn getScope(self: *Theme, scope: []const u8, atoms: []const Atom, colors: ?*Settings) ?*const Scope {
+        var atom = atoms[0];
 
         // This caching should be done per grammar, not per theme.
         // Otherwise the cache hashmap would grow too large.
         const enable_cache = ENABLE_SCOPE_CACHING;
         if (enable_cache) {
-            // std.debug.print("{}\n", .{scope_hash});
-            if (self.cache.get(scope)) |cached| {
-                if (colors) |c| {
-                    if (cached.token) |token| {
-                        if (token.settings) |settings| {
-                            c.foreground = settings.foreground;
-                            c.foreground_rgb = settings.foreground_rgb;
+            if (scope.len > 0) {
+                if (self.cache.get(scope)) |cached| {
+                    if (colors) |c| {
+                        if (cached.token) |token| {
+                            if (token.settings) |settings| {
+                                c.foreground = settings.foreground;
+                                c.foreground_rgb = settings.foreground_rgb;
+                            }
                         }
                     }
+                    return cached;
                 }
-                return cached;
+            } else if (atom.id > 0) {
+                if (self.cache_by_atom.get(atom.id)) |cached| {
+                    if (colors) |c| {
+                        if (cached.token) |token| {
+                            if (token.settings) |settings| {
+                                c.foreground = settings.foreground;
+                                c.foreground_rgb = settings.foreground_rgb;
+                            }
+                        }
+                    }
+                    return cached;
+                }
             }
         }
 
-        var atom = Atom{};
-        atom.compute(scope, &self.atoms);
+        if (scope.len > 0) {
+            if (atoms[0].count == 0) {
+                atom.compute(scope, &self.atoms);
+                // std.debug.print("[{s}({}) {}? {}<<<< ", .{scope, scope.len, atom.id, atoms[0].id});
+            }
+        }
 
         var highest: u8 = 0;
         var matched: ?*Scope = null;
@@ -427,11 +442,18 @@ pub const Theme = struct {
                         cc.foreground_rgb = ts.foreground_rgb;
                     }
                 }
-                // why the need to allocate? isn't hash computed from string content?
-                const key = self.arena.allocator().dupe(u8, scope) catch {
-                    return mm;
-                };
-                _ = self.cache.put(key, mm) catch {};
+
+                if (enable_cache) {
+                    if (scope.len > 0) {
+                        // why the need to allocate? isn't hash computed from string content?
+                        const key = self.arena.allocator().dupe(u8, scope) catch {
+                            return mm;
+                        };
+                        _ = self.cache.put(key, mm) catch {};
+                    } else if (atom.id > 0) {
+                        _ = self.cache_by_atom.put(atom.id, mm) catch {};
+                    }
+                }
             }
         }
         return matched;

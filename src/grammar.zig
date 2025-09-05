@@ -3,6 +3,8 @@ const oni = @import("oniguruma");
 const resources = @import("resources/resources.zig");
 const embedded = @import("resources/embedded.zig");
 const util = @import("util.zig");
+const atoms = @import("atoms.zig");
+const Atom = atoms.Atom;
 const GrammarInfo = resources.GrammarInfo;
 
 const Allocator = std.mem.Allocator;
@@ -55,12 +57,11 @@ pub const Syntax = struct {
     name: []const u8,
     content_name: []const u8,
     scope_name: []const u8,
-    scope_hash: u64 = 0,
+
+    atom: Atom = Atom{},
 
     parent: ?*Syntax = null,
 
-    // TODO these will replace regexs_ and regex_ pairing above
-    // Wrap oni.Regex into a struct R{ id, regex_str, regex } for better caching, and sharing
     // cached compiles will be saved at the Parser?
     // cached matched will be saved Parser
     rx_match: Regex = Regex{},
@@ -159,7 +160,6 @@ pub const Syntax = struct {
             .rx_end = Regex{ .expr = if (obj.get("end")) |v| v.string else null },
         };
 
-        syntax.scope_hash = util.toHash(syntax.getName());
         syntax.compileAllRegexes() catch {
             std.debug.print("Failed to compile regex: // TODO which one?\n", .{});
         };
