@@ -279,7 +279,7 @@ pub const Theme = struct {
     }
 
     fn parse(allocator: Allocator, source: []const u8) !*Theme {
-        var theme = try allocator.create(Theme); 
+        var theme = try allocator.create(Theme);
         theme.* = Theme{
             .allocator = allocator,
             .atoms = std.StringHashMap(u32).init(allocator),

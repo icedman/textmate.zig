@@ -141,7 +141,7 @@ pub fn main() !void {
                 if (item.inject_only) {
                     continue;
                 }
-                std.debug.print("{s}  ", .{item.name});
+                std.debug.print("{s}({s}) ", .{item.name, item.scope_name});
                 if ((i + 1) % 8 == 0) std.debug.print("\n", .{});
             }
         }
@@ -241,10 +241,6 @@ pub fn main() !void {
 
     const start = std.time.nanoTimestamp();
     proc.startDocument();
-
-    // while (reader.interface.takeDelimiterExclusive('\n')) |line| {
-    //     std.debug.print("{s}]\n", .{line});
-    // } else |err| if (err != error.EndOfStream) return err;
 
     var line_writer = std.Io.Writer.Allocating.init(allocator);
     defer line_writer.deinit();

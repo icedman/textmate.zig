@@ -19,6 +19,7 @@ pub const Rgb = theme.Rgb;
 pub const GrammarLibrary = grammar.GrammarLibrary;
 pub const Grammar = grammar.Grammar;
 pub const Syntax = grammar.Syntax;
+pub const Regex = grammar.Regex;
 
 pub const Parser = parser.Parser;
 pub const ParseState = parser.ParseState;

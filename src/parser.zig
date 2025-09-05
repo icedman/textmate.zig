@@ -206,8 +206,10 @@ pub const ParseState = struct {
             .anchor = @intCast(anchor),
         };
 
-        if (rx.has_references) {
-            if (match) |m| {
+        _ = rx;
+
+        if (match) |m| {
+            if (syntax.rx_end.has_references) {
                 if (syntax.rx_end.expr) |regexs| {
                     var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
                     _ = m.applyReferences(block, regexs, &output);
@@ -219,27 +221,31 @@ pub const ParseState = struct {
                         } else {
                             sc.rx_end.compile(&output) catch {};
                             if (sc.rx_end.id > 0) {
+                                std.debug.print("??>>>{s} {}\n", .{ output, sc.rx_end.id });
                                 try self.owner.regex_map.put(sc.rx_end.id, sc.rx_end);
                             }
                         }
                     }
                 }
-                if (syntax.rx_while.expr) |regexs| {
-                    var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
-                    _ = m.applyReferences(block, regexs, &output);
-                    {
-                        if (self.owner.regex_map.get(util.toHash(util.toSlice([MAX_SCOPE_LEN]u8, output)))) |r| {
-                            sc.rx_while = r;
-                        } else {
-                            sc.rx_while.compile(&output) catch {};
-                            if (sc.rx_while.id > 0) {
-                                try self.owner.regex_map.put(sc.rx_while.id, sc.rx_while);
+                if (syntax.rx_while.has_references) {
+                    if (syntax.rx_while.expr) |regexs| {
+                        var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
+                        _ = m.applyReferences(block, regexs, &output);
+                        {
+                            if (self.owner.regex_map.get(util.toHash(util.toSlice([MAX_SCOPE_LEN]u8, output)))) |r| {
+                                sc.rx_while = r;
+                            } else {
+                                sc.rx_while.compile(&output) catch {};
+                                if (sc.rx_while.id > 0) {
+                                    try self.owner.regex_map.put(sc.rx_while.id, sc.rx_while);
+                                }
                             }
                         }
                     }
                 }
             }
         }
+
         _ = self.stack.append(self.allocator, sc) catch {};
         _ = where;
         // std.debug.print("push {*}\n", .{syntax});
@@ -356,9 +362,7 @@ pub const Parser = struct {
                 should_cache = true;
                 if (self.exec_cache.get(rx.id)) |mm| {
                     if (mm.anchor_start <= start and mm.start > start) {
-
                         // std.debug.print("findMatch cache {s} {} {}-{}\n", .{rx.expr orelse "", start, mm.start, mm.end});
-
                         self.regex_skips += 1;
                         return mm;
                     }
@@ -431,7 +435,7 @@ pub const Parser = struct {
                 m.count = count;
 
                 if (count > 0) {
-                    // std.debug.print(">>>>>>>>>>>{s}\n", .{regexs orelse ""});
+                    // std.debug.print(">>>>>>>>>>>{s}\n", .{rx.expr orelse ""});
                     // std.debug.print("{s}\n", .{syntax.name});
                     // std.debug.print("{s}\n", .{syntax.scope_name});
                     // std.debug.print("{s}\n", .{syntax.content_name});
@@ -460,11 +464,6 @@ pub const Parser = struct {
     fn matchBegin(self: *Parser, syntax: *Syntax, block: []const u8, start: usize, end: usize) Match {
         if (block.len == 0) {
             return Match{};
-        }
-
-        // if all this syntax has are patterns, check patterns
-        if (syntax.rx_match.valid != .Valid and syntax.rx_begin.valid != .Valid) {
-            return self.matchPatterns(syntax, syntax.patterns, block, start, end);
         }
 
         // match
@@ -530,11 +529,20 @@ pub const Parser = struct {
             }
         }
 
+        if (syntax.rx_end.regex != null or syntax.rx_while.regex != null) {
+            return Match{};
+        }
+
+        // if all this syntax has are patterns, check patterns
+        if (syntax.rx_match.valid != .Valid and syntax.rx_begin.valid != .Valid) {
+            return self.matchPatterns(syntax, syntax.patterns, block, start, end);
+        }
+
         return Match{};
     }
 
     // TODO while matches could have captures
-    pub fn matchWhile(self: *Parser, state: *ParseState, block: []const u8) bool {
+    pub fn matchWhile(self: *Parser, state: *ParseState, block: []const u8) ?*Syntax {
         var state_depth = state.size();
         const start: usize = 0;
         const end = block.len;
@@ -544,39 +552,37 @@ pub const Parser = struct {
                 const ts = t.syntax;
                 const ls = ts.resolve(ts, self.lang.syntax);
                 if (ls) |syn| {
-                    if (syn.rx_while.regex == null) continue;
-                    const m: Match = blk: {
-                        if (t.rx_while.valid == .Valid) {
-                            // use dynamic while_regex here if one was compiled
-                            // not caching or result in this case
-                            // TODO caching is possible though
-                            const m = self.findMatch(@constCast(syn), @constCast(&syn.rx_while), t.rx_while.regex, block, start, end);
-                            break :blk m;
-                        }
-                        // while_match without caching
-                        if (syn.rx_while.regex) |r| {
-                            const m = self.findMatch(@constCast(syn), @constCast(&syn.rx_while), r, block, start, end);
-                            break :blk m;
-                        }
-                        break :blk Match{ .count = 1 };
-                    };
+                    if (syn.rx_while.expr != null) {
+                        const m: Match = blk: {
+                            if (t.rx_while.valid == .Valid) {
+                                // use dynamic while_regex here if one was compiled
+                                // not caching or result in this case
+                                // TODO caching is possible though
+                                const m = self.findMatch(@constCast(syn), @constCast(&syn.rx_while), t.rx_while.regex, block, start, end);
+                                break :blk m;
+                            }
+                            // while_match without caching
+                            if (syn.rx_while.regex) |r| {
+                                const m = self.findMatch(@constCast(syn), @constCast(&syn.rx_while), r, block, start, end);
+                                break :blk m;
+                            }
+                            break :blk Match{ .count = 1 };
+                        };
 
-                    if (m.count == 0) {
-                        // std.debug.print("pop {*}\n", .{syn});
-                        // while (state.size() >= state_depth) {
-                        //     state.pop("matchWhile");
-                        // }
-
-                        // TODO not properly exiting from while... temporarily exit all while
-                        while (state.size() > 1) {
-                            state.pop("matchWhile");
+                        if (m.count == 0) {
+                            std.debug.print("pop {s} [{s}]\n", .{ syn.rx_while.expr orelse "", block });
+                            while (state.size() >= state_depth) {
+                                state.pop("matchWhile");
+                            }
+                            return @constCast(syn);
                         }
-                        return true;
+
+                        // break;
                     }
                 }
             }
         }
-        return false;
+        return null;
     }
 
     /// TODO matchEnd must also be cached. Also, some end expressions are similar (should also be cached)
@@ -603,7 +609,9 @@ pub const Parser = struct {
                     if (t.rx_end.valid == .Valid) {
                         // use dynamic end_regex here if one was compiled
                         // not caching or result in this case
+                        // std.debug.print("dynamic end! {s} {} {s}\n", .{t.rx_end.expr orelse "", t.rx_end.id, t.rx_end.expr orelse ""});
                         const m = self.findMatch(@constCast(syn), @constCast(&syn.rx_end), t.rx_end.regex, block, start, end);
+                        // std.debug.print(">>>\n", .{});
                         break :blk m;
                     }
 
@@ -624,6 +632,7 @@ pub const Parser = struct {
                         }
                         break :inner_blk null;
                     } orelse self.findMatch(@constCast(syn), @constCast(&syn.rx_end), syn.rx_end.regex, block, start, end);
+
                     if (should_cache and ENABLE_END_CACHING) {
                         _ = self.match_cache.put(syn.rx_end.id, m) catch {};
                     }
@@ -784,7 +793,6 @@ pub const Parser = struct {
 
         self.current_state = state;
         self.match_cache.clearRetainingCapacity();
-        // self.end_cache.clearRetainingCapacity();
         self.exec_cache.clearRetainingCapacity();
 
         var start: usize = 0;
@@ -800,7 +808,8 @@ pub const Parser = struct {
 
         // handle while
         // todo track while count
-        _ = self.matchWhile(state, block);
+        const exit_while = self.matchWhile(state, block);
+        _ = exit_while;
 
         while (true) {
             end = block.len;
@@ -809,13 +818,13 @@ pub const Parser = struct {
             // {
             //     const text = block[start..end];
             //     std.debug.print("====================================\n", .{});
-            // std.debug.print("s:{} e:{} [{s}]\n", .{ start, end, block });
+            //     std.debug.print("s:{} e:{} [{s}]\n", .{ start, end, text });
             // }
 
             const top = state.top();
             if (top) |t| {
                 const ts = t.syntax;
-                // std.debug.print("top> {s} {*}..\n", .{ts.getName(), ts});
+                // std.debug.print("top> {s} {*}..{}\n", .{ts.getName(), ts, state.size()});
 
                 const ls = ts.resolve(ts, self.lang.syntax);
                 if (ls) |syn| {
@@ -868,7 +877,7 @@ pub const Parser = struct {
 
                             // if it has a regexs_end.. it is a begin and should cause a push
                             if (match_syn.rx_begin.valid == .Valid) {
-                                // std.debug.print("push {s}\n", .{match_syn.getName()});
+                                std.debug.print("push {s}\n", .{match_syn.getName()});
                                 if (pattern_match.regex) |rx| {
                                     if (last_push_pos != start_ or last_push_syntax != match_syn.id) {
                                         if (ENABLE_SCOPE_ATOMS and !rx.has_references) {
@@ -885,8 +894,6 @@ pub const Parser = struct {
                                         state.push(match_syn, rx, block, pattern_match, "patttern") catch {};
                                         last_push_pos = start_;
                                         last_push_syntax = match_syn.id;
-
-                                        _ = self.matchWhile(state, block);
                                     }
                                     // fail silently?
                                 }

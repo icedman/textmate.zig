@@ -13,7 +13,6 @@ const ThemeInfo = resources.ThemeInfo;
 const BITS_PER_ATOM = 10;
 
 fn addAtom(scope: []const u8, map: *std.StringHashMap(u32)) void {
-    // std.debug.print("[{s}]\n", .{scope});
     var sc = scope[0..scope.len];
     while (sc.len > 0) {
         if (sc[0] == ' ') {
@@ -29,7 +28,7 @@ fn addAtom(scope: []const u8, map: *std.StringHashMap(u32)) void {
         return;
     };
     if (!gop.found_existing) {
-        // ID is positio in the map as it is added
+        // ID is position in the map as it is added
         gop.value_ptr.* = 1 + map.count();
     }
 }
