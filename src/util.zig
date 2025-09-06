@@ -3,6 +3,7 @@ const std = @import("std");
 const theme = @import("theme.zig");
 const Rgb = theme.Rgb;
 
+// TODO .. remove this (too cumbersome), use simple []const u8, ArrayList(u8)
 pub fn toSlice(comptime T: type, array: T) []const u8 {
     const len = for (array, 0..) |ch, i| {
         if (ch == 0) break i;

@@ -61,7 +61,8 @@ pub const Processor = struct {
                         };
                         if (c.atom.count == 0) {
                             const name = context.syntax.getName();
-                            @memcpy(c.scope[0..name.len], name);
+                            c.scope = name;
+                            // @memcpy(c.scope[0..name.len], name);
                         }
                         self.captures.append(self.allocator, c) catch {};
                     }
@@ -209,7 +210,7 @@ pub const RenderProcessor = struct {
             const captures = self.captures;
             const block = self.block orelse "";
 
-            var color_stack: [1024]Rgb = [_]Rgb{Rgb{}} ** 1024;
+            var color_stack: [32]Rgb = [_]Rgb{Rgb{}} ** 32;
             var color_stack_idx: usize = 0;
             var current_color = Rgb{};
 
@@ -232,8 +233,8 @@ pub const RenderProcessor = struct {
 
                         var colors = theme.Settings{};
                         atoms[0] = cap.atom;
-                        const scope_name = cap.scope[0..cap.scope.len]; // util.toSlice([98]u8, cap.scope);
-                        const scope = thm.getScope(scope_name, &atoms, &colors);
+
+                        const scope = thm.getScope(cap.scope, &atoms, &colors);
                         _ = scope;
                         // std.debug.print("{}? ", .{scope_name.len});
 

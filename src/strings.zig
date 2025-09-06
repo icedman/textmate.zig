@@ -48,7 +48,7 @@ pub const StringsArena = struct {
 
     pub fn appendUnique(self: *StringsArena, str: []const u8) ![]const u8 {
         if (str.len == 0) return empty_string;
-        const h = self.appendHashed(str);
+        const h = try self.appendHashed(str);
         return h[1];
     }
 };
@@ -59,9 +59,9 @@ test "strings" {
 
     var buf: [128]u8 = undefined;
     for (0..200) |idx| {
-        const s = try std.fmt.bufPrint(&buf, "{s} {d}", .{ "hello", idx*0 });
+        const s = try std.fmt.bufPrint(&buf, "{s} {d}", .{ "hello", idx * 0 });
         const c = try strings.appendHashed(s);
         // _ = c;
-        std.debug.print("{} {s}\n", .{c[0], c[1]});
+        std.debug.print("{} {s}\n", .{ c[0], c[1] });
     }
 }

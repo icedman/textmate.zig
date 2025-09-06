@@ -33,10 +33,7 @@ pub const ParseCapture = struct {
     start: usize = 0,
     end: usize = 0,
 
-    // is this expensive to pass around (copy)
-    // TODO convert scope to atoms (scope_hash) ...
-    scope: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN,
-    scope_: []const u8 = undefined,
+    scope: []const u8 = "",
     atom: Atom = Atom{},
 
     syntax: ?*Syntax = null,
@@ -57,7 +54,8 @@ const Match = struct {
     regex: ?*Regex = null,
 
     // is this expensive to pass around (copy)
-    ranges: [MAX_MATCH_RANGES]MatchRange = [_]MatchRange{MatchRange{ .group = 0, .start = 0, .end = 0 }} ** MAX_MATCH_RANGES,
+    ranges: [MAX_MATCH_RANGES]MatchRange = undefined,
+    // = [_]MatchRange{MatchRange{ .group = 0, .start = 0, .end = 0 }} ** MAX_MATCH_RANGES,
     count: u8 = 0,
 
     // this is just start and end of ranges[0]
@@ -319,7 +317,7 @@ pub const Parser = struct {
             .match_cache = std.AutoHashMap(u64, Match).init(allocator),
             .exec_cache = std.AutoHashMap(u64, Match).init(allocator),
             .regex_map = std.AutoHashMap(u64, grammar.Regex).init(allocator),
-            .strings = StringsArena.init(allocator),
+            .strings = try StringsArena.init(allocator),
         };
     }
 
@@ -412,6 +410,7 @@ pub const Parser = struct {
                     .regex = rx,
                     .anchor_start = hard_start,
                     .anchor_end = hard_end,
+                    .ranges = [_]MatchRange{MatchRange{ .group = 0, .start = 0, .end = 0 }} ** MAX_MATCH_RANGES,
                 };
 
                 var count: u8 = 0;
@@ -686,14 +685,15 @@ pub const Parser = struct {
         return earliest_match;
     }
 
-    fn collectMatch(self: *Parser, syntax: *const Syntax, match: *const Match, block: []const u8) void {
+    fn collectMatch(self: *Parser, syntax: *const Syntax, match: *const Match, block: []const u8) !void {
         const name = syntax.getName();
         if (self.processor) |proc| {
             var c = Capture{
                 .start = match.start,
                 .end = match.end,
             };
-            if (match.applyCaptures(block, name, &c.scope) == 0) {
+            var cscope: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
+            if (match.applyCaptures(block, name, &cscope) == 0) {
                 if (match.regex) |rx| {
                     if (ENABLE_SCOPE_ATOMS and !rx.has_references) {
                         if (!rx.has_references) {
@@ -710,11 +710,12 @@ pub const Parser = struct {
                     }
                 }
             }
+            c.scope = try self.strings.appendUnique(&cscope);
             proc.capture(&c);
         }
     }
 
-    fn collectCaptures(self: *Parser, match: *const Match, captures: *const std.StringHashMap(*Syntax), block: []const u8) void {
+    fn collectCaptures(self: *Parser, match: *const Match, captures: *const std.StringHashMap(*Syntax), block: []const u8) !void {
         for (0..match.count) |i| {
             var buf: [32]u8 = undefined; // is this enough to hold any int as string?
             const range = match.ranges[i];
@@ -731,7 +732,8 @@ pub const Parser = struct {
                         .end = range.end,
                     };
 
-                    if (match.applyCaptures(block, syn.name, &c.scope) == 0) {
+                    var cscope: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
+                    if (match.applyCaptures(block, syn.name, &cscope) == 0) {
                         if (match.regex) |rx| {
                             if (ENABLE_SCOPE_ATOMS and !rx.has_references) {
                                 if (self.atoms) |at| {
@@ -746,6 +748,8 @@ pub const Parser = struct {
                             }
                         }
                     }
+                    c.scope = try self.strings.appendUnique(&cscope);
+                    // std.debug.print("{s}]\n", .{c.scope_});
                     proc.capture(&c);
                 }
 
@@ -763,16 +767,18 @@ pub const Parser = struct {
                                 // std.debug.print("count {}\n", .{m.count});
                                 if (p.captures) |*pc| {
                                     // descend into captures
-                                    self.collectCaptures(&m, pc, block);
+                                    try self.collectCaptures(&m, pc, block);
                                 } else if (p.name.len > 0) {
                                     if (self.processor) |proc| {
                                         var c = Capture{
                                             .start = range.start,
                                             .end = range.end,
                                         };
-                                        if (m.applyCaptures(block, p.name, &c.scope) == 0) {
+                                        var cscope: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
+                                        if (m.applyCaptures(block, p.name, &cscope) == 0) {
                                             // TODO atom
                                         }
+                                        c.scope = try self.strings.appendUnique(&cscope);
                                         proc.capture(&c);
                                     }
                                 }
@@ -849,9 +855,9 @@ pub const Parser = struct {
 
                         // collect endCaptures
                         if (end_match.syntax) |end_syn| {
-                            self.collectMatch(end_syn, &end_match, block);
+                            try self.collectMatch(end_syn, &end_match, block);
                             if (end_syn.end_captures) |end_cap| {
-                                self.collectCaptures(&end_match, &end_cap, block);
+                                try self.collectCaptures(&end_match, &end_cap, block);
                             }
 
                             if (self.processor) |proc| {
@@ -860,8 +866,8 @@ pub const Parser = struct {
                                     .start = end_match.start,
                                     .end = end_match.end,
                                     .syntax = end_syn,
+                                    .scope = name,
                                 };
-                                @memcpy(c.scope[0..name.len], name);
                                 proc.closeTag(&c);
                             }
 
@@ -906,19 +912,19 @@ pub const Parser = struct {
                                         .start = pattern_match.start,
                                         .end = pattern_match.end,
                                         .syntax = match_syn,
+                                        .scope = name,
                                     };
-                                    @memcpy(c.scope[0..name.len], name);
                                     proc.openTag(&c);
                                 }
 
-                                self.collectMatch(match_syn, &pattern_match, block);
+                                try self.collectMatch(match_syn, &pattern_match, block);
                                 if (match_syn.begin_captures) |beg_cap| {
-                                    self.collectCaptures(&pattern_match, &beg_cap, block);
+                                    try self.collectCaptures(&pattern_match, &beg_cap, block);
                                 }
                             } else {
-                                self.collectMatch(match_syn, &pattern_match, block);
+                                try self.collectMatch(match_syn, &pattern_match, block);
                                 if (match_syn.captures) |cap| {
-                                    self.collectCaptures(&pattern_match, &cap, block);
+                                    try self.collectCaptures(&pattern_match, &cap, block);
                                 }
                             }
                         }
