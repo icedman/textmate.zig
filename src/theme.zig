@@ -6,8 +6,9 @@ const ThemeInfo = resources.ThemeInfo;
 const atms = @import("atoms.zig");
 const util = @import("util.zig");
 const strings = @import("strings.zig");
-const Atom = atms.Atom;
+const config = @import("config.zig");
 
+const Atom = atms.Atom;
 const Allocator = std.mem.Allocator;
 const ArenaAllocator = std.heap.ArenaAllocator;
 const StringsArena = strings.StringsArena;
@@ -17,9 +18,6 @@ const setColorRgb = util.setColorRgb;
 const setBgColorHex = util.setBgColorHex;
 const setBgColorRgb = util.setBgColorRgb;
 const resetColor = util.resetColor;
-
-// TODO move to config.. smallcaps
-const ENABLE_SCOPE_CACHING = true;
 
 var theThemeLibrary: ?*ThemeLibrary = null;
 
@@ -412,7 +410,7 @@ pub const Theme = struct {
 
         // This caching should be done per grammar, not per theme.
         // Otherwise the cache hashmap would grow too large.
-        const enable_cache = ENABLE_SCOPE_CACHING;
+        const enable_cache = config.enable_scope_caching;
         if (enable_cache) {
             if (scope.len > 0) {
                 if (self.cache.get(scope)) |cached| {

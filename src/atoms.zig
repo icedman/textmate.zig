@@ -8,8 +8,6 @@ const util = @import("util.zig");
 const resources = @import("resources/resources.zig");
 const ThemeInfo = resources.ThemeInfo;
 
-// TODO
-// These needs to be in a config or option.zig and in smallcaps
 const BITS_PER_ATOM = 10;
 
 fn addAtom(scope: []const u8, map: *std.StringHashMap(u32)) void {
@@ -83,7 +81,7 @@ pub fn extractAtom(scope_: []const u8, map: *std.StringHashMap(u32)) void {
     addAtom(scope, map);
 }
 
-// Given the default 60 themes only 743 unique IDs were generated (u128 for ID with u10 for IDs will be more than enough)
+// Given the default 60 themes only 743 unique IDs were generated (u128 for ID with u10 for 11 atom IDs will be more than enough)
 fn testLoadingAllThemes(allocator: std.mem.Allocator) !void {
     var map = std.StringHashMap(u32).init(allocator);
     defer map.deinit();

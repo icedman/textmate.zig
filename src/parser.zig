@@ -5,28 +5,13 @@ const processor = @import("processor.zig");
 const util = @import("util.zig");
 const strings = @import("strings.zig");
 const atoms = @import("atoms.zig");
+const config = @import("config.zig");
 
 const Allocator = std.mem.Allocator;
 const Syntax = grammar.Syntax;
 const Regex = grammar.Regex;
 const Atom = atoms.Atom;
 const StringsArena = strings.StringsArena;
-
-// TODO move to config.. smallcaps
-// is exec level (findMatch) caching slower as it caches everything -- even resolving captures?)
-const ENABLE_EXEC_CACHING = true;
-// redundant to enable match-end cache with exec cache?
-const ENABLE_MATCH_CACHING = true;
-const ENABLE_END_CACHING = true;
-
-const ENABLE_SCOPE_ATOMS = true;
-
-const MAX_LINE_LEN = 1024; // and line longer will not be parsed
-const MAX_MATCH_RANGES = 9; // max $1 in grammar files is just 8
-const MAX_SCOPE_LEN = 98;
-
-const MAX_STATE_STACK_DEPTH = 128; // if the state depth is too deep .. just prune (this shouldn't happen though)
-const STATE_STACK_PRUNE = 64; // prune off states from the stack
 
 // capture is like MatchRange.. but atomic and should be serializable
 pub const ParseCapture = struct {
@@ -54,8 +39,8 @@ const Match = struct {
     regex: ?*Regex = null,
 
     // is this expensive to pass around (copy)
-    ranges: [MAX_MATCH_RANGES]MatchRange = undefined,
-    // = [_]MatchRange{MatchRange{ .group = 0, .start = 0, .end = 0 }} ** MAX_MATCH_RANGES,
+    ranges: [config.max_match_ranges]MatchRange = undefined,
+    // = [_]MatchRange{MatchRange{ .group = 0, .start = 0, .end = 0 }} ** config.max_match_ranges,
     count: u8 = 0,
 
     // this is just start and end of ranges[0]
@@ -66,7 +51,7 @@ const Match = struct {
     anchor_start: usize = 0,
     anchor_end: usize = 0,
 
-    fn applyRef(self: *const Match, block: []const u8, target: []const u8, escape_character: u8, output: *[MAX_SCOPE_LEN]u8) u8 {
+    fn applyRef(self: *const Match, block: []const u8, target: []const u8, escape_character: u8, output: *[config.max_scope_len]u8) u8 {
         var output_idx: u8 = 0;
         var escape = false;
         var skip: usize = 0;
@@ -81,7 +66,7 @@ const Match = struct {
                     const r = self.ranges[i];
                     const digit: u8 = blk: {
                         const d = ch - '0';
-                        if (MAX_MATCH_RANGES > 9 and output_idx < output.len - 1) {
+                        if (config.max_match_ranges > 9 and output_idx < output.len - 1) {
                             // check for another digit if allowed the config
                             const ch2 = target[idx + 1];
                             if (std.ascii.isDigit(ch2)) {
@@ -114,11 +99,11 @@ const Match = struct {
         return output_idx;
     }
 
-    pub fn applyReferences(self: *const Match, block: []const u8, target: []const u8, output: *[MAX_SCOPE_LEN]u8) u8 {
+    pub fn applyReferences(self: *const Match, block: []const u8, target: []const u8, output: *[config.max_scope_len]u8) u8 {
         return self.applyRef(block, target, '\\', output);
     }
 
-    pub fn applyCaptures(self: *const Match, block: []const u8, target: []const u8, output: *[MAX_SCOPE_LEN]u8) u8 {
+    pub fn applyCaptures(self: *const Match, block: []const u8, target: []const u8, output: *[config.max_scope_len]u8) u8 {
         return self.applyRef(block, target, '$', output);
     }
 };
@@ -213,7 +198,7 @@ pub const ParseState = struct {
         if (match) |m| {
             if (syntax.rx_end.has_references) {
                 if (syntax.rx_end.expr) |regexs| {
-                    var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
+                    var output: [config.max_scope_len]u8 = [_]u8{0} ** config.max_scope_len;
                     _ = m.applyReferences(block, regexs, &output);
                     const regex_id = util.toHash(&output);
 
@@ -233,10 +218,10 @@ pub const ParseState = struct {
                 }
                 if (syntax.rx_while.has_references) {
                     if (syntax.rx_while.expr) |regexs| {
-                        var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
+                        var output: [config.max_scope_len]u8 = [_]u8{0} ** config.max_scope_len;
                         _ = m.applyReferences(block, regexs, &output);
                         {
-                            if (self.owner.regex_map.get(util.toHash(util.toSlice([MAX_SCOPE_LEN]u8, output)))) |r| {
+                            if (self.owner.regex_map.get(util.toHash(util.toSlice([config.max_scope_len]u8, output)))) |r| {
                                 sc.rx_while = r;
                             } else {
                                 sc.rx_while.compile(&output) catch {};
@@ -366,7 +351,7 @@ pub const Parser = struct {
 
             // check cache
             var should_cache = false;
-            if (rx.valid == .Valid and ENABLE_EXEC_CACHING) {
+            if (rx.valid == .Valid and config.enable_exec_caching) {
                 should_cache = true;
                 if (self.exec_cache.get(rx.id)) |mm| {
                     if (mm.anchor_start <= start and mm.start > start) {
@@ -410,14 +395,14 @@ pub const Parser = struct {
                     .regex = rx,
                     .anchor_start = hard_start,
                     .anchor_end = hard_end,
-                    .ranges = [_]MatchRange{MatchRange{ .group = 0, .start = 0, .end = 0 }} ** MAX_MATCH_RANGES,
+                    .ranges = [_]MatchRange{MatchRange{ .group = 0, .start = 0, .end = 0 }} ** config.max_match_ranges,
                 };
 
                 var count: u8 = 0;
                 var i: u16 = 0;
                 const starts = r.starts();
                 const ends = r.ends();
-                while (i < r.count() and i < MAX_MATCH_RANGES) : (i += 1) {
+                while (i < r.count() and i < config.max_match_ranges) : (i += 1) {
                     if (starts[i] < 0) {
                         // m.ranges[count].group = i;
                         // m.ranges[count].start = start;
@@ -498,7 +483,7 @@ pub const Parser = struct {
                     }
                     break :blk null;
                 } orelse self.findMatch(syntax, &syntax.rx_match, regex, block, start, end);
-                if (should_cache and ENABLE_MATCH_CACHING) {
+                if (should_cache and config.enable_match_caching) {
                     if (syntax.rx_match.id != 0)
                         _ = self.match_cache.put(syntax.rx_match.id, m) catch {};
                 }
@@ -530,7 +515,7 @@ pub const Parser = struct {
                     }
                     break :blk null;
                 } orelse self.findMatch(syntax, &syntax.rx_begin, regex, block, start, end);
-                if (should_cache and ENABLE_MATCH_CACHING) {
+                if (should_cache and config.enable_match_caching) {
                     _ = self.match_cache.put(syntax.rx_begin.id, m) catch {};
                 }
                 if (m.count > 0) {
@@ -599,12 +584,12 @@ pub const Parser = struct {
     pub fn matchEnd(self: *Parser, state: *ParseState, block: []const u8, start: usize, end: usize) Match {
         // prune if the stack is already too deep like deeply nested blocks
         // This is merely now guard against intentionally written code
-        if (state.size() > MAX_STATE_STACK_DEPTH) {
-            if (state.stack.items.len >= MAX_STATE_STACK_DEPTH) {
-                const new_len = state.stack.items.len - STATE_STACK_PRUNE;
+        if (state.size() > config.max_state_stack_depth) {
+            if (state.stack.items.len >= config.max_state_stack_depth) {
+                const new_len = state.stack.items.len - config.state_stack_prune;
                 @memcpy(
                     state.stack.items[0..new_len],
-                    state.stack.items[STATE_STACK_PRUNE..state.stack.items.len],
+                    state.stack.items[config.state_stack_prune..state.stack.items.len],
                 );
                 state.stack.items.len = new_len;
             }
@@ -642,7 +627,7 @@ pub const Parser = struct {
                         break :inner_blk null;
                     } orelse self.findMatch(@constCast(syn), @constCast(&syn.rx_end), syn.rx_end.regex, block, start, end);
 
-                    if (should_cache and ENABLE_END_CACHING) {
+                    if (should_cache and config.enable_end_caching) {
                         _ = self.match_cache.put(syn.rx_end.id, m) catch {};
                     }
 
@@ -692,10 +677,10 @@ pub const Parser = struct {
                 .start = match.start,
                 .end = match.end,
             };
-            var cscope: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
+            var cscope: [config.max_scope_len]u8 = [_]u8{0} ** config.max_scope_len;
             if (match.applyCaptures(block, name, &cscope) == 0) {
                 if (match.regex) |rx| {
-                    if (ENABLE_SCOPE_ATOMS and !rx.has_references) {
+                    if (config.enable_scope_atoms and !rx.has_references) {
                         if (!rx.has_references) {
                             if (self.atoms) |at| {
                                 if (syntax.atom.count == 0 and syntax.atom.id == 0) {
@@ -732,10 +717,10 @@ pub const Parser = struct {
                         .end = range.end,
                     };
 
-                    var cscope: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
+                    var cscope: [config.max_scope_len]u8 = [_]u8{0} ** config.max_scope_len;
                     if (match.applyCaptures(block, syn.name, &cscope) == 0) {
                         if (match.regex) |rx| {
-                            if (ENABLE_SCOPE_ATOMS and !rx.has_references) {
+                            if (config.enable_scope_atoms and !rx.has_references) {
                                 if (self.atoms) |at| {
                                     if (syn.atom.count == 0 and syn.atom.id == 0) {
                                         syn.atom.compute(syn.getName(), at);
@@ -774,7 +759,7 @@ pub const Parser = struct {
                                             .start = range.start,
                                             .end = range.end,
                                         };
-                                        var cscope: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
+                                        var cscope: [config.max_scope_len]u8 = [_]u8{0} ** config.max_scope_len;
                                         if (m.applyCaptures(block, p.name, &cscope) == 0) {
                                             // TODO atom
                                         }
@@ -794,7 +779,7 @@ pub const Parser = struct {
     pub fn parseLine(self: *Parser, state: *ParseState, block: []const u8) !void {
         if (self.processor) |proc| proc.startLine(block);
 
-        if (block.len > MAX_LINE_LEN) {
+        if (block.len > config.max_line_len) {
             if (self.processor) |proc| proc.endLine();
             return;
         }
@@ -888,7 +873,7 @@ pub const Parser = struct {
                                 // std.debug.print("push {s}\n", .{match_syn.getName()});
                                 if (pattern_match.regex) |rx| {
                                     if (last_push_pos != start_ or last_push_syntax != match_syn.id) {
-                                        if (ENABLE_SCOPE_ATOMS and !rx.has_references) {
+                                        if (config.enable_scope_atoms and !rx.has_references) {
                                             if (self.atoms) |at| {
                                                 if (match_syn.atom.count == 0 and match_syn.atom.id == 0) {
                                                     match_syn.atom.compute(match_syn.getName(), at);
@@ -991,7 +976,7 @@ test "test references" {
     m.ranges[1].group = 2;
     m.ranges[1].start = 3;
     m.ranges[1].end = 5;
-    var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
+    var output: [config.max_scope_len]u8 = [_]u8{0} ** config.max_scope_len;
     _ = m.applyReferences(block, "hello \\1 world \\2.", &output);
 
     const expectedOutput = "hello ab world de.";
