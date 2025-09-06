@@ -5,10 +5,12 @@ const ThemeInfo = resources.ThemeInfo;
 
 const atms = @import("atoms.zig");
 const util = @import("util.zig");
+const strings = @import("strings.zig");
 const Atom = atms.Atom;
 
 const Allocator = std.mem.Allocator;
 const ArenaAllocator = std.heap.ArenaAllocator;
+const StringsArena = strings.StringsArena;
 
 const setColorHex = util.setColorHex;
 const setColorRgb = util.setColorRgb;
@@ -169,11 +171,18 @@ pub const ThemeColors = Settings;
 
 pub const Theme = struct {
     allocator: Allocator,
+
+    // Items in the arena
+    // 1. atoms, scopes, cache (all grow)
+    // 2. colors, tokenColors (do not grow - therefore arena)
+    // Rationale
+    // colors, tokenColors will have a lot of static allocated strings (which will be more conventient destroy all at once)
     arena: ArenaAllocator,
 
     name: []const u8,
 
     // TODO minimize optionals
+    // TODO use ArrayList .. cleaner
     author: ?[]const u8 = null,
     colors: ?std.StringHashMap(Settings) = null,
     token_colors: ?[]TokenColor = null,
@@ -186,8 +195,8 @@ pub const Theme = struct {
     cache: std.StringHashMap(*Scope),
     cache_by_atom: std.AutoHashMap(u128, *Scope),
 
-    // TODO release this after parse (requires that all string values be allocated and copied)
-    parsed: ?std.json.Parsed(std.json.Value) = null,
+    // any string allocated is held here
+    strings: StringsArena,
 
     pub fn init(allocator: Allocator, source_path: []const u8) !*Theme {
         const file = std.fs.cwd().openFile(source_path, .{}) catch |err| {
@@ -207,15 +216,12 @@ pub const Theme = struct {
 
     pub fn deinit(self: *Theme) void {
         self.atoms.deinit();
+        self.strings.deinit();
         self.scopes.deinit(self.allocator);
+
         self.cache.deinit();
         self.cache_by_atom.deinit();
 
-        // TODO ArenaAllocator is a bit difficult to track but this is the Rule
-        // 1. atoms, scopes, cache (all grow)
-        // 2. colors, tokenColors (do not grow - therefore arena)
-        // Rationale
-        // colors, tokenColors will have a lot of static allocated strings (which will be more conventient destroy all at once)
         self.arena.deinit();
 
         self.allocator.destroy(self);
@@ -287,6 +293,7 @@ pub const Theme = struct {
             .cache = std.StringHashMap(*Scope).init(allocator),
             .cache_by_atom = std.AutoHashMap(u128, *Scope).init(allocator),
             .arena = ArenaAllocator.init(allocator),
+            .strings = try StringsArena.init(allocator),
             .name = "",
         };
 
@@ -297,15 +304,15 @@ pub const Theme = struct {
         // anything associated with reading the json
         const aa = theme.arena.allocator();
 
-        const parsed = try std.json.parseFromSlice(std.json.Value, aa, source, .{ .ignore_unknown_fields = true });
-        errdefer parsed.deinit();
+        const parsed = try std.json.parseFromSlice(std.json.Value, allocator, source, .{ .ignore_unknown_fields = true });
+        defer parsed.deinit();
 
         const root = parsed.value;
         const obj = root.object;
 
         // theme meta
-        const name = if (obj.get("name")) |v| v.string else "";
-        const author = if (obj.get("author")) |v| v.string else "";
+        const name = try theme.strings.append(if (obj.get("name")) |v| v.string else "");
+        const author = try theme.strings.append(if (obj.get("author")) |v| v.string else "");
         const semantic_highlighting = if (obj.get("semanticHighlighting")) |v| v.bool else false;
 
         // colors
@@ -319,8 +326,8 @@ pub const Theme = struct {
                         // fail silenty
                         continue;
                     }
-                    const k = entry.key_ptr.*;
-                    const v = entry.value_ptr.*.string;
+                    const k = try theme.strings.append(entry.key_ptr.*);
+                    const v = try theme.strings.append(entry.value_ptr.*.string);
                     // TODO value should be settings
                     var settings = Settings{
                         .foreground = v,
@@ -341,7 +348,7 @@ pub const Theme = struct {
         errdefer aa.free(token_colors);
         for (token_colors_arr.items, 0..) |item, i| {
             const o = item.object;
-            const token_name = if (o.get("name")) |v| v.string else "";
+            const token_name = try theme.strings.append(if (o.get("name")) |v| v.string else "");
 
             // settings
             if (o.get("settings") == null) {
@@ -364,7 +371,7 @@ pub const Theme = struct {
                     const scopes = try aa.alloc([]const u8, opt.array.items.len);
                     errdefer aa.free(scopes);
                     for (opt.array.items, 0..) |scope_item, j| {
-                        scopes[j] = scope_item.string;
+                        scopes[j] = try theme.strings.append(scope_item.string);
                     }
                     break :blk scopes;
                 }
@@ -386,7 +393,7 @@ pub const Theme = struct {
         theme.semantic_highlighting = semantic_highlighting;
         theme.colors = colors;
         theme.token_colors = token_colors;
-        theme.parsed = parsed;
+        // theme.parsed = parsed;
 
         for (token_colors, 0..) |tokenColor, ti| {
             if (tokenColor.scope) |sc| {

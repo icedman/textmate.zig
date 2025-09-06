@@ -3,12 +3,14 @@ const oni = @import("oniguruma");
 const resources = @import("resources/resources.zig");
 const embedded = @import("resources/embedded.zig");
 const util = @import("util.zig");
+const strings = @import("strings.zig");
 const atoms = @import("atoms.zig");
-const Atom = atoms.Atom;
-const GrammarInfo = resources.GrammarInfo;
 
 const Allocator = std.mem.Allocator;
 const ArenaAllocator = std.heap.ArenaAllocator;
+const Atom = atoms.Atom;
+const GrammarInfo = resources.GrammarInfo;
+const StringsArena = strings.StringsArena;
 
 // Regex is merely a wrapper to oni.Regex
 // It adds an idenfier and points to the expression string
@@ -17,7 +19,6 @@ const ArenaAllocator = std.heap.ArenaAllocator;
 pub const Regex = struct {
     id: u64 = 0,
     expr: ?[]const u8 = null,
-    exprs: [64]u8 = [_]u8{0} ** 64,
     regex: ?oni.Regex = null,
     has_references: bool = false,
     is_anchored: bool = false,
@@ -47,6 +48,12 @@ pub const Regex = struct {
         self.regex = re;
         self.valid = .Valid;
         self.id = util.toHash(regex);
+    }
+
+    pub fn deinit(self: *Regex) void {
+        if (self.regex) |*regex| {
+            @constCast(regex).deinit();
+        }
     }
 };
 
@@ -108,7 +115,7 @@ pub const Syntax = struct {
     }
 
     // a syntaxMap is where a name is mapped to a syntax node
-    fn parseSyntaxMap(allocator: Allocator, json: std.json.Value, field_name: []const u8, parent: ?*Syntax) !?std.StringHashMap(*Syntax) {
+    fn parseSyntaxMap(allocator: Allocator, json: std.json.Value, field_name: []const u8, parent: ?*Syntax, strings_arena: *StringsArena) !?std.StringHashMap(*Syntax) {
         if (json != .object) return error.InvalidSyntax;
         const obj = json.object;
         return blk: {
@@ -118,9 +125,9 @@ pub const Syntax = struct {
                 errdefer res.deinit();
                 var it = source.object.iterator();
                 while (it.next()) |kv| {
-                    const k = kv.key_ptr.*;
+                    const k = try strings_arena.append(kv.key_ptr.*);
                     const v = kv.value_ptr.*;
-                    var syntax = try Syntax.init(allocator, v);
+                    var syntax = try Syntax.init(allocator, v, strings_arena);
                     syntax.parent = parent;
                     try res.put(k, syntax);
                 }
@@ -130,7 +137,7 @@ pub const Syntax = struct {
         };
     }
 
-    pub fn init(allocator: Allocator, json: std.json.Value) error{ OutOfMemory, InvalidSyntax }!*Syntax {
+    pub fn init(allocator: Allocator, json: std.json.Value, strings_arena: *StringsArena) error{ OutOfMemory, InvalidSyntax }!*Syntax {
         if (json != .object) return error.InvalidSyntax;
         const obj = json.object;
 
@@ -142,20 +149,20 @@ pub const Syntax = struct {
                 .name = "",
                 .content_name = "",
                 .scope_name = "",
-                .include_path = path.string,
+                .include_path = try strings_arena.append(path.string),
             };
             return syntax;
         }
 
         syntax.* = Syntax{
             .id = @intFromPtr(syntax),
-            .name = if (obj.get("name")) |v| v.string else "",
-            .content_name = if (obj.get("contentName")) |v| v.string else "",
-            .scope_name = if (obj.get("scopeName")) |v| v.string else "",
-            .rx_match = Regex{ .expr = if (obj.get("match")) |v| v.string else null },
-            .rx_begin = Regex{ .expr = if (obj.get("begin")) |v| v.string else null },
-            .rx_while = Regex{ .expr = if (obj.get("while")) |v| v.string else null },
-            .rx_end = Regex{ .expr = if (obj.get("end")) |v| v.string else null },
+            .name = try strings_arena.append(if (obj.get("name")) |v| v.string else ""),
+            .content_name = try strings_arena.append(if (obj.get("contentName")) |v| v.string else ""),
+            .scope_name = try strings_arena.append(if (obj.get("scopeName")) |v| v.string else ""),
+            .rx_match = Regex{ .expr = if (obj.get("match")) |v| try strings_arena.append(v.string) else null },
+            .rx_begin = Regex{ .expr = if (obj.get("begin")) |v| try strings_arena.append(v.string) else null },
+            .rx_while = Regex{ .expr = if (obj.get("while")) |v| try strings_arena.append(v.string) else null },
+            .rx_end = Regex{ .expr = if (obj.get("end")) |v| try strings_arena.append(v.string) else null },
         };
 
         syntax.compileAllRegexes() catch {
@@ -168,17 +175,17 @@ pub const Syntax = struct {
             const res = try allocator.alloc(*Syntax, patterns_arr.array.items.len);
             errdefer allocator.free(res);
             for (patterns_arr.array.items) |item| {
-                var syn = try Syntax.init(allocator, item);
+                var syn = try Syntax.init(allocator, item, strings_arena);
                 syn.parent = syntax;
                 try syntax.patterns.?.append(allocator, syn);
             }
         }
 
-        syntax.captures = try parseSyntaxMap(allocator, json, "captures", syntax);
-        syntax.begin_captures = try parseSyntaxMap(allocator, json, "beginCaptures", syntax);
-        syntax.while_captures = try parseSyntaxMap(allocator, json, "whileCaptures", syntax);
-        syntax.end_captures = try parseSyntaxMap(allocator, json, "endCaptures", syntax);
-        syntax.repository = try parseSyntaxMap(allocator, json, "repository", syntax);
+        syntax.captures = try parseSyntaxMap(allocator, json, "captures", syntax, strings_arena);
+        syntax.begin_captures = try parseSyntaxMap(allocator, json, "beginCaptures", syntax, strings_arena);
+        syntax.while_captures = try parseSyntaxMap(allocator, json, "whileCaptures", syntax, strings_arena);
+        syntax.end_captures = try parseSyntaxMap(allocator, json, "endCaptures", syntax, strings_arena);
+        syntax.repository = try parseSyntaxMap(allocator, json, "repository", syntax, strings_arena);
 
         // std.debug.print("syntax address {*}-{*}\n", .{syntax, syntax.parent});
         return syntax;
@@ -204,10 +211,8 @@ pub const Syntax = struct {
 
         // free oni.Regexes
         for (entries) |entry| {
-            const r: Regex = entry.rx_ptr.*;
-            if (r.regex) |*regex| {
-                @constCast(regex).deinit();
-            }
+            var regex: Regex = entry.rx_ptr.*;
+            regex.deinit();
         }
 
         if (self.patterns) |pats| {
@@ -636,7 +641,7 @@ pub const Grammar = struct {
     // foldingStartMarker / foldingStopMarker
 
     // TODO release this after parse (requires that all string values be allocated and copied)
-    parsed: ?std.json.Parsed(std.json.Value) = null,
+    strings: StringsArena,
 
     pub fn init(allocator: Allocator, source_path: []const u8) !*Grammar {
         const file = try std.fs.cwd().openFile(source_path, .{});
@@ -655,11 +660,11 @@ pub const Grammar = struct {
 
     pub fn deinit(self: *Grammar) void {
         // std.debug.print("grammar deinit {*}\n", .{self});
+        self.strings.deinit();
         if (self.syntax) |syn| {
             syn.deinit();
         }
 
-        // TODO arena - makes allocation really abstract.. remove?
         self.inject_to.deinit(self.allocator);
         self.arena.deinit();
 
@@ -672,6 +677,7 @@ pub const Grammar = struct {
             .allocator = allocator,
             .inject_to = try std.ArrayList([]const u8).initCapacity(allocator, 2048),
             .arena = ArenaAllocator.init(allocator),
+            .strings = try StringsArena.init(allocator),
             .name = "",
             .scope_name = "",
         };
@@ -680,16 +686,17 @@ pub const Grammar = struct {
         // TODO reconsider arena
         const aa = grammar.arena.allocator();
 
-        const parsed = try std.json.parseFromSlice(std.json.Value, aa, source, .{ .ignore_unknown_fields = true });
+        const parsed = try std.json.parseFromSlice(std.json.Value, allocator, source, .{ .ignore_unknown_fields = true });
+        defer parsed.deinit();
         const root = parsed.value;
 
         if (root != .object) return error.InvalidGrammar;
         const obj = root.object;
 
         // grammar meta
-        const name = if (obj.get("name")) |v| v.string else "";
-        const scope_name = if (obj.get("scope_name")) |v| v.string else "";
-        const syntax = try Syntax.init(aa, root);
+        const name = try grammar.strings.append(if (obj.get("name")) |v| v.string else "");
+        const scope_name = try grammar.strings.append(if (obj.get("scope_name")) |v| v.string else "");
+        const syntax = try Syntax.init(aa, root, &grammar.strings);
 
         if (obj.get("injectTo")) |inject| {
             if (inject == .array) {
@@ -700,7 +707,6 @@ pub const Grammar = struct {
         grammar.name = name;
         grammar.scope_name = scope_name;
         grammar.syntax = syntax;
-        grammar.parsed = parsed;
         syntax.scope_name = "scope_name";
         return grammar;
     }

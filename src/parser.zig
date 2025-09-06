@@ -3,11 +3,14 @@ const oni = @import("oniguruma");
 const grammar = @import("grammar.zig");
 const processor = @import("processor.zig");
 const util = @import("util.zig");
+const strings = @import("strings.zig");
 const atoms = @import("atoms.zig");
+
+const Allocator = std.mem.Allocator;
 const Syntax = grammar.Syntax;
 const Regex = grammar.Regex;
 const Atom = atoms.Atom;
-const Allocator = std.mem.Allocator;
+const StringsArena = strings.StringsArena;
 
 // TODO move to config.. smallcaps
 // is exec level (findMatch) caching slower as it caches everything -- even resolving captures?)
@@ -33,6 +36,7 @@ pub const ParseCapture = struct {
     // is this expensive to pass around (copy)
     // TODO convert scope to atoms (scope_hash) ...
     scope: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN,
+    scope_: []const u8 = undefined,
     atom: Atom = Atom{},
 
     syntax: ?*Syntax = null,
@@ -301,6 +305,8 @@ pub const Parser = struct {
     // optionally attach a theme's atoms here for faster scope resolution
     atoms: ?*std.StringHashMap(u32) = null,
 
+    strings: StringsArena,
+
     // stats
     regex_execs: u32 = 0,
     regex_skips: u32 = 0,
@@ -313,6 +319,7 @@ pub const Parser = struct {
             .match_cache = std.AutoHashMap(u64, Match).init(allocator),
             .exec_cache = std.AutoHashMap(u64, Match).init(allocator),
             .regex_map = std.AutoHashMap(u64, grammar.Regex).init(allocator),
+            .strings = StringsArena.init(allocator),
         };
     }
 
@@ -328,6 +335,7 @@ pub const Parser = struct {
             }
         }
         self.regex_map.deinit();
+        self.strings.deinit();
     }
 
     pub fn initState(self: *Parser) !ParseState {
@@ -397,7 +405,8 @@ pub const Parser = struct {
                 break :blk result;
             };
 
-            if (reg) |r| {
+            if (reg) |*r| {
+                defer @constCast(r).deinit();
                 var m = Match{
                     .syntax = syntax,
                     .regex = rx,
@@ -678,15 +687,7 @@ pub const Parser = struct {
     }
 
     fn collectMatch(self: *Parser, syntax: *const Syntax, match: *const Match, block: []const u8) void {
-        const name = blk: {
-            if (syntax.content_name.len > 0) {
-                break :blk syntax.content_name;
-            }
-            if (syntax.scope_name.len > 0) {
-                break :blk syntax.scope_name;
-            }
-            break :blk syntax.name;
-        };
+        const name = syntax.getName();
         if (self.processor) |proc| {
             var c = Capture{
                 .start = match.start,

@@ -14,6 +14,7 @@ var grammar_id: u16 = 1;
 
 // Fixed length strings for embedded resources
 // convert to []const u8 for faster embedding (avoiding memcpy)
+// TODO use StringsArena (strings are copied anyway), and ArrayList
 pub const GrammarInfo = struct {
     id: usize = 0, // for caching purposed
     name: [MAX_NAME_LENGTH]u8 = [_]u8{0} ** MAX_NAME_LENGTH,
