@@ -10,9 +10,6 @@ const GrammarInfo = resources.GrammarInfo;
 const Allocator = std.mem.Allocator;
 const ArenaAllocator = std.heap.ArenaAllocator;
 
-// TODO convert to hash or uuid
-var syntax_id: u32 = 1;
-
 // Regex is merely a wrapper to oni.Regex
 // It adds an idenfier and points to the expression string
 // It also holds other cached information
@@ -20,6 +17,7 @@ var syntax_id: u32 = 1;
 pub const Regex = struct {
     id: u64 = 0,
     expr: ?[]const u8 = null,
+    exprs: [64]u8 = [_]u8{0} ** 64,
     regex: ?oni.Regex = null,
     has_references: bool = false,
     is_anchored: bool = false,

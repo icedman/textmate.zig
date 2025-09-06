@@ -141,7 +141,7 @@ pub fn main() !void {
                 if (item.inject_only) {
                     continue;
                 }
-                std.debug.print("{s}({s}) ", .{item.name, item.scope_name});
+                std.debug.print("{s}({s}) ", .{ item.name, item.scope_name });
                 if ((i + 1) % 8 == 0) std.debug.print("\n", .{});
             }
         }
@@ -171,7 +171,7 @@ pub fn main() !void {
             };
         }
     }
-    // let the library deinit library-loaded thee 
+    // let the library deinit library-loaded thee
     // defer thm.deinit();
 
     var gmr: *Grammar = undefined;
@@ -197,8 +197,7 @@ pub fn main() !void {
         }
     }
 
-
-    // let the library deinit library-loaded grammars 
+    // let the library deinit library-loaded grammars
     // defer gmr.deinit();
 
     var par = try Parser.init(allocator, gmr);

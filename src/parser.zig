@@ -213,15 +213,17 @@ pub const ParseState = struct {
                 if (syntax.rx_end.expr) |regexs| {
                     var output: [MAX_SCOPE_LEN]u8 = [_]u8{0} ** MAX_SCOPE_LEN;
                     _ = m.applyReferences(block, regexs, &output);
+                    const regex_id = util.toHash(&output);
 
                     // TODO cache this dynamic regex
                     {
-                        if (self.owner.regex_map.get(util.toHash(util.toSlice([MAX_SCOPE_LEN]u8, output)))) |r| {
+                        if (self.owner.regex_map.get(regex_id)) |r| {
                             sc.rx_end = r;
                         } else {
-                            sc.rx_end.compile(&output) catch {};
+                            sc.rx_end.compile(&output) catch {
+                                std.debug.print("unable to compile {s}\n", .{output});
+                            };
                             if (sc.rx_end.id > 0) {
-                                std.debug.print("??>>>{s} {}\n", .{ output, sc.rx_end.id });
                                 try self.owner.regex_map.put(sc.rx_end.id, sc.rx_end);
                             }
                         }
@@ -570,7 +572,7 @@ pub const Parser = struct {
                         };
 
                         if (m.count == 0) {
-                            std.debug.print("pop {s} [{s}]\n", .{ syn.rx_while.expr orelse "", block });
+                            // std.debug.print("pop {s} [{s}]\n", .{ syn.rx_while.expr orelse "", block });
                             while (state.size() >= state_depth) {
                                 state.pop("matchWhile");
                             }
@@ -609,9 +611,8 @@ pub const Parser = struct {
                     if (t.rx_end.valid == .Valid) {
                         // use dynamic end_regex here if one was compiled
                         // not caching or result in this case
-                        // std.debug.print("dynamic end! {s} {} {s}\n", .{t.rx_end.expr orelse "", t.rx_end.id, t.rx_end.expr orelse ""});
-                        const m = self.findMatch(@constCast(syn), @constCast(&syn.rx_end), t.rx_end.regex, block, start, end);
-                        // std.debug.print(">>>\n", .{});
+                        const m = self.findMatch(@constCast(syn), @constCast(&t.rx_end), t.rx_end.regex, block, start, end);
+                        // std.debug.print(">>>[{s}] match:{} {}-{}\n", .{ block, m.count, start, end });
                         break :blk m;
                     }
 
@@ -877,7 +878,7 @@ pub const Parser = struct {
 
                             // if it has a regexs_end.. it is a begin and should cause a push
                             if (match_syn.rx_begin.valid == .Valid) {
-                                std.debug.print("push {s}\n", .{match_syn.getName()});
+                                // std.debug.print("push {s}\n", .{match_syn.getName()});
                                 if (pattern_match.regex) |rx| {
                                     if (last_push_pos != start_ or last_push_syntax != match_syn.id) {
                                         if (ENABLE_SCOPE_ATOMS and !rx.has_references) {
