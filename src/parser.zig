@@ -8,6 +8,7 @@ const atoms = @import("atoms.zig");
 const config = @import("config.zig");
 
 const Allocator = std.mem.Allocator;
+const ArrayList = std.ArrayList;
 const Syntax = grammar.Syntax;
 const Regex = grammar.Regex;
 const Atom = atoms.Atom;
@@ -51,8 +52,15 @@ const Match = struct {
     anchor_start: usize = 0,
     anchor_end: usize = 0,
 
-    fn applyRef(self: *const Match, block: []const u8, target: []const u8, escape_character: u8, output: *[config.max_scope_len]u8) u8 {
-        var output_idx: u8 = 0;
+    // todo convert to ArrayList(u8) - slower but safer
+    fn applyRef(
+        self: *const Match,
+        block: []const u8,
+        target: []const u8,
+        escape_character: u8,
+        output: *ArrayList(u8),
+        allocator: Allocator,
+    ) !usize {
         var escape = false;
         var skip: usize = 0;
         for (target, 0..) |ch, idx| {
@@ -61,12 +69,11 @@ const Match = struct {
                 continue;
             }
             if (escape and std.ascii.isDigit(ch)) {
-                output_idx -= 1;
                 for (0..self.count) |i| {
                     const r = self.ranges[i];
                     const digit: u8 = blk: {
                         const d = ch - '0';
-                        if (config.max_match_ranges > 9 and output_idx < output.len - 1) {
+                        if (config.max_match_ranges > 9) {
                             // check for another digit if allowed the config
                             const ch2 = target[idx + 1];
                             if (std.ascii.isDigit(ch2)) {
@@ -79,37 +86,53 @@ const Match = struct {
                         break :blk d;
                     };
                     if (digit == r.group) {
+                        _ = output.pop().?;
                         for (r.start..r.end) |bi| {
                             const rch = block[bi];
                             if (rch == '*' or rch == '.') {
-                                output[output_idx] = '\\';
-                                output_idx += 1;
+                                try output.append(allocator, '\\');
                             }
-                            output[output_idx] = rch;
-                            output_idx += 1;
-                            // this cuts off any overflow
-                            if (output_idx >= output.len) return output_idx;
+                            try output.append(allocator, rch);
                         }
                     }
                 }
             } else {
-                output[output_idx] = ch;
-                output_idx += 1;
-                if (output_idx >= output.len) return output_idx;
+                try output.append(allocator, ch);
             }
             escape = (!escape) and (ch == escape_character);
         }
 
         // std.debug.print("{s}\n", .{output});
-        return output_idx;
+        return output.items.len;
     }
 
-    pub fn applyReferences(self: *const Match, block: []const u8, target: []const u8, output: *[config.max_scope_len]u8) u8 {
-        return self.applyRef(block, target, '\\', output);
+    pub fn applyReferences(
+        self: *const Match,
+        block: []const u8,
+        target: []const u8,
+        output: *ArrayList(u8),
+        allocator: Allocator,
+    ) !usize {
+        return try self.applyRef(block, target, '\\', output, allocator);
     }
 
-    pub fn applyCaptures(self: *const Match, block: []const u8, target: []const u8, output: *[config.max_scope_len]u8) u8 {
-        return self.applyRef(block, target, '$', output);
+    pub fn applyCaptures(
+        self: *const Match,
+        block: []const u8,
+        target: []const u8,
+        output: *ArrayList(u8),
+        allocator: Allocator,
+    ) !usize {
+        return try self.applyRef(block, target, '$', output, allocator);
+    }
+
+    pub fn dump(self: *const Match, block: []const u8) void {
+        for (0..self.count) |i| {
+            const r = self.ranges[i];
+            const s = r.start;
+            const e = r.end;
+            std.debug.print("{} {s}\n", .{ i, block[s..e] });
+        }
     }
 };
 
@@ -203,17 +226,23 @@ pub const ParseState = struct {
         if (match) |m| {
             if (syntax.rx_end.has_references) {
                 if (syntax.rx_end.expr) |regexs| {
-                    // fixed arrays for strings has too many gotchas ... avoid
-                    var output: [config.max_regex_len]u8 = [_]u8{0} ** config.max_regex_len;
-                    _ = m.applyReferences(block, regexs, &output);
-                    const expr = try self.owner.strings.appendUnique(util.toSlice([config.max_regex_len]u8, output));
+                    var output = try ArrayList(u8).initCapacity(self.allocator, regexs.len + 64);
+                    defer output.deinit(self.allocator);
+                    _ = try m.applyReferences(block, regexs, &output, self.allocator);
+                    const expr = try self.owner.strings.appendUnique(output.items);
                     const regex_id = util.toHash(expr);
                     {
                         if (self.owner.regex_map.get(regex_id)) |r| {
                             sc.rx_end = r;
                         } else {
+                            // std.debug.print("compile {s} < {s} {s}<\n", .{ regexs, expr, block });
                             sc.rx_end.compile(expr) catch {
-                                std.debug.print("unable to compile {s} < {s}<\n", .{ regexs, expr });
+                                // std.debug.print("compile {s} < {s} {s} matches:{}<\n", .{ regexs, expr, block, m.count });
+                                // std.debug.print("unable to compile {s} < {s}<\n", .{ regexs, expr });
+                                // m.dump(block);
+
+                                // if unable to compile... don't push otherwise we won't be able to exit
+                                return;
                             };
                             if (sc.rx_end.id > 0) {
                                 // std.debug.print("{} {s} {}\n", .{sc.rx_end.id, expr, expr.len});
@@ -225,9 +254,10 @@ pub const ParseState = struct {
                 }
                 if (syntax.rx_while.has_references) {
                     if (syntax.rx_while.expr) |regexs| {
-                        var output: [config.max_regex_len]u8 = [_]u8{0} ** config.max_regex_len;
-                        _ = m.applyReferences(block, regexs, &output);
-                        const expr = try self.owner.strings.appendUnique(util.toSlice([config.max_regex_len]u8, output));
+                        var output = try ArrayList(u8).initCapacity(self.allocator, regexs.len + 64);
+                        defer output.deinit(self.allocator);
+                        _ = try m.applyReferences(block, regexs, &output, self.allocator);
+                        const expr = try self.owner.strings.appendUnique(output.items);
                         const regex_id = util.toHash(expr);
                         {
                             if (self.owner.regex_map.get(regex_id)) |r| {
@@ -433,7 +463,7 @@ pub const Parser = struct {
                         // m.ranges[count].group = i;
                         // m.ranges[count].start = start;
                         // m.ranges[count].end = start;
-                        // count += 1;
+                        count += 1;
                         // -1 could happen in oniguruma when an optional capture group didn't match
                         // case: when no newline '\n' is present (c.tmLanguage)
                         continue;
@@ -692,13 +722,17 @@ pub const Parser = struct {
 
     fn collectMatch(self: *Parser, syntax: *const Syntax, match: *const Match, block: []const u8) !void {
         const name = syntax.getName();
+
+        if (config.enable_scope_atoms_skip and syntax.atom.id == 1) return;
+
         if (self.processor) |proc| {
             var c = Capture{
                 .start = match.start,
                 .end = match.end,
             };
-            var cscope: [config.max_scope_len]u8 = [_]u8{0} ** config.max_scope_len;
-            if (match.applyCaptures(block, name, &cscope) == 0) {
+            var cscope = try ArrayList(u8).initCapacity(self.allocator, name.len + 24);
+            defer cscope.deinit(self.allocator);
+            if (try match.applyCaptures(block, name, &cscope, self.allocator) == 0) {
                 if (match.regex) |rx| {
                     if (config.enable_scope_atoms and !rx.has_references) {
                         if (!rx.has_references) {
@@ -715,8 +749,7 @@ pub const Parser = struct {
                     }
                 }
             }
-            // c.scope = try self.transient_strings.appendUnique(util.toSlice([config.max_scope_len]u8, cscope));
-            c.scope = try self.transient_strings.appendUnique(&cscope);
+            c.scope = try self.transient_strings.appendUnique(cscope.items);
             proc.capture(&c);
         }
     }
@@ -738,8 +771,12 @@ pub const Parser = struct {
                         .end = range.end,
                     };
 
-                    var cscope: [config.max_scope_len]u8 = [_]u8{0} ** config.max_scope_len;
-                    if (match.applyCaptures(block, syn.name, &cscope) == 0) {
+                    // theme is not interested in this
+                    if (config.enable_scope_atoms_skip and syn.atom.id == 1) continue;
+
+                    var cscope = try ArrayList(u8).initCapacity(self.allocator, syn.name.len + 24);
+                    defer cscope.deinit(self.allocator);
+                    if (try match.applyCaptures(block, syn.name, &cscope, self.allocator) == 0) {
                         if (match.regex) |rx| {
                             if (config.enable_scope_atoms and !rx.has_references) {
                                 if (self.atoms) |at| {
@@ -754,8 +791,7 @@ pub const Parser = struct {
                             }
                         }
                     }
-                    // c.scope = try self.transient_strings.appendUnique(util.toSlice([config.max_scope_len]u8, cscope));
-                    c.scope = try self.transient_strings.appendUnique(&cscope);
+                    c.scope = try self.transient_strings.appendUnique(cscope.items);
                     // std.debug.print("{s}]\n", .{c.scope_});
                     proc.capture(&c);
                 }
@@ -781,12 +817,13 @@ pub const Parser = struct {
                                             .start = range.start,
                                             .end = range.end,
                                         };
-                                        var cscope: [config.max_scope_len]u8 = [_]u8{0} ** config.max_scope_len;
-                                        if (m.applyCaptures(block, p.name, &cscope) == 0) {
+
+                                        var cscope = try ArrayList(u8).initCapacity(self.allocator, p.name.len + 24);
+                                        defer cscope.deinit(self.allocator);
+                                        if (try m.applyCaptures(block, p.name, &cscope, self.allocator) == 0) {
                                             // TODO atom
                                         }
-                                        // c.scope = try self.transient_strings.appendUnique(util.toSlice([config.max_scope_len]u8, cscope));
-                                        c.scope = try self.transient_strings.appendUnique(&cscope);
+                                        c.scope = try self.transient_strings.appendUnique(cscope.items);
                                         proc.capture(&c);
                                     }
                                 }
@@ -811,7 +848,7 @@ pub const Parser = struct {
         self.match_cache.clearRetainingCapacity();
         self.exec_cache.clearRetainingCapacity();
 
-        // self.transient_strings.clear();
+        self.transient_strings.clear();
 
         var start: usize = 0;
         var end = block.len;
@@ -850,10 +887,8 @@ pub const Parser = struct {
                     const end_match: Match = self.matchEnd(state, block, start, end);
                     var pattern_match: Match = Match{};
 
-                    if (end_match.count > 0 and end_match.end + 1 >= end) {
+                    if (end_match.count > 0 and end_match.end + 1 >= end and start == 0) {
                         // this is the end of the block.. don't bother with patterns
-                    } else if (end_match.count > 0 and start == 0) {
-                        // if end is matched at the very start... end immediately
                     } else {
                         pattern_match = self.matchPatterns(syn, syn.patterns, block, start, end);
                     }
@@ -1010,9 +1045,10 @@ test "test references" {
     m.ranges[1].group = 2;
     m.ranges[1].start = 3;
     m.ranges[1].end = 5;
-    var output: [config.max_scope_len]u8 = [_]u8{0} ** config.max_scope_len;
-    _ = m.applyReferences(block, "hello \\1 world \\2.", &output);
+    var output = ArrayList(u8).initCapacity(std.testing.allocator, 64);
+    defer output.deinit();
+    _ = try m.applyReferences(block, "hello \\1 world \\2.", &output, std.testing.allocator);
 
     const expectedOutput = "hello ab world de.";
-    try std.testing.expectEqualStrings(output[0..expectedOutput.len], expectedOutput);
+    try std.testing.expectEqualStrings(output.items[0..expectedOutput.len], expectedOutput);
 }

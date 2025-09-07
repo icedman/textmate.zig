@@ -5,6 +5,7 @@ const embedded = @import("resources/embedded.zig");
 const util = @import("util.zig");
 const strings = @import("strings.zig");
 const atoms = @import("atoms.zig");
+const config = @import("config.zig");
 
 const Allocator = std.mem.Allocator;
 const ArenaAllocator = std.heap.ArenaAllocator;
@@ -34,6 +35,7 @@ pub const Regex = struct {
 
     // TODO change to void - regex compile errors are blamed on user-defined grammars - fail silently
     pub fn compile(self: *Regex, regex: []const u8) !void {
+        // std.debug.print("rx: {s} {}\n", .{regex, regex.len});
         const re = oni.Regex.init(
             regex,
             .{},
@@ -231,6 +233,7 @@ pub const Syntax = struct {
             .{ .map_ptr = &self.captures },
             .{ .map_ptr = &self.begin_captures },
             .{ .map_ptr = &self.end_captures },
+            .{ .map_ptr = &self.while_captures },
         };
 
         for (capture_entries) |entry| {
@@ -275,6 +278,7 @@ pub const Syntax = struct {
                     entry.rx_ptr.*.has_references = true;
                     continue;
                 }
+
                 entry.rx_ptr.*.compile(regex) catch {
                     // fail silently
                 };
@@ -707,7 +711,7 @@ pub const Grammar = struct {
         grammar.name = name;
         grammar.scope_name = scope_name;
         grammar.syntax = syntax;
-        syntax.scope_name = "scope_name";
+        syntax.scope_name = scope_name;
         return grammar;
     }
 };

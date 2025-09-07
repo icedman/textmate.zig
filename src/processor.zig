@@ -62,7 +62,6 @@ pub const Processor = struct {
                         if (c.atom.count == 0) {
                             const name = context.syntax.getName();
                             c.scope = name;
-                            // @memcpy(c.scope[0..name.len], name);
                         }
                         self.captures.append(self.allocator, c) catch {};
                     }

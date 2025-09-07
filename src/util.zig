@@ -13,7 +13,7 @@ pub fn toSlice(comptime T: type, array: T) []const u8 {
 
 pub fn toHash(s: []const u8) u64 {
     var hasher = std.hash.Fnv1a_64.init();
-    if (s.len < 16) { 
+    if (s.len < 16) {
         var tmp: [128]u8 = [_]u8{0} ** 128;
         @memcpy(tmp[0..s.len], s);
         hasher.update(&tmp);
