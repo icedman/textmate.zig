@@ -181,7 +181,7 @@ pub const Theme = struct {
 
     // TODO minimize optionals
     // TODO use ArrayList .. cleaner
-    author: ?[]const u8 = null,
+    author: []const u8 = "",
     colors: ?std.StringHashMap(Settings) = null,
     token_colors: ?[]TokenColor = null,
     semantic_highlighting: bool = false,
@@ -377,6 +377,20 @@ pub const Theme = struct {
             };
 
             token_colors[i] = TokenColor{ .name = token_name, .settings = settings.value, .scope = scopes };
+
+            // dupe to StringsArena
+            if (token_colors[i].settings) |*ss| {
+                if (ss.foreground) |fg| {
+                    ss.foreground = try theme.strings.appendUnique(fg);
+                }
+                if (ss.background) |bg| {
+                    ss.background = try theme.strings.appendUnique(bg);
+                }
+                if (ss.fontStyle) |fs| {
+                    ss.fontStyle = try theme.strings.appendUnique(fs);
+                }
+            }
+
             token_colors[i].settings.?.compute();
 
             if (scopes) |outer| {

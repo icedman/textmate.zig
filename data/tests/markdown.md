@@ -25,6 +25,16 @@ int main(int argc, char **argv) {
     return 0;
 }
 ```
+
+```python
+def print():
+ j = [1,2,3,4];
+```
+
+```js
+ j = [1,2,3,4];
+```
+
 # heading 1 # 
 ## heading 2 ## 
 ### heading 3 ###

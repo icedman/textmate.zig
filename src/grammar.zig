@@ -20,8 +20,8 @@ pub const Regex = struct {
     id: u64 = 0,
     expr: ?[]const u8 = null,
     regex: ?oni.Regex = null,
-    has_references: bool = false,
-    is_anchored: bool = false,
+    has_references: bool = false, // \1 or $1
+    is_anchored: bool = false, // \G
     is_string_block: bool = false,
     is_comment_block: bool = false,
 
@@ -86,6 +86,7 @@ pub const Syntax = struct {
     // include
     include_path: ?[]const u8 = null,
     include: ?*Syntax = null,
+    is_grammar_root: bool = false,
 
     // stats
     execs: u32 = 0,
@@ -281,6 +282,14 @@ pub const Syntax = struct {
         }
     }
 
+    pub fn root(self: *Syntax) *Syntax {
+        var r = self;
+        while (r.parent) |p| {
+            r = p;
+        }
+        return r;
+    }
+
     pub fn resolve(self: *Syntax, syntax: *Syntax, base: ?*Syntax) ?*const Syntax {
         if (syntax.include_path) |include_path| {
             if (include_path.len == 0) return null;
@@ -296,23 +305,14 @@ pub const Syntax = struct {
             if (include_path[0] == '$') {
                 // TODO understand $self, $base
                 if (std.mem.indexOf(u8, include_path, "$self") == 0) {
-                    // root?
-                    var root = self;
-                    while (root.parent) |p| {
-                        root = p;
-                    }
-                    syntax.include = root;
-                    return root;
+                    // root? which one..
+                    const r = syntax.root();
+                    // const r = self.root();
+                    syntax.include = r;
+                    return r;
                 }
 
                 if (std.mem.indexOf(u8, include_path, "$base") == 0) {
-                    // base grammar?
-                    // var root = self;
-                    // while (root.parent) |p| {
-                    //     root = p;
-                    // }
-                    // syntax.include = root;
-                    // return root;
                     return base;
                 }
             }
@@ -325,8 +325,8 @@ pub const Syntax = struct {
                     const gmr = gml.grammarFromScopeName(include_path) catch {
                         return null;
                     };
-                    // std.debug.print("{s} {s}\n", .{include_path, gmr.name});
                     syntax.include = gmr.syntax;
+                    // std.debug.print("{s} {s} {*} {*}\n", .{ include_path, gmr.name, gmr.syntax, syntax.include });
                     return gmr.syntax;
                 }
             }

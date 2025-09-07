@@ -80,7 +80,12 @@ const Match = struct {
                     };
                     if (digit == r.group) {
                         for (r.start..r.end) |bi| {
-                            output[output_idx] = block[bi];
+                            const rch = block[bi];
+                            if (rch == '*' or rch == '.') {
+                                output[output_idx] = '\\';
+                                output_idx += 1;
+                            }
+                            output[output_idx] = rch;
                             output_idx += 1;
                             // this cuts off any overflow
                             if (output_idx >= output.len) return output_idx;
@@ -198,37 +203,44 @@ pub const ParseState = struct {
         if (match) |m| {
             if (syntax.rx_end.has_references) {
                 if (syntax.rx_end.expr) |regexs| {
-                    var output: [config.max_scope_len]u8 = [_]u8{0} ** config.max_scope_len;
+                    // fixed arrays for strings has too many gotchas ... avoid
+                    var output: [config.max_regex_len]u8 = [_]u8{0} ** config.max_regex_len;
                     _ = m.applyReferences(block, regexs, &output);
-                    const regex_id = util.toHash(&output);
-
-                    // TODO cache this dynamic regex
+                    const expr = try self.owner.strings.appendUnique(util.toSlice([config.max_regex_len]u8, output));
+                    const regex_id = util.toHash(expr);
                     {
                         if (self.owner.regex_map.get(regex_id)) |r| {
                             sc.rx_end = r;
                         } else {
-                            sc.rx_end.compile(&output) catch {
-                                std.debug.print("unable to compile {s}\n", .{output});
+                            sc.rx_end.compile(expr) catch {
+                                std.debug.print("unable to compile {s} < {s}<\n", .{ regexs, expr });
                             };
                             if (sc.rx_end.id > 0) {
+                                // std.debug.print("{} {s} {}\n", .{sc.rx_end.id, expr, expr.len});
                                 try self.owner.regex_map.put(sc.rx_end.id, sc.rx_end);
                             }
                         }
+                        sc.rx_end.expr = expr;
                     }
                 }
                 if (syntax.rx_while.has_references) {
                     if (syntax.rx_while.expr) |regexs| {
-                        var output: [config.max_scope_len]u8 = [_]u8{0} ** config.max_scope_len;
+                        var output: [config.max_regex_len]u8 = [_]u8{0} ** config.max_regex_len;
                         _ = m.applyReferences(block, regexs, &output);
+                        const expr = try self.owner.strings.appendUnique(util.toSlice([config.max_regex_len]u8, output));
+                        const regex_id = util.toHash(expr);
                         {
-                            if (self.owner.regex_map.get(util.toHash(util.toSlice([config.max_scope_len]u8, output)))) |r| {
+                            if (self.owner.regex_map.get(regex_id)) |r| {
                                 sc.rx_while = r;
                             } else {
-                                sc.rx_while.compile(&output) catch {};
+                                sc.rx_while.compile(expr) catch {
+                                    std.debug.print("unable to compile {s} < {s}<\n", .{ regexs, expr });
+                                };
                                 if (sc.rx_while.id > 0) {
                                     try self.owner.regex_map.put(sc.rx_while.id, sc.rx_while);
                                 }
                             }
+                            sc.rx_while.expr = expr;
                         }
                     }
                 }
@@ -251,15 +263,15 @@ pub const ParseState = struct {
             const ctx = self.at(i);
             if (ctx) |t| {
                 const ts = t.syntax;
-                const ls = ts.resolve(ts, self.lang.syntax);
+                const ls = ts.resolve(ts, t.syntax);
                 if (ls) |syn| {
                     std.debug.print("{} {*} {s}\n", .{ i, syn, syn.getName() });
-                    if (syn.regexs_match) |r| {
+                    if (syn.rx_match.expr) |r| {
                         std.debug.print("  match: {s}\n", .{r});
                     }
-                    if (syn.regexs_begin) |r| {
+                    if (syn.rx_begin.expr) |r| {
                         std.debug.print("  begin: {s}\n", .{r});
-                        std.debug.print("  end: {s}\n", .{syn.regexs_end orelse ""});
+                        std.debug.print("  end: {s}\n", .{syn.rx_end.expr orelse ""});
                     }
                 }
             }
@@ -289,6 +301,7 @@ pub const Parser = struct {
     atoms: ?*std.StringHashMap(u32) = null,
 
     strings: StringsArena,
+    transient_strings: StringsArena,
 
     // stats
     regex_execs: u32 = 0,
@@ -303,6 +316,7 @@ pub const Parser = struct {
             .exec_cache = std.AutoHashMap(u64, Match).init(allocator),
             .regex_map = std.AutoHashMap(u64, grammar.Regex).init(allocator),
             .strings = try StringsArena.init(allocator),
+            .transient_strings = try StringsArena.init(allocator),
         };
     }
 
@@ -319,6 +333,7 @@ pub const Parser = struct {
         }
         self.regex_map.deinit();
         self.strings.deinit();
+        self.transient_strings.deinit();
     }
 
     pub fn initState(self: *Parser) !ParseState {
@@ -338,17 +353,24 @@ pub const Parser = struct {
         return 0;
     }
 
+    fn resetCurrentAnchor(self: *Parser) void {
+        if (self.current_state) |state| {
+            var top = state.top();
+            if (top) |*t| {
+                t.anchor = 0;
+            }
+        }
+    }
+
     // findMatch. Regular expression matching. This is where all the CPU usage goes.
     fn findMatch(self: *Parser, syntax: *Syntax, rx: *Regex, regex: ?oni.Regex, block: []const u8, start: usize, end: usize) Match {
         if (block.len == 0) {
             return Match{};
         }
 
-        // std.debug.print("findMatch {s} {}\n", .{regexs orelse "", rx.id});
-        // std.debug.print("findMatch {}\n", .{rx.id});
+        // std.debug.print("findMatch {} {s}\n", .{rx.id, rx.expr orelse ""});
 
         if (regex) |*re| {
-
             // check cache
             var should_cache = false;
             if (rx.valid == .Valid and config.enable_exec_caching) {
@@ -387,6 +409,10 @@ pub const Parser = struct {
                 };
                 break :blk result;
             };
+
+            // if (block[0] == '`') {
+            //     std.debug.print("findMatch {} {s}\n", .{rx.id, rx.expr orelse ""});
+            // }
 
             if (reg) |*r| {
                 defer @constCast(r).deinit();
@@ -464,8 +490,6 @@ pub const Parser = struct {
         // match
         if (syntax.rx_match.valid == .Valid) {
             if (syntax.rx_match.regex) |regex| {
-                // if (syntax.regex_match != null) {
-                //     if (syntax.regex_match) |regex| {
                 // check of matching has been previously cached (for the same position in the buffer)
                 var should_cache = false;
                 const m = blk: {
@@ -496,8 +520,6 @@ pub const Parser = struct {
         // begin
         if (syntax.rx_begin.valid == .Valid) {
             if (syntax.rx_begin.regex) |regex| {
-                // if (syntax.regex_begin != null) {
-                //     if (syntax.regex_begin) |regex| {
                 // check of matching has been previously cached (for the same position in the buffer)
                 var should_cache = false;
                 const m = blk: {
@@ -547,7 +569,7 @@ pub const Parser = struct {
                 const ts = t.syntax;
                 const ls = ts.resolve(ts, self.lang.syntax);
                 if (ls) |syn| {
-                    if (syn.rx_while.expr != null) {
+                    if (ts.rx_while.expr != null) {
                         const m: Match = blk: {
                             if (t.rx_while.valid == .Valid) {
                                 // use dynamic while_regex here if one was compiled
@@ -571,8 +593,6 @@ pub const Parser = struct {
                             }
                             return @constCast(syn);
                         }
-
-                        // break;
                     }
                 }
             }
@@ -584,16 +604,16 @@ pub const Parser = struct {
     pub fn matchEnd(self: *Parser, state: *ParseState, block: []const u8, start: usize, end: usize) Match {
         // prune if the stack is already too deep like deeply nested blocks
         // This is merely now guard against intentionally written code
-        if (state.size() > config.max_state_stack_depth) {
-            if (state.stack.items.len >= config.max_state_stack_depth) {
-                const new_len = state.stack.items.len - config.state_stack_prune;
-                @memcpy(
-                    state.stack.items[0..new_len],
-                    state.stack.items[config.state_stack_prune..state.stack.items.len],
-                );
-                state.stack.items.len = new_len;
-            }
-        }
+        // if (state.size() > config.max_state_stack_depth) {
+        //     if (state.stack.items.len >= config.max_state_stack_depth) {
+        //         const new_len = state.stack.items.len - config.state_stack_prune;
+        //         @memcpy(
+        //             state.stack.items[0..new_len],
+        //             state.stack.items[config.state_stack_prune..state.stack.items.len],
+        //         );
+        //         state.stack.items.len = new_len;
+        //     }
+        // }
 
         const top = state.top();
         if (top) |t| {
@@ -605,7 +625,7 @@ pub const Parser = struct {
                         // use dynamic end_regex here if one was compiled
                         // not caching or result in this case
                         const m = self.findMatch(@constCast(syn), @constCast(&t.rx_end), t.rx_end.regex, block, start, end);
-                        // std.debug.print(">>>[{s}] match:{} {}-{}\n", .{ block, m.count, start, end });
+                        // std.debug.print(">>>[{s}] match:{s} {} {}-{}\n", .{ block, t.rx_end.expr orelse "", m.count, start, end });
                         break :blk m;
                     }
 
@@ -695,7 +715,8 @@ pub const Parser = struct {
                     }
                 }
             }
-            c.scope = try self.strings.appendUnique(&cscope);
+            // c.scope = try self.transient_strings.appendUnique(util.toSlice([config.max_scope_len]u8, cscope));
+            c.scope = try self.transient_strings.appendUnique(&cscope);
             proc.capture(&c);
         }
     }
@@ -733,7 +754,8 @@ pub const Parser = struct {
                             }
                         }
                     }
-                    c.scope = try self.strings.appendUnique(&cscope);
+                    // c.scope = try self.transient_strings.appendUnique(util.toSlice([config.max_scope_len]u8, cscope));
+                    c.scope = try self.transient_strings.appendUnique(&cscope);
                     // std.debug.print("{s}]\n", .{c.scope_});
                     proc.capture(&c);
                 }
@@ -763,7 +785,8 @@ pub const Parser = struct {
                                         if (m.applyCaptures(block, p.name, &cscope) == 0) {
                                             // TODO atom
                                         }
-                                        c.scope = try self.strings.appendUnique(&cscope);
+                                        // c.scope = try self.transient_strings.appendUnique(util.toSlice([config.max_scope_len]u8, cscope));
+                                        c.scope = try self.transient_strings.appendUnique(&cscope);
                                         proc.capture(&c);
                                     }
                                 }
@@ -788,6 +811,8 @@ pub const Parser = struct {
         self.match_cache.clearRetainingCapacity();
         self.exec_cache.clearRetainingCapacity();
 
+        // self.transient_strings.clear();
+
         var start: usize = 0;
         var end = block.len;
 
@@ -798,6 +823,8 @@ pub const Parser = struct {
         // hacky way to escape push-pop infinite loop
         var last_push_pos: usize = 0;
         var last_push_syntax: u64 = 0;
+
+        self.resetCurrentAnchor();
 
         // handle while
         // todo track while count
@@ -817,15 +844,16 @@ pub const Parser = struct {
             const top = state.top();
             if (top) |t| {
                 const ts = t.syntax;
-                // std.debug.print("top> {s} {*}..{}\n", .{ts.getName(), ts, state.size()});
-
                 const ls = ts.resolve(ts, self.lang.syntax);
                 if (ls) |syn| {
+                    // std.debug.print("top> {s} {*}..{}\n", .{syn.getName(), @constCast(syn).root(), state.size()});
                     const end_match: Match = self.matchEnd(state, block, start, end);
                     var pattern_match: Match = Match{};
 
                     if (end_match.count > 0 and end_match.end + 1 >= end) {
                         // this is the end of the block.. don't bother with patterns
+                    } else if (end_match.count > 0 and start == 0) {
+                        // if end is matched at the very start... end immediately
                     } else {
                         pattern_match = self.matchPatterns(syn, syn.patterns, block, start, end);
                     }
@@ -834,6 +862,8 @@ pub const Parser = struct {
                         (pattern_match.count == 0 or
                             (pattern_match.count > 0 and pattern_match.start >= end_match.start)))
                     {
+                        // std.debug.print("end?{} {} {}\n", .{end_match.count, end_match.start, end});
+
                         // end pattern has been matched
                         start = end_match.start;
                         end = end_match.end;
@@ -870,7 +900,7 @@ pub const Parser = struct {
 
                             // if it has a regexs_end.. it is a begin and should cause a push
                             if (match_syn.rx_begin.valid == .Valid) {
-                                // std.debug.print("push {s}\n", .{match_syn.getName()});
+                                // std.debug.print("push {s} {}\n", .{match_syn.getName(), start_});
                                 if (pattern_match.regex) |rx| {
                                     if (last_push_pos != start_ or last_push_syntax != match_syn.id) {
                                         if (config.enable_scope_atoms and !rx.has_references) {
@@ -884,7 +914,11 @@ pub const Parser = struct {
                                             }
                                         }
 
-                                        state.push(match_syn, rx, block, pattern_match, "patttern") catch {};
+                                        state.push(@constCast(match_syn), rx, block, pattern_match, "pattern") catch {};
+                                        if (ts.rx_begin.is_anchored and rx.is_anchored) {
+                                            end = start_;
+                                        }
+
                                         last_push_pos = start_;
                                         last_push_syntax = match_syn.id;
                                     }

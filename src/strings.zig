@@ -32,7 +32,7 @@ pub const StringsArena = struct {
 
     pub fn appendHashed(self: *StringsArena, str: []const u8) !struct { u64, []const u8 } {
         if (str.len == 0) {
-            return .{ 0, "" };
+            return .{ 0, empty_string };
         }
 
         const hash: u64 = util.toHash(str);
@@ -47,9 +47,15 @@ pub const StringsArena = struct {
     }
 
     pub fn appendUnique(self: *StringsArena, str: []const u8) ![]const u8 {
-        if (str.len == 0) return empty_string;
-        const h = try self.appendHashed(str);
-        return h[1];
+        // if (str.len == 0) return empty_string;
+        // const h = try self.appendHashed(str);
+        // return h[1];
+        return self.append(str);
+    }
+
+    pub fn clear(self: *StringsArena) void {
+        _ = self.arena.reset(ArenaAllocator.ResetMode.retain_capacity);
+        self.hashed.clearRetainingCapacity();
     }
 };
 
