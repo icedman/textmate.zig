@@ -440,10 +440,6 @@ pub const Parser = struct {
                 break :blk result;
             };
 
-            // if (block[0] == '`') {
-            //     std.debug.print("findMatch {} {s}\n", .{rx.id, rx.expr orelse ""});
-            // }
-
             if (reg) |*r| {
                 defer @constCast(r).deinit();
                 var m = Match{
@@ -461,9 +457,9 @@ pub const Parser = struct {
                 while (i < r.count() and i < config.max_match_ranges) : (i += 1) {
                     if (starts[i] < 0) {
                         // m.ranges[count].group = i;
-                        // m.ranges[count].start = start;
-                        // m.ranges[count].end = start;
-                        count += 1;
+                        // m.ranges[count].start = 0;
+                        // m.ranges[count].end = 0;
+                        // count += 1;
                         // -1 could happen in oniguruma when an optional capture group didn't match
                         // case: when no newline '\n' is present (c.tmLanguage)
                         continue;
@@ -478,7 +474,7 @@ pub const Parser = struct {
                             m.start = s;
                             m.end = e;
                         }
-                        // std.debug.print("{}-{}: {s}\n", .{ s, e, block[m.ranges[count].start..m.ranges[count].end] });
+                        std.debug.print("{}-{}: {s}\n", .{ s, e, block[m.ranges[count].start..m.ranges[count].end] });
                         count += 1;
                     }
                 }
@@ -486,7 +482,8 @@ pub const Parser = struct {
                 m.count = count;
 
                 if (count > 0) {
-                    // std.debug.print(">>>>>>>>>>>{s}\n", .{rx.expr orelse ""});
+                    std.debug.print(">>>>>>>>>>>{s}\n", .{rx.expr orelse ""});
+                    std.debug.print("{} {}\n", .{start, hard_start});
                     // std.debug.print("{s}\n", .{syntax.name});
                     // std.debug.print("{s}\n", .{syntax.scope_name});
                     // std.debug.print("{s}\n", .{syntax.content_name});
@@ -792,7 +789,6 @@ pub const Parser = struct {
                         }
                     }
                     c.scope = try self.transient_strings.appendUnique(cscope.items);
-                    // std.debug.print("{s}]\n", .{c.scope_});
                     proc.capture(&c);
                 }
 

@@ -169,7 +169,7 @@ pub const Syntax = struct {
         };
 
         syntax.compileAllRegexes() catch {
-            std.debug.print("Failed to compile regex: // TODO which one?\n", .{});
+            // std.debug.print("Failed to compile regex: // TODO which one?\n", .{});
         };
 
         syntax.patterns = try std.ArrayList(*Syntax).initCapacity(allocator, 64);

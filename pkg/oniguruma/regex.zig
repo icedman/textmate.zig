@@ -20,7 +20,6 @@ pub const Regex = struct {
         syntax: *Syntax,
         err: ?*ErrorInfo,
     ) !Regex {
-        // std.debug.print("{}\n", .{pattern.len});
         var self: Regex = undefined;
         _ = try errors.convertError(c.onig_new(
             &self.value,
