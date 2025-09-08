@@ -6,6 +6,22 @@ O(n) ~ Time is linear to number of lines
 
 ## Release mode runs
 
+commit 462206d98f2beb4870dff3d22f58f13f815ec5b1
+* regressed back to 8.5s. From here on prioritize passing tests and correctness over speed.
+* note than rendering takes around 1s
+
+sqlite3.c
+
+lines: 222905
+execs: 15078890
+execs/line: 67
+skips: 53072540
+warmup in 0.008036s
+done in 8.591252s
+state depth: 1
+grammar: c
+theme: dracula-soft
+theme atoms: 208
 CPU: AMD Ryzen AI 9 HX 370 (24) @ 5.16 GHz
 
 sqlite3.c
