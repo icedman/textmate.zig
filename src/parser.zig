@@ -212,9 +212,8 @@ pub const ParseState = struct {
         }
     }
 
-    // TODO why optional match?
-    pub fn push(self: *ParseState, syntax: *Syntax, rx: *Regex, block: []const u8, match: ?Match, where: []const u8) !void {
-        const anchor = (match orelse Match{ .start = 0 }).start;
+    pub fn push(self: *ParseState, syntax: *Syntax, rx: *Regex, block: []const u8, match: Match, where: []const u8) !void {
+        const anchor = match.start;
         var sc = StateContext{
             .syntax = syntax,
             .line = 0,
@@ -223,7 +222,8 @@ pub const ParseState = struct {
 
         _ = rx;
 
-        if (match) |m| {
+        const m = match;
+        {
             if (syntax.rx_end.has_references) {
                 if (syntax.rx_end.expr) |regexs| {
                     var output = try ArrayList(u8).initCapacity(self.allocator, regexs.len + 64);
@@ -474,20 +474,20 @@ pub const Parser = struct {
                             m.start = s;
                             m.end = e;
                         }
-                        std.debug.print("{}-{}: {s}\n", .{ s, e, block[m.ranges[count].start..m.ranges[count].end] });
+                        // std.debug.print("{}-{}: {s}\n", .{ s, e, block[m.ranges[count].start..m.ranges[count].end] });
                         count += 1;
                     }
                 }
 
                 m.count = count;
 
-                if (count > 0) {
-                    std.debug.print(">>>>>>>>>>>{s}\n", .{rx.expr orelse ""});
-                    std.debug.print("{} {}\n", .{start, hard_start});
-                    // std.debug.print("{s}\n", .{syntax.name});
-                    // std.debug.print("{s}\n", .{syntax.scope_name});
-                    // std.debug.print("{s}\n", .{syntax.content_name});
-                }
+                // if (count > 0) {
+                // std.debug.print(">>>>>>>>>>>{s}\n", .{rx.expr orelse ""});
+                // std.debug.print("{} {}\n", .{start, hard_start});
+                // std.debug.print("{s}\n", .{syntax.name});
+                // std.debug.print("{s}\n", .{syntax.scope_name});
+                // std.debug.print("{s}\n", .{syntax.content_name});
+                // }
 
                 if (should_cache) {
                     self.exec_cache.put(rx.id, m) catch {};

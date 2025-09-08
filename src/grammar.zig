@@ -44,6 +44,7 @@ pub const Regex = struct {
             null,
         ) catch |err| {
             self.valid = .Invalid;
+            // std.debug.print("failed rx: {s} {}\n", .{regex, regex.len});
             return err;
         };
         errdefer re.deinit();
@@ -88,7 +89,6 @@ pub const Syntax = struct {
     // include
     include_path: ?[]const u8 = null,
     include: ?*Syntax = null,
-    is_grammar_root: bool = false,
 
     // stats
     execs: u32 = 0,
@@ -125,14 +125,29 @@ pub const Syntax = struct {
             if (obj.get(field_name)) |source| {
                 if (source != .object) break :blk null;
                 var res = std.StringHashMap(*Syntax).init(allocator);
-                errdefer res.deinit();
+                errdefer {
+                    var it = res.iterator();
+                    while (it.next()) |kv| {
+                        const v = kv.value_ptr.*;
+                        v.deinit();
+                    }
+                    res.deinit();
+                }
                 var it = source.object.iterator();
                 while (it.next()) |kv| {
                     const k = try strings_arena.append(kv.key_ptr.*);
                     const v = kv.value_ptr.*;
-                    var syntax = try Syntax.init(allocator, v, strings_arena);
-                    syntax.parent = parent;
-                    try res.put(k, syntax);
+                    if (v == .object) {
+                        var syntax = Syntax.init(allocator, v, strings_arena) catch |err| {
+                            // std.debug.print("error in parseSyntaxMap {s}\n", .{k});
+                            return err;
+                        };
+                        syntax.parent = parent;
+                        try res.put(k, syntax);
+                    } else if (v == .string) {
+                        // TODO ... capture is string
+                        // convert to { name = "..." }
+                    }
                 }
                 break :blk res;
             }
@@ -143,8 +158,15 @@ pub const Syntax = struct {
     pub fn init(allocator: Allocator, json: std.json.Value, strings_arena: *StringsArena) error{ OutOfMemory, InvalidSyntax }!*Syntax {
         if (json != .object) return error.InvalidSyntax;
         const obj = json.object;
-
         var syntax = try allocator.create(Syntax);
+        errdefer {
+            // const name = if (obj.get("name")) |v| v.string else "";
+            // const content_name = if (obj.get("contentName")) |v| v.string else "";
+            // const scope_name = if (obj.get("scopeName")) |v| v.string else "";
+            // std.debug.print("syntax init failed n:{s} c:{s} s:{s}\n", .{name, content_name, scope_name});
+            syntax.deinit();
+        }
+
         const include = obj.get("include");
         if (include) |path| {
             syntax.* = Syntax{
@@ -159,9 +181,9 @@ pub const Syntax = struct {
 
         syntax.* = Syntax{
             .id = @intFromPtr(syntax),
-            .name = try strings_arena.append(if (obj.get("name")) |v| v.string else ""),
-            .content_name = try strings_arena.append(if (obj.get("contentName")) |v| v.string else ""),
-            .scope_name = try strings_arena.append(if (obj.get("scopeName")) |v| v.string else ""),
+            .name = try strings_arena.append(if (obj.get("name")) |v| if (v == .string) v.string else "" else ""),
+            .content_name = try strings_arena.append(if (obj.get("contentName")) |v| if (v == .string) v.string else "" else ""),
+            .scope_name = try strings_arena.append(if (obj.get("scopeName")) |v| if (v == .string) v.string else "" else ""),
             .rx_match = Regex{ .expr = if (obj.get("match")) |v| try strings_arena.append(v.string) else null },
             .rx_begin = Regex{ .expr = if (obj.get("begin")) |v| try strings_arena.append(v.string) else null },
             .rx_while = Regex{ .expr = if (obj.get("while")) |v| try strings_arena.append(v.string) else null },
@@ -178,7 +200,10 @@ pub const Syntax = struct {
             const res = try allocator.alloc(*Syntax, patterns_arr.array.items.len);
             errdefer allocator.free(res);
             for (patterns_arr.array.items) |item| {
-                var syn = try Syntax.init(allocator, item, strings_arena);
+                var syn = Syntax.init(allocator, item, strings_arena) catch |err| {
+                    std.debug.print("error in pattern {f}\n", .{std.json.fmt(item, .{})});
+                    return err;
+                };
                 syn.parent = syntax;
                 try syntax.patterns.?.append(allocator, syn);
             }
@@ -393,7 +418,7 @@ pub const Syntax = struct {
         }
 
         if (self.patterns) |pats| {
-            for (pats) |*p| {
+            for (pats.items) |*p| {
                 const v = p.*;
                 v.dump(depth + 1, stats);
             }
@@ -677,6 +702,9 @@ pub const Grammar = struct {
 
     fn parse(allocator: Allocator, source: []const u8) !*Grammar {
         const grammar = try allocator.create(Grammar);
+        errdefer {
+            grammar.deinit();
+        }
         grammar.* = Grammar{
             .allocator = allocator,
             .inject_to = try std.ArrayList([]const u8).initCapacity(allocator, 2048),
