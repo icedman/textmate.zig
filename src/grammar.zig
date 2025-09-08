@@ -2,7 +2,6 @@ const std = @import("std");
 const oni = @import("oniguruma");
 const resources = @import("resources/resources.zig");
 const embedded = @import("resources/embedded.zig");
-const util = @import("util.zig");
 const strings = @import("strings.zig");
 const atoms = @import("atoms.zig");
 const config = @import("config.zig");
@@ -50,7 +49,7 @@ pub const Regex = struct {
         errdefer re.deinit();
         self.regex = re;
         self.valid = .Valid;
-        self.id = util.toHash(regex);
+        self.id = strings.toHash(regex);
     }
 
     pub fn deinit(self: *Regex) void {
@@ -483,7 +482,7 @@ pub const GrammarLibrary = struct {
                 if (!item.inject_only) continue;
                 for (0..item.inject_to_count) |fi| {
                     const np: []const u8 = &item.inject_to[fi];
-                    if (std.mem.eql(u8, util.toSlice([]const u8, np), scope_name)) {
+                    if (std.mem.eql(u8, strings.toSlice([]const u8, np), scope_name)) {
                         const g = self.grammarFromId(item.id) catch {
                             // only fail silently if an injector fails to load
                             continue;
@@ -508,7 +507,7 @@ pub const GrammarLibrary = struct {
         if (name.len >= 128) return error.NotFound;
         for (self.grammars.items) |item| {
             const np: []const u8 = &item.name;
-            if (std.mem.eql(u8, util.toSlice([]const u8, np), name)) {
+            if (std.mem.eql(u8, strings.toSlice([]const u8, np), name)) {
                 if (self.cache.get(item.id)) |g| {
                     return g;
                 }
@@ -520,7 +519,7 @@ pub const GrammarLibrary = struct {
                     return g;
                 }
                 const p: []const u8 = &item.full_path;
-                const g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
+                const g = try Grammar.init(self.allocator, strings.toSlice([]const u8, p));
                 self.applyInjectors(g);
                 try self.cache.put(item.id, g);
                 return g;
@@ -533,7 +532,7 @@ pub const GrammarLibrary = struct {
         if (name.len >= 128) return error.NotFound;
         for (self.grammars.items) |item| {
             const np: []const u8 = &item.scope_name;
-            if (std.mem.eql(u8, util.toSlice([]const u8, np), name)) {
+            if (std.mem.eql(u8, strings.toSlice([]const u8, np), name)) {
                 // std.debug.print("found grammar {s} {s} {}\n", .{name, np, item.id});
                 if (self.cache.get(item.id)) |g| {
                     return g;
@@ -545,7 +544,7 @@ pub const GrammarLibrary = struct {
                     return g;
                 }
                 const p: []const u8 = &item.full_path;
-                const g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
+                const g = try Grammar.init(self.allocator, strings.toSlice([]const u8, p));
                 self.applyInjectors(g);
                 try self.cache.put(item.id, g);
                 return g;
@@ -576,7 +575,7 @@ pub const GrammarLibrary = struct {
                 // Check against file types
                 for (0..item.file_types_count) |fi| {
                     const np: []const u8 = &item.file_types[fi];
-                    if (std.mem.eql(u8, util.toSlice([]const u8, np), ext[0..ext.len])) {
+                    if (std.mem.eql(u8, strings.toSlice([]const u8, np), ext[0..ext.len])) {
                         if (self.cache.get(item.id)) |g| {
                             return g;
                         }
@@ -587,7 +586,7 @@ pub const GrammarLibrary = struct {
                             return g;
                         }
                         const p: []const u8 = &item.full_path;
-                        const g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
+                        const g = try Grammar.init(self.allocator, strings.toSlice([]const u8, p));
                         self.applyInjectors(g);
                         try self.cache.put(item.id, g);
                         return g;
@@ -597,7 +596,7 @@ pub const GrammarLibrary = struct {
                 // Check against scope
                 // TODO move this somewhere. getByExtension is intentful, no fallback
                 const np: []const u8 = &item.scope_name;
-                if (std.mem.eql(u8, util.toSlice([]const u8, np), scope_name[0..scope_name_len])) {
+                if (std.mem.eql(u8, strings.toSlice([]const u8, np), scope_name[0..scope_name_len])) {
                     if (self.cache.get(item.id)) |g| {
                         return g;
                     }
@@ -608,7 +607,7 @@ pub const GrammarLibrary = struct {
                         return g;
                     }
                     const p: []const u8 = &item.full_path;
-                    const g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
+                    const g = try Grammar.init(self.allocator, strings.toSlice([]const u8, p));
                     self.applyInjectors(g);
                     try self.cache.put(item.id, g);
                     return g;
@@ -632,7 +631,7 @@ pub const GrammarLibrary = struct {
                     return g;
                 }
                 const p: []const u8 = &item.full_path;
-                const g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
+                const g = try Grammar.init(self.allocator, strings.toSlice([]const u8, p));
                 // self.applyInjectors(g);
                 try self.cache.put(item.id, g);
                 return g;

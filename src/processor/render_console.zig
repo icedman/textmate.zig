@@ -4,7 +4,7 @@ const Processor = processor.Processor;
 const parser = @import("../parser.zig");
 const grammar = @import("../grammar.zig");
 const theme = @import("../theme.zig");
-const util = @import("../util.zig");
+const util = @import("../ansi_terminal.zig");
 const atms = @import("../atoms.zig");
 
 const Allocator = std.mem.Allocator;

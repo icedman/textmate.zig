@@ -1,7 +1,6 @@
 const std = @import("std");
 const oni = @import("oniguruma");
 const grammar = @import("grammar.zig");
-const util = @import("util.zig");
 const strings = @import("strings.zig");
 const atoms = @import("atoms.zig");
 const config = @import("config.zig");
@@ -230,7 +229,7 @@ pub const ParseState = struct {
                     defer output.deinit(self.allocator);
                     _ = try m.applyReferences(block, regexs, &output, self.allocator);
                     const expr = try self.owner.strings.appendUnique(output.items);
-                    const regex_id = util.toHash(expr);
+                    const regex_id = strings.toHash(expr);
                     {
                         if (self.owner.regex_map.get(regex_id)) |r| {
                             sc.rx_end = r;
@@ -257,7 +256,7 @@ pub const ParseState = struct {
                         defer output.deinit(self.allocator);
                         _ = try m.applyReferences(block, regexs, &output, self.allocator);
                         const expr = try self.owner.strings.appendUnique(output.items);
-                        const regex_id = util.toHash(expr);
+                        const regex_id = strings.toHash(expr);
                         {
                             if (self.owner.regex_map.get(regex_id)) |r| {
                                 sc.rx_while = r;

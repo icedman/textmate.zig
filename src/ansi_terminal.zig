@@ -3,26 +3,6 @@ const std = @import("std");
 const theme = @import("theme.zig");
 const Rgb = theme.Rgb;
 
-// TODO .. remove this (too cumbersome), use simple []const u8, ArrayList(u8)
-pub fn toSlice(comptime T: type, array: T) []const u8 {
-    const len = for (array, 0..) |ch, i| {
-        if (ch == 0) break i;
-    } else 0;
-    return array[0..len];
-}
-
-pub fn toHash(s: []const u8) u64 {
-    var hasher = std.hash.Fnv1a_64.init();
-    if (s.len < 16) {
-        var tmp: [128]u8 = [_]u8{0} ** 128;
-        @memcpy(tmp[0..s.len], s);
-        hasher.update(&tmp);
-    }
-
-    hasher.update(s);
-    return hasher.final();
-}
-
 // 24-bit ANSI foreground and background color
 pub fn setColorHex(stdout: anytype, hex: []const u8) !void {
     if (hex.len != 7 or hex[0] != '#') {

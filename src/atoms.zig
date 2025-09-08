@@ -2,7 +2,7 @@
 // scope selection needs to be accurate for rendering to be accurate
 const std = @import("std");
 const theme = @import("theme.zig");
-const util = @import("util.zig");
+const strings = @import("strings.zig");
 
 // TODO for testing only
 const resources = @import("resources/resources.zig");
@@ -94,7 +94,7 @@ fn testLoadingAllThemes(allocator: std.mem.Allocator) !void {
     defer themes.deinit();
     for (list.items) |item| {
         const p: []const u8 = &item.full_path;
-        const thm = theme.Theme.init(allocator, util.toSlice([]const u8, p)) catch {
+        const thm = theme.Theme.init(allocator, strings.toSlice([]const u8, p)) catch {
             unreachable;
         };
 

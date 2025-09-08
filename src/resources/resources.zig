@@ -1,5 +1,5 @@
 const std = @import("std");
-const util = @import("../util.zig");
+const strings = @import("../strings.zig");
 
 const Allocator = std.mem.Allocator;
 
@@ -212,7 +212,7 @@ pub fn generateEmbeddedThemesFile(allocator: Allocator, writer: anytype, prefix:
 
     for (list.items) |item| {
         const np: []const u8 = &item.full_path;
-        const nps = util.toSlice([]const u8, np);
+        const nps = strings.toSlice([]const u8, np);
         var idx = (std.mem.indexOf(u8, nps, "src") orelse 0) + "src".len + 1;
         idx += (std.mem.indexOf(u8, nps[idx..], "resources") orelse 0) + "resources".len + 1;
         try writer.print("const {s}{} = @embedFile(\"{s}\");\n", .{ prefix, embed_id, nps[idx..] });
@@ -230,7 +230,7 @@ pub fn generateEmbeddedThemesFile(allocator: Allocator, writer: anytype, prefix:
 
     for (list.items) |item| {
         const np: []const u8 = &item.name;
-        const nps = util.toSlice([]const u8, np);
+        const nps = strings.toSlice([]const u8, np);
         try writer.print("    {c}\n", .{'{'});
         try writer.print("        const bytes: []const u8 = {s}{}[0..{s}{}.len];\n", .{ prefix, embed_id, prefix, embed_id });
         try writer.print("        var ti = ThemeInfo{c} .embedded_file = bytes {c};\n", .{ '{', '}' });
@@ -259,7 +259,7 @@ pub fn generateEmbeddedGrammarsFile(allocator: Allocator, writer: anytype, prefi
 
     for (list.items) |item| {
         const np: []const u8 = &item.full_path;
-        const nps = util.toSlice([]const u8, np);
+        const nps = strings.toSlice([]const u8, np);
         var idx = (std.mem.indexOf(u8, nps, "src") orelse 0) + "src".len + 1;
         idx += (std.mem.indexOf(u8, nps[idx..], "resources") orelse 0) + "resources".len + 1;
         try writer.print("const {s}{} = @embedFile(\"{s}\");\n", .{ prefix, embed_id, nps[idx..] });
@@ -275,9 +275,9 @@ pub fn generateEmbeddedGrammarsFile(allocator: Allocator, writer: anytype, prefi
     });
     for (list.items) |item| {
         const np: []const u8 = &item.name;
-        const nps = util.toSlice([]const u8, np);
+        const nps = strings.toSlice([]const u8, np);
         const sp: []const u8 = &item.scope_name;
-        const sps = util.toSlice([]const u8, sp);
+        const sps = strings.toSlice([]const u8, sp);
         try writer.print("    {c}\n", .{'{'});
         try writer.print("        const bytes: []const u8 = {s}{}[0..{s}{}.len];\n", .{ prefix, embed_id, prefix, embed_id });
         try writer.print("        var gi = GrammarInfo{c} .embedded_file = bytes, .file_types_count = {}, .inject_to_count = {}, .inject_only = {} {c};\n", .{
@@ -291,12 +291,12 @@ pub fn generateEmbeddedGrammarsFile(allocator: Allocator, writer: anytype, prefi
         try writer.print("        @memcpy(gi.scope_name[0..\"{s}\".len], \"{s}\");\n", .{ sps, sps });
         for (0..item.file_types_count) |fi| {
             const fp: []const u8 = &item.file_types[fi];
-            const fps = util.toSlice([]const u8, fp);
+            const fps = strings.toSlice([]const u8, fp);
             try writer.print("        @memcpy(gi.file_types[{}][0..\"{s}\".len], \"{s}\");\n", .{ fi, fps, fps });
         }
         for (0..item.inject_to_count) |fi| {
             const fp: []const u8 = &item.inject_to[fi];
-            const fps = util.toSlice([]const u8, fp);
+            const fps = strings.toSlice([]const u8, fp);
             try writer.print("        @memcpy(gi.inject_to[{}][0..\"{s}\".len], \"{s}\");\n", .{ fi, fps, fps });
         }
         try writer.print("        gi.id = list.items.len + 1;\n", .{});

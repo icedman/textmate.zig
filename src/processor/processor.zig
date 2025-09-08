@@ -2,16 +2,9 @@ const std = @import("std");
 const parser = @import("../parser.zig");
 const grammar = @import("../grammar.zig");
 const theme = @import("../theme.zig");
-const util = @import("../util.zig");
 const atms = @import("../atoms.zig");
 
 const Allocator = std.mem.Allocator;
-
-const setColorHex = util.setColorHex;
-const setColorRgb = util.setColorRgb;
-const setBgColorHex = util.setBgColorHex;
-const setBgColorRgb = util.setBgColorRgb;
-const resetColor = util.resetColor;
 
 const ParseCapture = parser.ParseCapture;
 const ParseState = parser.ParseState;

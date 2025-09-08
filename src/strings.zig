@@ -1,5 +1,4 @@
 const std = @import("std");
-const util = @import("util.zig");
 
 const Allocator = std.mem.Allocator;
 const ArenaAllocator = std.heap.ArenaAllocator;
@@ -40,7 +39,7 @@ pub const StringsArena = struct {
             return .{ 0, empty_string };
         }
 
-        const hash: u64 = util.toHash(str);
+        const hash: u64 = toHash(str);
         const gop = try self.hashed.getOrPut(hash);
 
         if (!gop.found_existing) {
@@ -65,6 +64,26 @@ pub const StringsArena = struct {
         self.hashed.clearRetainingCapacity();
     }
 };
+
+pub fn toHash(s: []const u8) u64 {
+    var hasher = std.hash.Fnv1a_64.init();
+    if (s.len < 16) {
+        var tmp: [128]u8 = [_]u8{0} ** 128;
+        @memcpy(tmp[0..s.len], s);
+        hasher.update(&tmp);
+    }
+
+    hasher.update(s);
+    return hasher.final();
+}
+
+// TODO .. remove this (too cumbersome), use simple []const u8, ArrayList(u8)
+pub fn toSlice(comptime T: type, array: T) []const u8 {
+    const len = for (array, 0..) |ch, i| {
+        if (ch == 0) break i;
+    } else 0;
+    return array[0..len];
+}
 
 test "strings" {
     var strings = try StringsArena.init(std.testing.allocator);

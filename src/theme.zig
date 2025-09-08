@@ -4,7 +4,6 @@ const embedded = @import("resources/embedded.zig");
 const ThemeInfo = resources.ThemeInfo;
 
 const atms = @import("atoms.zig");
-const util = @import("util.zig");
 const strings = @import("strings.zig");
 const config = @import("config.zig");
 
@@ -12,12 +11,6 @@ const Atom = atms.Atom;
 const Allocator = std.mem.Allocator;
 const ArenaAllocator = std.heap.ArenaAllocator;
 const StringsArena = strings.StringsArena;
-
-const setColorHex = util.setColorHex;
-const setColorRgb = util.setColorRgb;
-const setBgColorHex = util.setBgColorHex;
-const setBgColorRgb = util.setBgColorRgb;
-const resetColor = util.resetColor;
 
 var theThemeLibrary: ?*ThemeLibrary = null;
 
@@ -64,7 +57,7 @@ pub const ThemeLibrary = struct {
                     return t;
                 }
                 const p: []const u8 = &item.full_path;
-                const t = try Theme.init(self.allocator, util.toSlice([]const u8, p));
+                const t = try Theme.init(self.allocator, strings.toSlice([]const u8, p));
                 try self.cache.put(item.id, t);
                 return t;
             }
@@ -533,7 +526,6 @@ pub fn runTests(comptime testing: anytype, verbosely: bool) !void {
         _ = thm.getScope(entry.key, &colors);
         if (colors.foreground) |fg| {
             if (verbosely) {
-                setColorHex(std.debug, fg) catch {};
                 std.debug.print("{s} fg: {s}\n", .{ entry.key, fg });
             }
             // TODO these tests are no longer correct
