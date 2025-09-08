@@ -69,6 +69,13 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     less_exe_mod.addImport("textmate_lib", lib_mod);
+    
+    const test_runner_mod = b.createModule(.{
+        .root_source_file = b.path("src/test_runner.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    test_runner_mod.addImport("textmate_lib", lib_mod);
 
     // textmate lib - this produces the static library
     const lib = b.addLibrary(.{
@@ -93,6 +100,13 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(less_exe);
     const run_less_cmd = b.addRunArtifact(less_exe);
 
+    const test_runner_exe = b.addExecutable(.{
+        .name = "test_runner",
+        .root_module = test_runner_mod,
+    });
+    b.installArtifact(test_runner_exe);
+    const run_test_runner_cmd = b.addRunArtifact(test_runner_exe);
+    
     // oniguruma
     if (b.lazyDependency("oniguruma", .{
         .target = target,
@@ -111,6 +125,7 @@ pub fn build(b: *std.Build) void {
     // files, this ensures they will be present and in the expected location.
     run_cat_cmd.step.dependOn(b.getInstallStep());
     run_less_cmd.step.dependOn(b.getInstallStep());
+    run_test_runner_cmd.step.dependOn(b.getInstallStep());
 
     // This allows the user to pass arguments to the application in the build
     // command itself, like this: `zig build run -- arg1 arg2 etc`
@@ -128,6 +143,12 @@ pub fn build(b: *std.Build) void {
     const run_less_step = b.step("less", "Run less");
     run_less_step.dependOn(&run_less_cmd.step);
 
+    const run_test_runner_step = b.step("tests", "Run the tests");
+    run_test_runner_step.dependOn(&run_test_runner_cmd.step);
+
+    // const run_test_runner_step = b.step("tests", "Run textmate tests");
+    // run_test_runner_step.dependOn(&run_test_runner_cmd.step);
+    
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
     const lib_unit_tests = b.addTest(.{
@@ -137,7 +158,7 @@ pub fn build(b: *std.Build) void {
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
 
     const exe_unit_tests = b.addTest(.{
-        .root_module = cat_exe_mod,
+        .root_module = test_runner_mod,
     });
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);

@@ -101,6 +101,8 @@ pub const Scope = struct {
     ascendant: Atom = Atom{},
     // having exclusion(s) - one for now - will allow this atom to fail
     exclusion: Atom = Atom{},
+
+    // TODO subsume TokenColor here
 };
 
 pub const TokenColor = struct {

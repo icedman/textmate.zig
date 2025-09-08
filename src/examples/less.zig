@@ -28,12 +28,12 @@ pub fn main() !void {
         const cnt = result.count();
         const starts = result.starts();
         const ends = result.ends();
-        for(0..cnt) |i| {
+        for (0..cnt) |i| {
             std.debug.print("{}?\n", .{starts[i]});
             if (starts[i] < 0) continue;
             const s: usize = @intCast(starts[i]);
             const e: usize = @intCast(ends[i]);
-            std.debug.print("{}-{} {s}\n", .{s, e, block[s..e]});
+            std.debug.print("{}-{} {s}\n", .{ s, e, block[s..e] });
         }
     } else {
         std.debug.print("no regex compiled!\n", .{});
