@@ -14,7 +14,8 @@ const DumpProcessor = lib.DumpProcessor;
 const RenderProcessor = lib.RenderProcessor;
 const RenderHtmlProcessor = lib.RenderHtmlProcessor;
 
-const TEST_VERBOSELY = false;
+// dump leaks
+const TEST_VERBOSELY = true;
 
 fn printUsage() void {
     var stdout_buffer: [1024]u8 = undefined;
@@ -40,12 +41,7 @@ pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
 
-    const allocator = switch (builtin.mode) {
-        .Debug => gpa.allocator(),
-        else => std.heap.page_allocator,
-    };
-
-    // const allocator = std.heap.page_allocator;
+    const allocator = if (TEST_VERBOSELY and builtin.mode == .Debug) gpa.allocator() else std.heap.page_allocator;
 
     try oni.init(&.{oni.Encoding.utf8});
     try oni.testing.ensureInit();

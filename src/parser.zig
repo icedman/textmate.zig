@@ -240,7 +240,6 @@ pub const ParseState = struct {
                                 // std.debug.print("compile {s} < {s} {s} matches:{}<\n", .{ regexs, expr, block, m.count });
                                 // std.debug.print("unable to compile {s} < {s}<\n", .{ regexs, expr });
                                 // m.dump(block);
-
                                 // if unable to compile... don't push otherwise we won't be able to exit
                                 return;
                             };
@@ -858,11 +857,6 @@ pub const Parser = struct {
         var last_push_syntax: u64 = 0;
 
         self.resetCurrentAnchor();
-
-        while (block[start] == ' ' or block[start] == '\t') {
-            if (start >= end) break;
-            start += 1;
-        }
 
         // handle while
         // todo track while count

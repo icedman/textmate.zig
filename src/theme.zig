@@ -428,8 +428,8 @@ pub const Theme = struct {
         // Otherwise the cache hashmap would grow too large.
         const enable_cache = config.enable_scope_caching;
         if (enable_cache) {
-            if (scope.len > 0) {
-                if (self.cache.get(scope)) |cached| {
+            if (atom.id > 0) {
+                if (self.cache_by_atom.get(atom.id)) |cached| {
                     if (colors) |c| {
                         if (cached.token) |token| {
                             if (token.settings) |settings| {
@@ -440,8 +440,8 @@ pub const Theme = struct {
                     }
                     return cached;
                 }
-            } else if (atom.id > 0) {
-                if (self.cache_by_atom.get(atom.id)) |cached| {
+            } else if (scope.len > 0) {
+                if (self.cache.get(scope)) |cached| {
                     if (colors) |c| {
                         if (cached.token) |token| {
                             if (token.settings) |settings| {

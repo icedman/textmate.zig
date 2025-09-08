@@ -40,19 +40,33 @@ pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_p
         var state = try par.initState();
         defer state.deinit();
 
-        var proc = try DumpProcessor.init(allocator);
+        var proc = try NullProcessor.init(allocator);
         defer proc.deinit();
 
         par.processor = &proc;
+        proc.state = &state;
 
         const lines = json.object.get("lines");
         if (lines) |ll| {
             if (ll == .array) {
                 proc.startDocument();
-                for (ll.array.items) |l_item| {
-                    const l = l_item.object.get("line").?.string;
-                    _ = try par.parseLine(&state, l);
-                    std.debug.print(">{s}\n", .{l});
+                for (ll.array.items) |l| {
+                    const line = l.object.get("line").?.string;
+                    _ = try par.parseLine(&state, line);
+                    std.debug.print("Line: {s}\n", .{line});
+
+                    const tokens = l.object.get("tokens").?.array;
+                    var idx: usize = 0;
+                    for (tokens.items) |t| {
+                        const value = t.object.get("value").?.string;
+                        const scopes = t.object.get("scopes");
+                        const s = idx;
+                        const e = s + value.len;
+                        std.debug.print("[{s}]\n", .{value});
+                        std.debug.print(" ?: {f}\n", .{std.json.fmt(scopes, .{})});
+                        proc.query(s, e);
+                        idx = e;
+                    }
                 }
                 proc.endDocument();
             }
@@ -131,10 +145,10 @@ pub fn main() !void {
 
     const allocator = gpa.allocator();
 
-    // try run_test_suit(allocator, "data/test-cases/first-mate", "tests.json");
-    // try run_test_suit(allocator, "data/test-cases/suite1", "tests.json");
+    try run_test_suit(allocator, "data/test-cases/first-mate", "tests.json");
+    try run_test_suit(allocator, "data/test-cases/suite1", "tests.json");
     // try run_theme_library(allocator);
-    try run_grammar_library(allocator);
+    // try run_grammar_library(allocator);
 }
 
 const std = @import("std");

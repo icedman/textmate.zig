@@ -245,7 +245,10 @@ pub const Syntax = struct {
 
         if (self.patterns) |pats| {
             for (pats.items) |p| {
-                p.deinit();
+                // check root because we do not free injected syntaxes owned by other Grammars
+                if (p.root() == self.root()) {
+                    p.deinit();
+                }
             }
         }
 
@@ -352,6 +355,7 @@ pub const Syntax = struct {
                 // Further resolve '#comments' in this situation
                 if (GrammarLibrary.getLibrary()) |gml| {
                     const gmr = gml.grammarFromScopeName(include_path) catch {
+                        // std.debug.print("unable to load grammar {s}\n", .{include_path});
                         return null;
                     };
                     syntax.include = gmr.syntax;
@@ -622,11 +626,14 @@ pub const GrammarLibrary = struct {
                 }
                 // std.debug.print("found!\n", .{});
                 if (item.embedded_file) |file| {
-                    return Grammar.initWithData(self.allocator, file);
+                    const g = try Grammar.initWithData(self.allocator, file);
+                    // self.applyInjectors(g);
+                    try self.cache.put(item.id, g);
+                    return g;
                 }
                 const p: []const u8 = &item.full_path;
                 const g = try Grammar.init(self.allocator, util.toSlice([]const u8, p));
-                self.applyInjectors(g);
+                // self.applyInjectors(g);
                 try self.cache.put(item.id, g);
                 return g;
             }
@@ -727,7 +734,7 @@ pub const Grammar = struct {
 
         // grammar meta
         const name = try grammar.strings.append(if (obj.get("name")) |v| v.string else "");
-        const scope_name = try grammar.strings.append(if (obj.get("scope_name")) |v| v.string else "");
+        const scope_name = try grammar.strings.append(if (obj.get("scopeName")) |v| v.string else "");
         const syntax = try Syntax.init(aa, root, &grammar.strings);
 
         if (obj.get("injectTo")) |inject| {

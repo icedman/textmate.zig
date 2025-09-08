@@ -18,6 +18,7 @@ const ParseState = parser.ParseState;
 const Syntax = grammar.Syntax;
 const Atom = atms.Atom;
 
+// TODO comptime this
 pub const Processor = struct {
     allocator: Allocator,
     block: ?[]const u8 = null,
@@ -50,21 +51,36 @@ pub const Processor = struct {
         self.captures.clearRetainingCapacity();
 
         if (self.state) |state| {
+            // add root
+            {
+                const root = state.owner.lang.syntax.?.root();
+                const name = root.getName();
+                const c = ParseCapture{
+                    .start = 0,
+                    .end = block.len,
+                    .syntax = root,
+                    .atom = root.atom,
+                    .scope = name,
+                };
+                self.captures.append(self.allocator, c) catch {};
+            }
             for (state.stack.items) |context| {
+
+                // add state tree
                 if (context.syntax.rx_begin.valid == .Valid) {
-                    if (context.syntax.rx_begin.is_comment_block or context.syntax.rx_begin.is_string_block) {
-                        var c = ParseCapture{
+                    // if (context.syntax.rx_begin.is_comment_block or context.syntax.rx_begin.is_string_block) {
+                    const name = context.syntax.getName();
+                    if (name.len > 0) {
+                        const c = ParseCapture{
                             .start = 0,
                             .end = block.len,
                             .syntax = context.syntax,
                             .atom = context.syntax.atom,
+                            .scope = name,
                         };
-                        if (c.atom.count == 0) {
-                            const name = context.syntax.getName();
-                            c.scope = name;
-                        }
                         self.captures.append(self.allocator, c) catch {};
                     }
+                    // }
                 }
             }
         }
@@ -142,6 +158,18 @@ pub const Processor = struct {
 
     pub fn deinit(self: *Processor) void {
         self.captures.deinit(self.allocator);
+    }
+
+    pub fn query(self: *Processor, start: usize, end: usize) void {
+        var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
+        if (self.block) |b| {
+            stdout.print("...{s} {}-{}\n", .{ b[start..end], start, end }) catch {};
+            for (self.captures.items) |cap| {
+                if (start >= cap.start and end <= cap.end) {
+                    stdout.print("  !{s} {}-{}\n", .{ cap.scope, cap.start, cap.end }) catch {};
+                }
+            }
+        }
     }
 };
 

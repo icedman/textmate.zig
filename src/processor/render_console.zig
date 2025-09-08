@@ -23,7 +23,10 @@ const Rgb = theme.Rgb;
 
 pub const RenderProcessor = struct {
     pub fn endLine(self: *Processor) void {
-        var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
+        var stdout_buffer: [1024]u8 = undefined;
+        var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+        const stdout = &stdout_writer.interface;
+        // var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
 
         var atoms: [4]Atom = [_]Atom{Atom{}} ** 4;
 
