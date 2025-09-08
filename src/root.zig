@@ -8,7 +8,7 @@ pub const oni = @import("oniguruma");
 const theme = @import("theme.zig");
 const grammar = @import("grammar.zig");
 const parser = @import("parser.zig");
-const processor = @import("processor.zig");
+const processor = @import("processor/processor.zig");
 
 // Types
 pub const ThemeLibrary = theme.ThemeLibrary;

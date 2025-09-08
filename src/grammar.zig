@@ -201,7 +201,7 @@ pub const Syntax = struct {
             errdefer allocator.free(res);
             for (patterns_arr.array.items) |item| {
                 var syn = Syntax.init(allocator, item, strings_arena) catch |err| {
-                    std.debug.print("error in pattern {f}\n", .{std.json.fmt(item, .{})});
+                    // std.debug.print("error in pattern {f}\n", .{std.json.fmt(item, .{})});
                     return err;
                 };
                 syn.parent = syntax;

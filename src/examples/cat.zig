@@ -275,8 +275,9 @@ pub fn main() !void {
         stdout.print("theme: {s}\n", .{thm.name}) catch {};
         stdout.print("theme atoms: {}\n", .{thm.atoms.count()}) catch {};
         // state.dump();
-        stdout.flush() catch {};
     }
+
+    stdout.flush() catch {};
 }
 
 // TODO make proper tests

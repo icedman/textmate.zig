@@ -1,11 +1,11 @@
 const std = @import("std");
 const oni = @import("oniguruma");
 const grammar = @import("grammar.zig");
-const processor = @import("processor.zig");
 const util = @import("util.zig");
 const strings = @import("strings.zig");
 const atoms = @import("atoms.zig");
 const config = @import("config.zig");
+const processor = @import("processor/processor.zig");
 
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
@@ -858,6 +858,11 @@ pub const Parser = struct {
         var last_push_syntax: u64 = 0;
 
         self.resetCurrentAnchor();
+
+        while (block[start] == ' ' or block[start] == '\t') {
+            if (start >= end) break;
+            start += 1;
+        }
 
         // handle while
         // todo track while count
