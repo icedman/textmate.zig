@@ -475,6 +475,10 @@ pub const GrammarLibrary = struct {
         try embedded.listGrammars(self.allocator, &self.grammars);
     }
 
+    pub fn addGrammar(self: *GrammarLibrary, path: []const u8) !void {
+        try resources.addGrammar(self.allocator, path, &self.grammars);
+    }
+
     pub fn applyInjectors(self: *GrammarLibrary, grammar: *Grammar) void {
         if (grammar.syntax) |syntax| {
             const scope_name = syntax.scope_name;

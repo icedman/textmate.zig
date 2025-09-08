@@ -5,6 +5,7 @@ const theme = @import("../theme.zig");
 const atms = @import("../atoms.zig");
 
 const Allocator = std.mem.Allocator;
+const ArrayList = std.ArrayList;
 
 const ParseCapture = parser.ParseCapture;
 const ParseState = parser.ParseState;
@@ -17,7 +18,7 @@ pub const Processor = struct {
     block: ?[]const u8 = null,
     theme: ?*theme.Theme = null,
     state: ?*ParseState = null,
-    captures: std.ArrayList(ParseCapture),
+    captures: ArrayList(ParseCapture),
 
     start_document_fn: ?*const fn (*Processor) void = null,
     end_document_fn: ?*const fn (*Processor) void = null,
@@ -58,10 +59,11 @@ pub const Processor = struct {
                 self.captures.append(self.allocator, c) catch {};
             }
             for (state.stack.items) |context| {
-
                 // add state tree
                 if (context.syntax.rx_begin.valid == .Valid) {
-                    // if (context.syntax.rx_begin.is_comment_block or context.syntax.rx_begin.is_string_block) {
+                    // if (!context.syntax.rx_begin.is_comment_block and !context.syntax.rx_begin.is_string_block) {
+                    // continue;
+                    // }
                     const name = context.syntax.getName();
                     if (name.len > 0) {
                         const c = ParseCapture{
@@ -73,7 +75,6 @@ pub const Processor = struct {
                         };
                         self.captures.append(self.allocator, c) catch {};
                     }
-                    // }
                 }
             }
         }
@@ -90,6 +91,7 @@ pub const Processor = struct {
     }
 
     pub fn openTag(self: *Processor, cap: *ParseCapture) void {
+        if (cap.scope.len == 0) return;
         var c = cap;
         if (self.block) |b| {
             if (c.start > b.len and b.len > 0) {
@@ -104,6 +106,7 @@ pub const Processor = struct {
     }
 
     pub fn closeTag(self: *Processor, cap: *ParseCapture) void {
+        if (cap.scope.len == 0) return;
         var c = cap;
         if (self.block) |b| {
             // this happens if parser adds '\n' at every parse
@@ -132,6 +135,7 @@ pub const Processor = struct {
     }
 
     pub fn capture(self: *Processor, cap: *ParseCapture) void {
+        if (cap.scope.len == 0) return;
         var c = cap;
         if (self.block) |b| {
             // this happens if parser adds '\n' at every parse
@@ -153,12 +157,15 @@ pub const Processor = struct {
         self.captures.deinit(self.allocator);
     }
 
-    pub fn query(self: *Processor, start: usize, end: usize) void {
+    pub fn query(self: *Processor, start: usize, end: usize, allocator: Allocator, collect: ?*ArrayList([]const u8)) !void {
         var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
         if (self.block) |b| {
             stdout.print("...{s} {}-{}\n", .{ b[start..end], start, end }) catch {};
             for (self.captures.items) |cap| {
                 if (start >= cap.start and end <= cap.end) {
+                    if (collect) |c| {
+                        try c.append(allocator, cap.scope);
+                    }
                     stdout.print("  !{s} {}-{}\n", .{ cap.scope, cap.start, cap.end }) catch {};
                 }
             }
@@ -170,7 +177,7 @@ pub const NullProcessor = struct {
     pub fn init(allocator: Allocator) !Processor {
         return Processor{
             .allocator = allocator,
-            .captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
+            .captures = try ArrayList(ParseCapture).initCapacity(allocator, 32),
         };
     }
 };

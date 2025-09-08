@@ -9,6 +9,7 @@ const theme = @import("theme.zig");
 const grammar = @import("grammar.zig");
 const parser = @import("parser.zig");
 const processor = @import("processor/processor.zig");
+const util = @import("ansi_terminal.zig");
 
 // Types
 pub const ThemeLibrary = theme.ThemeLibrary;
@@ -30,5 +31,7 @@ pub const NullProcessor = processor.NullProcessor;
 pub const DumpProcessor = processor.DumpProcessor;
 pub const RenderProcessor = processor.RenderProcessor;
 pub const RenderHtmlProcessor = processor.RenderHtmlProcessor;
+
+pub const AnsiTerminal = util;
 
 const testing = std.testing;

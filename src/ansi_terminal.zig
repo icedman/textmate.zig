@@ -1,7 +1,12 @@
 // TODO avoid utils (too generic as per Zig docs)
 const std = @import("std");
-const theme = @import("theme.zig");
-const Rgb = theme.Rgb;
+
+const Rgb = struct {
+    r: u8 = 0,
+    g: u8 = 0,
+    b: u8 = 0,
+    a: u8 = 0,
+};
 
 // 24-bit ANSI foreground and background color
 pub fn setColorHex(stdout: anytype, hex: []const u8) !void {
@@ -16,7 +21,7 @@ pub fn setColorHex(stdout: anytype, hex: []const u8) !void {
     try stdout.print("\x1b[38;2;{d};{d};{d}m", .{ r, g, b });
 }
 
-pub fn setColorRgb(stdout: anytype, rgb: Rgb) !void {
+pub fn setColorRgb(stdout: anytype, rgb: anytype) !void {
     try stdout.print("\x1b[38;2;{d};{d};{d}m", .{ rgb.r, rgb.g, rgb.b });
 }
 
@@ -32,7 +37,7 @@ pub fn setBgColorHex(stdout: anytype, hex: []const u8) !void {
     try stdout.print("\x1b[48;2;{d};{d};{d}m", .{ r, g, b });
 }
 
-pub fn setBgColorRgb(stdout: anytype, rgb: Rgb) !void {
+pub fn setBgColorRgb(stdout: anytype, rgb: anytype) !void {
     try stdout.print("\x1b[48;2;{d};{d};{d}m", .{ rgb.r, rgb.g, rgb.b });
 }
 

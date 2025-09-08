@@ -11,9 +11,61 @@ const NullProcessor = lib.NullProcessor;
 const DumpProcessor = lib.DumpProcessor;
 const RenderProcessor = lib.RenderProcessor;
 const RenderHtmlProcessor = lib.RenderHtmlProcessor;
+const Rgb = lib.Rgb;
+const util = lib.AnsiTerminal;
+
+const ArrayList = std.ArrayList;
+
+const setColorHex = util.setColorHex;
+const setColorRgb = util.setColorRgb;
+const setBgColorHex = util.setBgColorHex;
+const setBgColorRgb = util.setBgColorRgb;
+const resetColor = util.resetColor;
+
+var line_tests: usize = 0;
+var line_tests_failed: usize = 0;
+
+fn compare_tokens(hay: *ArrayList([]const u8), needles: std.json.Value) bool {
+    var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
+    var eq = true;
+    for (needles.array.items) |n| {
+        const ns = n.string;
+        var found = false;
+        for (hay.items) |h| {
+            if (std.mem.eql(u8, h, ns)) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            eq = false;
+            stdout.print("!missing {s}\n", .{ns}) catch {};
+        }
+    }
+    stdout.flush() catch {};
+    return eq;
+}
 
 pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_path: []const u8) !void {
+    var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
     var buf: [1024]u8 = undefined; // fixed buffer
+    GrammarLibrary.initLibrary(allocator) catch {
+        return;
+    };
+    defer GrammarLibrary.deinitLibrary();
+
+    if (GrammarLibrary.getLibrary()) |gml| {
+        const grammars = json.object.get("grammars");
+        if (grammars) |gmrs| {
+            if (gmrs == .array) {
+                for (gmrs.array.items) |g| {
+                    const s = try std.fmt.bufPrint(&buf, "{s}/{s}", .{ base_path, g.string });
+                    try gml.addGrammar(s);
+                }
+            }
+        }
+    }
+
     const grammar_path = json.object.get("grammarPath");
     var gmr: ?*Grammar = null;
     if (grammar_path) |p| {
@@ -22,10 +74,10 @@ pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_p
             if (std.mem.indexOf(u8, s, "json")) |_| {
                 // we support only json files
             } else {
-                std.debug.print("unsupported file {s}\n", .{s});
+                try stdout.print("unsupported file {s}\n", .{s});
                 return error.UnsupportedFile;
             }
-            std.debug.print("{s}\n", .{s});
+            try stdout.print("{s}\n", .{s});
             gmr = try Grammar.init(allocator, s);
             // gmr.syntax.?.dump(0, false);
         }
@@ -33,6 +85,11 @@ pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_p
 
     if (gmr) |grammar| {
         defer grammar.deinit();
+
+        const desc = json.object.get("desc");
+        if (desc) |d| {
+            stdout.print("===========\n{s}\n===========\n", .{d.string}) catch {};
+        }
 
         var par = try Parser.init(allocator, grammar);
         defer par.deinit();
@@ -46,35 +103,59 @@ pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_p
         par.processor = &proc;
         proc.state = &state;
 
+        var collect = try ArrayList([]const u8).initCapacity(allocator, 32);
+        defer collect.deinit(allocator);
+
         const lines = json.object.get("lines");
         if (lines) |ll| {
             if (ll == .array) {
                 proc.startDocument();
                 for (ll.array.items) |l| {
+                    collect.clearRetainingCapacity();
+
                     const line = l.object.get("line").?.string;
                     _ = try par.parseLine(&state, line);
-                    std.debug.print("Line: {s}\n", .{line});
+                    try stdout.print("Line: {s}\n", .{line});
 
                     const tokens = l.object.get("tokens").?.array;
                     var idx: usize = 0;
+                    var passed = true;
                     for (tokens.items) |t| {
                         const value = t.object.get("value").?.string;
                         const scopes = t.object.get("scopes");
                         const s = idx;
                         const e = s + value.len;
-                        std.debug.print("[{s}]\n", .{value});
-                        std.debug.print(" ?: {f}\n", .{std.json.fmt(scopes, .{})});
-                        proc.query(s, e);
+                        try stdout.print("[{s}]\n", .{value});
+                        try stdout.print(" ?: {f}\n", .{std.json.fmt(scopes, .{})});
+                        try proc.query(s, e, allocator, &collect);
+                        if (!compare_tokens(&collect, scopes.?)) {
+                            passed = false;
+                        }
                         idx = e;
+                    }
+
+                    line_tests += 1;
+                    if (!passed) {
+                        try setColorRgb(stdout, Rgb{ .r = 255, .g = 50, .b = 50, .a = 255 });
+                        try stdout.print("line test failed\n", .{});
+                        try resetColor(stdout);
+                        line_tests_failed += 1;
+                    } else {
+                        try setColorRgb(stdout, Rgb{ .r = 50, .g = 255, .b = 50, .a = 255 });
+                        try stdout.print("line test succeed\n", .{});
+                        try resetColor(stdout);
                     }
                 }
                 proc.endDocument();
             }
         }
     }
+
+    stdout.flush() catch {};
 }
 
 pub fn run_test_suit(allocator: std.mem.Allocator, base_path: []const u8, source_path: []const u8) !void {
+    var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
     var buf: [1024]u8 = undefined; // fixed buffer
     const file_path = try std.fmt.bufPrint(&buf, "{s}/{s}", .{ base_path, source_path });
 
@@ -92,13 +173,15 @@ pub fn run_test_suit(allocator: std.mem.Allocator, base_path: []const u8, source
         for (root.array.items) |item| {
             if (item == .object) {
                 run_parse_test(allocator, item, base_path) catch {};
-                // break;
             }
         }
     }
+
+    stdout.flush() catch {};
 }
 
 pub fn run_theme_library(allocator: std.mem.Allocator) !void {
+    var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
     ThemeLibrary.initLibrary(allocator) catch {
         return;
     };
@@ -106,17 +189,20 @@ pub fn run_theme_library(allocator: std.mem.Allocator) !void {
     if (ThemeLibrary.getLibrary()) |thl| {
         thl.addEmbeddedThemes() catch {};
         for (thl.themes.items) |thm| {
-            std.debug.print("theme: {s}\n", .{thm.name});
+            try stdout.print("theme: {s}\n", .{thm.name});
             if (thm.embedded_file) |f| {
                 var t = try Theme.initWithData(allocator, f);
-                std.debug.print("..{s}\n", .{t.name});
+                try stdout.print("..{s}\n", .{t.name});
                 defer t.deinit();
             }
         }
     }
+
+    stdout.flush() catch {};
 }
 
 pub fn run_grammar_library(allocator: std.mem.Allocator) !void {
+    var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
     GrammarLibrary.initLibrary(allocator) catch {
         return;
     };
@@ -124,22 +210,26 @@ pub fn run_grammar_library(allocator: std.mem.Allocator) !void {
     if (GrammarLibrary.getLibrary()) |gml| {
         gml.addEmbeddedGrammars() catch {};
         for (gml.grammars.items) |gmr| {
-            std.debug.print("grammar: {s}\n", .{gmr.scope_name});
+            try stdout.print("grammar: {s}\n", .{gmr.scope_name});
             if (gmr.embedded_file) |f| {
                 var t = Grammar.initWithData(allocator, f) catch |err| {
-                    std.debug.print("!{any}\n", .{err});
+                    try stdout.print("!{any}\n", .{err});
                     continue;
                 };
                 defer t.deinit();
                 if (t.syntax) |s| {
-                    std.debug.print("..{s}\n", .{s.getName()});
+                    try stdout.print("..{s}\n", .{s.getName()});
                 }
             }
         }
     }
+
+    stdout.flush() catch {};
 }
 
 pub fn main() !void {
+    var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
+
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
 
@@ -149,6 +239,9 @@ pub fn main() !void {
     try run_test_suit(allocator, "data/test-cases/suite1", "tests.json");
     // try run_theme_library(allocator);
     // try run_grammar_library(allocator);
+
+    stdout.print("\n==================\n", .{}) catch {};
+    stdout.print("line tests: {}/{}\n", .{ line_tests - line_tests_failed, line_tests }) catch {};
 }
 
 const std = @import("std");
