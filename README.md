@@ -41,3 +41,29 @@ Run 'help' for instructions on selecting a theme and other info
 ```sh
 ./zig-out/bin/catx -h 
 ```
+
+### Using the library
+
+** minimal boilerplate to parse and render **
+
+1. Load a Theme
+2. Load a Grammar
+3. Init a Parser
+4. Init an initial ParseState
+5. Create a Processor
+6. Read a file line by line and feed to Parser
+
+** library **
+
+Themes and Grammars may be handled by the ThemeLibrary and GrammarLibrary
+
+Init the libraries by adding a resource folder
+
+** Processors **
+
+Processors have callback functions for parsing events such as when a token range is found.
+
+Assign a Processor to a Parser
+
+Assign a ParserState to a Processor
+
