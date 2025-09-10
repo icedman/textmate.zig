@@ -289,7 +289,7 @@ pub const Theme = struct {
             .strings = try StringsArena.init(allocator),
             .name = "",
         };
-                    
+
         errdefer theme.atoms.deinit();
         errdefer theme.scopes.deinit(allocator);
         errdefer theme.cache.deinit();

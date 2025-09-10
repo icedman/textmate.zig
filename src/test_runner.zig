@@ -129,7 +129,7 @@ pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_p
                     try lineSlice.appendSlice(allocator, line);
                     try lineSlice.appendSlice(allocator, "\n");
                     _ = try par.parseLine(&state, lineSlice.items);
-                    try stdout.print("Line: {s} {}\n", .{line, line.len});
+                    try stdout.print("Line: {s} {}\n", .{ line, line.len });
 
                     const tokens = l.object.get("tokens").?.array;
                     var idx: usize = 0;

@@ -761,7 +761,7 @@ pub const Parser = struct {
             const key = std.fmt.bufPrint(&buf, "{}", .{range.group}) catch {
                 continue;
             };
-            
+
             // std.debug.print(" captures {s}\n", .{key});
 
             const capture: ?*Syntax = captures.get(key);
@@ -803,10 +803,10 @@ pub const Parser = struct {
                     const ps = match.start; // should be range.start and range.end?
                     const pe = match.end;
                     for (pats.items) |p| {
-                        var rx = p.rx_begin; 
+                        var rx = p.rx_begin;
                         var rx_caps = p.begin_captures;
                         if (p.rx_begin.regex) |_| {
-                            rx = p.rx_begin; 
+                            rx = p.rx_begin;
                         } else if (p.rx_match.regex) |_| {
                             rx = p.rx_match;
                             rx_caps = p.captures;
@@ -915,7 +915,7 @@ pub const Parser = struct {
                         // end pattern has been matched
                         start = end_match.start;
                         end = end_match.end;
-                        
+
                         if (end_match.regex.?.is_anchored) {
                             end = start_;
                         }

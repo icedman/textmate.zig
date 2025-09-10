@@ -376,16 +376,40 @@ pub const Syntax = struct {
 
             // include another grammar
             if (include_path[0] == 's' and (std.mem.indexOf(u8, include_path, "source.") orelse 1) == 0) {
-                // TODO Some may point to specific a syntax (source.js#comments)
-                // Further resolve '#comments' in this situation
+                var source_scope = include_path;
+
+                // Some may point to specific a syntax (source.js#comments)
+                var source_include_scope: ?[]const u8 = null;
+                if (std.mem.indexOf(u8, source_scope, "#")) |idx| {
+                    source_scope = include_path[0..idx];
+                    source_include_scope = include_path[idx..];
+                }
+
                 if (GrammarLibrary.getLibrary()) |gml| {
-                    const gmr = gml.grammarFromScopeName(include_path) catch {
-                        // std.debug.print("unable to load grammar {s}\n", .{include_path});
+                    const gmr = gml.grammarFromScopeName(source_scope) catch {
+                        std.debug.print("unable to load grammar {s}\n", .{source_scope});
                         return null;
                     };
+
                     syntax.include = gmr.syntax;
-                    // std.debug.print("{s} {s} {*} {*}\n", .{ include_path, gmr.name, gmr.syntax, syntax.include });
-                    return gmr.syntax;
+
+                    if (source_include_scope) |ps| {
+                        const tmp: Syntax = Syntax{
+                            .name = "",
+                            .content_name = "",
+                            .scope_name = "",
+                            .include_path = ps,
+                        };
+                        const incs = gmr.syntax.?.resolve(@constCast(&tmp), base);
+                        if (incs) |inc_syn| {
+                            syntax.include = @constCast(inc_syn);
+                        } else {
+                            syntax.include = null;
+                        }
+                    }
+
+                    // std.debug.print("INCLUDE: {s} {s} {*} {*}\n", .{ include_path, gmr.name, gmr.syntax, syntax.include });
+                    return syntax.include;
                 }
             }
 
