@@ -9,7 +9,7 @@ const processor = @import("processor/processor.zig");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const Syntax = grammar.Syntax;
-const Regex = grammar.Regex;
+const Rule = grammar.Rule;
 const Atom = atoms.Atom;
 const StringsArena = strings.StringsArena;
 
@@ -36,7 +36,7 @@ const MatchRange = struct {
 // every findMatch productes a Match, with MatchRanges holding the captured groups
 const Match = struct {
     syntax: ?*Syntax = null,
-    regex: ?*Regex = null,
+    regex: ?*Rule = null,
 
     // is this expensive to pass around (copy)
     ranges: [config.max_match_ranges]MatchRange = undefined,
@@ -148,8 +148,8 @@ const StateContext = struct {
     anchor: u32 = 0,
 
     // Parser owns these at regex_map and responsible for oni.Regex.deinit not Self
-    rx_while: Regex = Regex{},
-    rx_end: Regex = Regex{},
+    rx_while: Rule = Rule{},
+    rx_end: Rule = Rule{},
 
     pub fn serialize(self: *StateContext, parser: *Parser) StateContextPack {
         _ = parser;
@@ -160,7 +160,8 @@ const StateContext = struct {
         self.syntax = @ptrFromInt(serial.syntax);
         self.line = serial.line;
         self.anchor = serial.anchor;
-        self.rx_while = parser.regex_map.get(serial.rx_while) orelse Regex{};
+        self.rx_end = parser.regex_map.get(serial.rx_end) orelse Rule{};
+        self.rx_while = parser.regex_map.get(serial.rx_while) orelse Rule{};
     }
 };
 
@@ -211,7 +212,7 @@ pub const ParseState = struct {
         }
     }
 
-    pub fn push(self: *ParseState, syntax: *Syntax, rx: *Regex, block: []const u8, match: Match, where: []const u8) !void {
+    pub fn push(self: *ParseState, syntax: *Syntax, rx: *Rule, block: []const u8, match: Match, where: []const u8) !void {
         const anchor = match.start;
         var sc = StateContext{
             .syntax = syntax,
@@ -277,7 +278,7 @@ pub const ParseState = struct {
 
         _ = self.stack.append(self.allocator, sc) catch {};
         _ = where;
-        // std.debug.print("push {*}\n", .{syntax});
+        // std.debug.print("push {s}\n", .{syntax.getName()});
     }
 
     pub fn size(self: *ParseState) usize {
@@ -323,7 +324,7 @@ pub const Parser = struct {
     exec_cache: std.AutoHashMap(u64, Match),
 
     // runtime-compiled (with dynamic patterns) are save for sharing a (de)serialization
-    regex_map: std.AutoHashMap(u64, grammar.Regex),
+    regex_map: std.AutoHashMap(u64, grammar.Rule),
 
     // optionally attach a theme's atoms here for faster scope resolution
     atoms: ?*std.StringHashMap(u32) = null,
@@ -342,7 +343,7 @@ pub const Parser = struct {
             .lang = lang,
             .match_cache = std.AutoHashMap(u64, Match).init(allocator),
             .exec_cache = std.AutoHashMap(u64, Match).init(allocator),
-            .regex_map = std.AutoHashMap(u64, grammar.Regex).init(allocator),
+            .regex_map = std.AutoHashMap(u64, grammar.Rule).init(allocator),
             .strings = try StringsArena.init(allocator),
             .transient_strings = try StringsArena.init(allocator),
         };
@@ -391,12 +392,8 @@ pub const Parser = struct {
     }
 
     // findMatch. Regular expression matching. This is where all the CPU usage goes.
-    fn findMatch(self: *Parser, syntax: *Syntax, rx: *Regex, regex: ?oni.Regex, block: []const u8, start: usize, end: usize) Match {
-        if (block.len == 0) {
-            return Match{};
-        }
-
-        // std.debug.print("findMatch {} {s}\n", .{rx.id, rx.expr orelse ""});
+    fn findMatch(self: *Parser, syntax: *Syntax, rx: *Rule, regex: ?oni.Regex, block: []const u8, start: usize, end: usize) Match {
+        // std.debug.print("findMatch {} [{s}] {s}\n", .{rx.id, block, rx.expr orelse ""});
 
         if (regex) |*re| {
             // check cache
@@ -419,11 +416,15 @@ pub const Parser = struct {
             syntax.execs += 1;
             self.regex_execs += 1;
             var hard_start: usize = start;
-            const is_anchored = rx.is_anchored;
-            if (is_anchored) {
-                // TODO is this correct?
+            if (rx.is_anchored) {
                 // \G in oniguruma means start of previous match
                 hard_start = self.getCurrentAnchor();
+            }
+            if (rx.is_anchored_start) {
+                // \A in oniguruma means should match only at start
+                if (start != 0) {
+                    return Match{};
+                }
             }
             const hard_end: usize = end;
             const reg = blk: {
@@ -532,6 +533,9 @@ pub const Parser = struct {
                     }
                     break :blk null;
                 } orelse self.findMatch(syntax, &syntax.rx_match, regex, block, start, end);
+
+                // std.debug.print("{s} ? {s} {s} {}\n", .{syntax.rx_match.expr, syntax.getName(), block[start..end], m.count});
+
                 if (should_cache and config.enable_match_caching) {
                     if (syntax.rx_match.id != 0)
                         _ = self.match_cache.put(syntax.rx_match.id, m) catch {};
@@ -694,7 +698,6 @@ pub const Parser = struct {
             for (pats.items) |p| {
                 const ls = p.resolve(p, self.lang.syntax);
                 if (ls) |syn| {
-                    // std.debug.print("{s}\n", .{syn.scope_name});
                     const m = self.matchBegin(@constCast(syn), block, start, end);
                     if (m.count > 0) {
                         // if matched correctly at the current position, no need to scan further, we have our match
@@ -750,6 +753,7 @@ pub const Parser = struct {
     }
 
     fn collectCaptures(self: *Parser, match: *const Match, captures: *const std.StringHashMap(*Syntax), block: []const u8) !void {
+        // std.debug.print("collectCaptures\n", .{});
         for (0..match.count) |i| {
             var buf: [32]u8 = undefined; // is this enough to hold any int as string?
             const range = match.ranges[i];
@@ -757,9 +761,12 @@ pub const Parser = struct {
             const key = std.fmt.bufPrint(&buf, "{}", .{range.group}) catch {
                 continue;
             };
+            
+            // std.debug.print(" captures {s}\n", .{key});
 
             const capture: ?*Syntax = captures.get(key);
             if (capture) |syn| {
+                // std.debug.print("capture {s}\n", .{syn.getName()});
                 if (self.processor) |proc| {
                     var c = Capture{
                         .start = range.start,
@@ -797,11 +804,12 @@ pub const Parser = struct {
                     const pe = match.end;
                     for (pats.items) |p| {
                         var rx = p.rx_begin; 
+                        var rx_caps = p.begin_captures;
                         if (p.rx_begin.regex) |_| {
-                            // std.debug.print("!!!\n", .{});
                             rx = p.rx_begin; 
                         } else if (p.rx_match.regex) |_| {
                             rx = p.rx_match;
+                            rx_caps = p.captures;
                         }
                         if (rx.regex) |regex| {
                             // std.debug.print(">> {s} <<\n", .{p.rx_match.expr orelse ""});
@@ -809,7 +817,7 @@ pub const Parser = struct {
                             const m = self.findMatch(p, &p.rx_match, regex, block, ps, pe);
                             if (m.count > 0) {
                                 // std.debug.print("count {}\n", .{m.count});
-                                if (p.captures) |*pc| {
+                                if (rx_caps) |*pc| {
                                     // descend into captures
                                     try self.collectCaptures(&m, pc, block);
                                 } else if (p.name.len > 0) {
@@ -872,6 +880,8 @@ pub const Parser = struct {
         while (true) {
             end = block.len;
 
+            const start_ = start;
+
             // debug only
             // {
             //     const text = block[start..end];
@@ -885,7 +895,7 @@ pub const Parser = struct {
                 const ls = ts.resolve(ts, self.lang.syntax);
                 if (ls) |syn| {
                     // std.debug.print("top> {s} {*}..{}\n", .{syn.getName(), @constCast(syn).root(), state.size()});
-                    const end_match: Match = self.matchEnd(state, block, start, end);
+                    var end_match: Match = self.matchEnd(state, block, start, end);
                     var pattern_match: Match = Match{};
 
                     if (end_match.count > 0 and end_match.end + 1 >= end and start == 0) {
@@ -894,21 +904,27 @@ pub const Parser = struct {
                         pattern_match = self.matchPatterns(syn, syn.patterns, block, start, end);
                     }
 
-                    if (end_match.count > 0 and
-                        (pattern_match.count == 0 or
-                            (pattern_match.count > 0 and pattern_match.start >= end_match.start)))
-                    {
-                        // std.debug.print("end?{} {} {}\n", .{end_match.count, end_match.start, end});
+                    // patter match prevails over end ...
+                    if (pattern_match.count > 0 and syn.apply_end_pattern_last) {
+                        end_match.count = 0;
+                    } else if (pattern_match.count > 0 and pattern_match.start <= end_match.start) {
+                        end_match.count = 0;
+                    }
 
+                    if (end_match.count > 0) {
                         // end pattern has been matched
                         start = end_match.start;
                         end = end_match.end;
+                        
+                        if (end_match.regex.?.is_anchored) {
+                            end = start_;
+                        }
 
                         // collect endCaptures
                         if (end_match.syntax) |end_syn| {
                             try self.collectMatch(end_syn, &end_match, block);
                             if (end_syn.end_captures) |end_cap| {
-                                // std.debug.print("end captures ?{} {} {}\n", .{end_match.count, end_match.start, end});
+                                // std.debug.print("end capture!\n", .{});
                                 try self.collectCaptures(&end_match, &end_cap, block);
                             }
 
@@ -923,7 +939,7 @@ pub const Parser = struct {
                                 proc.closeTag(&c);
                             }
 
-                            // std.debug.print("pop {s}\n", .{end_syn.getName()});
+                            std.debug.print("pop {s} {}\n", .{ end_syn.getName(), end_match.anchor_start });
                         }
 
                         // pop!
@@ -931,13 +947,12 @@ pub const Parser = struct {
                     } else if (pattern_match.count > 0) {
                         if (pattern_match.syntax) |match_syn| {
                             // pattern has been matched
-                            const start_ = start;
                             start = pattern_match.start;
                             end = pattern_match.end;
 
                             // if it has a regexs_end.. it is a begin and should cause a push
                             if (match_syn.rx_begin.valid == .Valid) {
-                                // std.debug.print("push {s} {}\n", .{match_syn.getName(), start_});
+                                std.debug.print("push {s} {s} {}\n", .{ match_syn.getName(), match_syn.rx_begin.expr orelse "", start_ });
                                 if (pattern_match.regex) |rx| {
                                     if (last_push_pos != start_ or last_push_syntax != match_syn.id) {
                                         if (config.enable_scope_atoms and !rx.has_references) {
@@ -975,6 +990,8 @@ pub const Parser = struct {
 
                                 try self.collectMatch(match_syn, &pattern_match, block);
                                 if (match_syn.begin_captures) |beg_cap| {
+                                    try self.collectCaptures(&pattern_match, &beg_cap, block);
+                                } else if (match_syn.captures) |beg_cap| {
                                     try self.collectCaptures(&pattern_match, &beg_cap, block);
                                 }
                             } else {

@@ -144,6 +144,11 @@ pub const Atom = struct {
     }
 
     pub fn compute(self: *Atom, scope: []const u8, map: *std.StringHashMap(u32)) void {
+        if (scope.len == 0) {
+            self.id = 1;
+            return;
+        }
+
         const a = atomize(scope, map);
         self.id = a.id;
         self.count = a.count;
