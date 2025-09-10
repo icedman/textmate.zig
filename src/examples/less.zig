@@ -1,5 +1,5 @@
 const oni = lib.oni;
-const Regex = lib.Regex;
+const Rule = lib.Rule;
 const Grammar = lib.Grammar;
 
 pub fn main() !void {
@@ -11,7 +11,7 @@ pub fn main() !void {
     const expr = "(\\[)((?<square>[^]\\[\\\\]|\\\\.|\\[\\g<square>*+])*+)(])(\\()[\\t ]*((<)((?:\\\\[<>]|[^\\n<>])*)(>)|((?<url>(?>[^()\\s]+)|\\(\\g<url>*\\))*))[\\t ]*(?:((\\()[^()]*(\\)))|((\")[^\"]*(\"))|((')[^']*(')))?\\s*(\\))";
 
     std.debug.print("compiling...{s}\n", .{expr});
-    var r = Regex{};
+    var r = Rule{};
     try r.compile(expr);
     std.debug.print("id: {}\n", .{r.id});
     // const block = "```\n";

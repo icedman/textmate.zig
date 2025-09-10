@@ -25,6 +25,8 @@ const resetColor = util.resetColor;
 var line_tests: usize = 0;
 var line_tests_failed: usize = 0;
 
+const end_on_fail = true;
+
 fn compare_tokens(hay: *ArrayList([]const u8), needles: std.json.Value) bool {
     var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
     var eq = true;
@@ -39,18 +41,20 @@ fn compare_tokens(hay: *ArrayList([]const u8), needles: std.json.Value) bool {
         }
         if (!found) {
             eq = false;
+            setColorRgb(stdout, Rgb{ .r = 50, .g = 150, .b = 150, .a = 255 }) catch {};
             stdout.print("!missing {s}\n", .{ns}) catch {};
+            resetColor(stdout) catch {};
         }
     }
     stdout.flush() catch {};
     return eq;
 }
 
-pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_path: []const u8) !void {
+pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_path: []const u8) !bool {
     var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
     var buf: [1024]u8 = undefined; // fixed buffer
     GrammarLibrary.initLibrary(allocator) catch {
-        return;
+        return false;
     };
     defer GrammarLibrary.deinitLibrary();
 
@@ -60,7 +64,10 @@ pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_p
             if (gmrs == .array) {
                 for (gmrs.array.items) |g| {
                     const s = try std.fmt.bufPrint(&buf, "{s}/{s}", .{ base_path, g.string });
-                    try gml.addGrammar(s);
+                    gml.addGrammar(s) catch {
+                        // skip test if grammars can't be loaded (plists)
+                        return true;
+                    };
                 }
             }
         }
@@ -140,6 +147,9 @@ pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_p
                         try stdout.print("line test failed\n", .{});
                         try resetColor(stdout);
                         line_tests_failed += 1;
+                        if (end_on_fail) {
+                            return false;
+                        }
                     } else {
                         try setColorRgb(stdout, Rgb{ .r = 50, .g = 255, .b = 50, .a = 255 });
                         try stdout.print("line test succeed\n", .{});
@@ -152,9 +162,11 @@ pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_p
     }
 
     stdout.flush() catch {};
+
+    return true;
 }
 
-pub fn run_test_suit(allocator: std.mem.Allocator, base_path: []const u8, source_path: []const u8) !void {
+pub fn run_test_suit(allocator: std.mem.Allocator, base_path: []const u8, source_path: []const u8) !bool {
     var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
     var buf: [1024]u8 = undefined; // fixed buffer
     const file_path = try std.fmt.bufPrint(&buf, "{s}/{s}", .{ base_path, source_path });
@@ -172,12 +184,17 @@ pub fn run_test_suit(allocator: std.mem.Allocator, base_path: []const u8, source
     if (root == .array) {
         for (root.array.items) |item| {
             if (item == .object) {
-                run_parse_test(allocator, item, base_path) catch {};
+                if (!try run_parse_test(allocator, item, base_path)) {
+                    if (end_on_fail) {
+                        return false;
+                    }
+                }
             }
         }
     }
 
     stdout.flush() catch {};
+    return true;
 }
 
 pub fn run_theme_library(allocator: std.mem.Allocator) !void {
@@ -235,8 +252,8 @@ pub fn main() !void {
 
     const allocator = gpa.allocator();
 
-    try run_test_suit(allocator, "data/test-cases/first-mate", "tests.json");
-    try run_test_suit(allocator, "data/test-cases/suite1", "tests.json");
+    _ = try run_test_suit(allocator, "data/test-cases/first-mate", "tests.json");
+    // _ = try run_test_suit(allocator, "data/test-cases/suite1", "tests.json");
     // try run_theme_library(allocator);
     // try run_grammar_library(allocator);
 

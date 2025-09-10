@@ -16,7 +16,7 @@ const StringsArena = strings.StringsArena;
 // It adds an idenfier and points to the expression string
 // It also holds other cached information
 
-pub const Regex = struct {
+pub const Rule = struct {
     id: u64 = 0,
     expr: ?[]const u8 = null,
     regex: ?oni.Regex = null,
@@ -33,7 +33,7 @@ pub const Regex = struct {
     };
 
     // TODO change to void - regex compile errors are blamed on user-defined grammars - fail silently
-    pub fn compile(self: *Regex, regex: []const u8) !void {
+    pub fn compile(self: *Rule, regex: []const u8) !void {
         // std.debug.print("rx: {s} {}\n", .{regex, regex.len});
         const re = oni.Regex.init(
             regex,
@@ -52,7 +52,7 @@ pub const Regex = struct {
         self.id = strings.toHash(regex);
     }
 
-    pub fn deinit(self: *Regex) void {
+    pub fn deinit(self: *Rule) void {
         if (self.regex) |*regex| {
             @constCast(regex).deinit();
         }
@@ -71,10 +71,10 @@ pub const Syntax = struct {
 
     // cached compiles will be saved at the Parser?
     // cached matched will be saved Parser
-    rx_match: Regex = Regex{},
-    rx_begin: Regex = Regex{},
-    rx_end: Regex = Regex{},
-    rx_while: Regex = Regex{},
+    rx_match: Rule = Rule{},
+    rx_begin: Rule = Rule{},
+    rx_end: Rule = Rule{},
+    rx_while: Rule = Rule{},
 
     repository: ?std.StringHashMap(*Syntax) = null,
 
@@ -88,6 +88,9 @@ pub const Syntax = struct {
     // include
     include_path: ?[]const u8 = null,
     include: ?*Syntax = null,
+
+    // additional settings
+    apply_end_pattern_last: bool = false,
 
     // stats
     execs: u32 = 0,
@@ -183,10 +186,10 @@ pub const Syntax = struct {
             .name = try strings_arena.append(if (obj.get("name")) |v| if (v == .string) v.string else "" else ""),
             .content_name = try strings_arena.append(if (obj.get("contentName")) |v| if (v == .string) v.string else "" else ""),
             .scope_name = try strings_arena.append(if (obj.get("scopeName")) |v| if (v == .string) v.string else "" else ""),
-            .rx_match = Regex{ .expr = if (obj.get("match")) |v| try strings_arena.append(v.string) else null },
-            .rx_begin = Regex{ .expr = if (obj.get("begin")) |v| try strings_arena.append(v.string) else null },
-            .rx_while = Regex{ .expr = if (obj.get("while")) |v| try strings_arena.append(v.string) else null },
-            .rx_end = Regex{ .expr = if (obj.get("end")) |v| try strings_arena.append(v.string) else null },
+            .rx_match = Rule{ .expr = if (obj.get("match")) |v| try strings_arena.append(v.string) else null },
+            .rx_begin = Rule{ .expr = if (obj.get("begin")) |v| try strings_arena.append(v.string) else null },
+            .rx_while = Rule{ .expr = if (obj.get("while")) |v| try strings_arena.append(v.string) else null },
+            .rx_end = Rule{ .expr = if (obj.get("end")) |v| try strings_arena.append(v.string) else null },
         };
 
         syntax.compileAllRegexes() catch {
@@ -208,6 +211,10 @@ pub const Syntax = struct {
             }
         }
 
+        if (obj.get("applyEndPatternLast")) |_| {
+            syntax.apply_end_pattern_last = true;
+        }
+
         syntax.captures = try parseSyntaxMap(allocator, json, "captures", syntax, strings_arena);
         syntax.begin_captures = try parseSyntaxMap(allocator, json, "beginCaptures", syntax, strings_arena);
         syntax.while_captures = try parseSyntaxMap(allocator, json, "whileCaptures", syntax, strings_arena);
@@ -226,7 +233,7 @@ pub const Syntax = struct {
         // std.debug.print("deinit syntax address {*}-{*}\n", .{self, self.parent});
 
         const Entry = struct {
-            rx_ptr: *Regex,
+            rx_ptr: *Rule,
         };
 
         const entries = [_]Entry{
@@ -238,7 +245,7 @@ pub const Syntax = struct {
 
         // free oni.Regexes
         for (entries) |entry| {
-            var regex: Regex = entry.rx_ptr.*;
+            var regex: Rule = entry.rx_ptr.*;
             regex.deinit();
         }
 
@@ -277,7 +284,7 @@ pub const Syntax = struct {
     pub fn compileAllRegexes(self: *Syntax) !void {
         // TODO, compilation will now be done a load but only when required
         const Entry = struct {
-            rx_ptr: *Regex,
+            rx_ptr: *Rule,
         };
 
         const entries = [_]Entry{
