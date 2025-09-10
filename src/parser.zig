@@ -796,8 +796,15 @@ pub const Parser = struct {
                     const ps = match.start; // should be range.start and range.end?
                     const pe = match.end;
                     for (pats.items) |p| {
-                        if (p.rx_match.regex) |regex| {
-                            // std.debug.print(">> {s} <<\n", .{p.regexs_match orelse ""});
+                        var rx = p.rx_begin; 
+                        if (p.rx_begin.regex) |_| {
+                            // std.debug.print("!!!\n", .{});
+                            rx = p.rx_begin; 
+                        } else if (p.rx_match.regex) |_| {
+                            rx = p.rx_match;
+                        }
+                        if (rx.regex) |regex| {
+                            // std.debug.print(">> {s} <<\n", .{p.rx_match.expr orelse ""});
                             // std.debug.print(">> {s} <<\n", .{block[ps..pe]});
                             const m = self.findMatch(p, &p.rx_match, regex, block, ps, pe);
                             if (m.count > 0) {
@@ -901,6 +908,7 @@ pub const Parser = struct {
                         if (end_match.syntax) |end_syn| {
                             try self.collectMatch(end_syn, &end_match, block);
                             if (end_syn.end_captures) |end_cap| {
+                                // std.debug.print("end captures ?{} {} {}\n", .{end_match.count, end_match.start, end});
                                 try self.collectCaptures(&end_match, &end_cap, block);
                             }
 

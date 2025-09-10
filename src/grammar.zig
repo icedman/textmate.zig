@@ -16,6 +16,7 @@ const StringsArena = strings.StringsArena;
 // It adds an idenfier and points to the expression string
 // It also holds other cached information
 
+// TODO change name to Rule (avoid oni.Regex confusion)
 pub const Regex = struct {
     id: u64 = 0,
     expr: ?[]const u8 = null,
@@ -71,6 +72,8 @@ pub const Syntax = struct {
 
     // cached compiles will be saved at the Parser?
     // cached matched will be saved Parser
+    // TODO rx_match, rx_begin should be combined
+    // TODO rx_end, rx_while should be combined
     rx_match: Regex = Regex{},
     rx_begin: Regex = Regex{},
     rx_end: Regex = Regex{},

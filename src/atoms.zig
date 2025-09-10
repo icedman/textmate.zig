@@ -159,7 +159,6 @@ pub const Atom = struct {
 // Anything not in the map will just be dropped.
 fn atomize(scope_: []const u8, map: *std.StringHashMap(u32)) Atom {
     var atom = Atom{};
-    // std.debug.print("{s}\n", .{scope_});
     var scope = scope_[0..scope_.len];
     var shift: u7 = 0;
     while (std.mem.indexOf(u8, scope, ".")) |idx| {

@@ -23,6 +23,7 @@ const setBgColorRgb = util.setBgColorRgb;
 const resetColor = util.resetColor;
 
 var line_tests: usize = 0;
+var line_tests_passed: usize = 0;
 var line_tests_failed: usize = 0;
 
 fn compare_tokens(hay: *ArrayList([]const u8), needles: std.json.Value) bool {
@@ -39,7 +40,9 @@ fn compare_tokens(hay: *ArrayList([]const u8), needles: std.json.Value) bool {
         }
         if (!found) {
             eq = false;
+            setColorRgb(stdout, Rgb{ .r = 50, .g = 50, .b = 150, .a = 255 }) catch {};
             stdout.print("!missing {s}\n", .{ns}) catch {};
+            resetColor(stdout) catch {};
         }
     }
     stdout.flush() catch {};
@@ -142,8 +145,9 @@ pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_p
                         line_tests_failed += 1;
                     } else {
                         try setColorRgb(stdout, Rgb{ .r = 50, .g = 255, .b = 50, .a = 255 });
-                        try stdout.print("line test succeed\n", .{});
+                        try stdout.print("line test passed\n", .{});
                         try resetColor(stdout);
+                        line_tests_passed += 1;
                     }
                 }
                 proc.endDocument();
@@ -241,7 +245,7 @@ pub fn main() !void {
     // try run_grammar_library(allocator);
 
     stdout.print("\n==================\n", .{}) catch {};
-    stdout.print("line tests: {}/{}\n", .{ line_tests - line_tests_failed, line_tests }) catch {};
+    stdout.print("line tests: {}/{}\n", .{ line_tests_passed, line_tests }) catch {};
 }
 
 const std = @import("std");
