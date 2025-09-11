@@ -34,7 +34,7 @@ pub const RenderProcessor = struct {
             const captures = self.captures;
             const block = self.block orelse "";
 
-            var color_stack: [32]Rgb = [_]Rgb{Rgb{}} ** 32;
+            var color_stack: [128]Rgb = [_]Rgb{Rgb{}} ** 128;
             var color_stack_idx: usize = 0;
             var current_color = Rgb{};
 
@@ -60,7 +60,6 @@ pub const RenderProcessor = struct {
 
                         const scope = thm.getScope(cap.scope, &atoms, &colors);
                         _ = scope;
-                        // std.debug.print("{}? ", .{scope_name.len});
 
                         // if (colors.foreground) |fgs| {
                         //     std.debug.print("{s}\n", .{fgs});

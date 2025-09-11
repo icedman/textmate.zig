@@ -357,7 +357,7 @@ pub const Theme = struct {
                 if (opt == .string) {
                     const scopes = try aa.alloc([]const u8, 1);
                     errdefer aa.free(scopes);
-                    scopes[0] = opt.string;
+                    scopes[0] = try theme.strings.append(opt.string);
                     break :blk scopes;
                 }
                 if (opt == .array) {
@@ -414,6 +414,8 @@ pub const Theme = struct {
 
     pub fn getScope(self: *Theme, scope: []const u8, atoms: []const Atom, colors: ?*Settings) ?*const Scope {
         var atom = atoms[0];
+
+        // std.debug.print("{s} {}\n", .{scope, atom.count});
 
         if (scope.len == 0 and atom.count == 0) return null;
 

@@ -26,7 +26,7 @@ var line_tests: usize = 0;
 var line_tests_passed: usize = 0;
 var line_tests_failed: usize = 0;
 
-const end_on_fail = false;
+const end_on_fail = true;
 
 fn compare_tokens(hay: *ArrayList([]const u8), needles: std.json.Value) bool {
     var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
@@ -266,6 +266,7 @@ pub fn main() !void {
 
     _ = try run_test_suit(allocator, "data/test-cases/first-mate", "tests.json");
     _ = try run_test_suit(allocator, "data/test-cases/suite1", "tests.json");
+    // _ = try run_test_suit(allocator, "data/test-cases/suite1", "whileTests.json");
     // try run_theme_library(allocator);
     // try run_grammar_library(allocator);
 

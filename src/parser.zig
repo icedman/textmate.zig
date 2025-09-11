@@ -322,6 +322,8 @@ pub const Parser = struct {
     match_cache: std.AutoHashMap(u64, Match),
     // regex level cache
     exec_cache: std.AutoHashMap(u64, Match),
+    // matches at line parse - to watch endless loops
+    line_matches: std.ArrayList(Match),
 
     // runtime-compiled (with dynamic patterns) are save for sharing a (de)serialization
     regex_map: std.AutoHashMap(u64, grammar.Rule),
@@ -343,6 +345,7 @@ pub const Parser = struct {
             .lang = lang,
             .match_cache = std.AutoHashMap(u64, Match).init(allocator),
             .exec_cache = std.AutoHashMap(u64, Match).init(allocator),
+            .line_matches = try std.ArrayList(Match).initCapacity(allocator, 32),
             .regex_map = std.AutoHashMap(u64, grammar.Rule).init(allocator),
             .strings = try StringsArena.init(allocator),
             .transient_strings = try StringsArena.init(allocator),
@@ -352,6 +355,7 @@ pub const Parser = struct {
     pub fn deinit(self: *Parser) void {
         self.match_cache.deinit();
         self.exec_cache.deinit();
+        self.line_matches.deinit(self.allocator);
 
         var it = self.regex_map.iterator();
         while (it.next()) |kv| {
@@ -398,35 +402,31 @@ pub const Parser = struct {
         if (regex) |*re| {
             // check cache
             var should_cache = false;
+
+            syntax.execs += 1;
+            self.regex_execs += 1;
+            var hard_start: usize = start;
+            if (rx.is_anchored) {
+                // \G or \A in oniguruma means start of previous match
+                hard_start = self.getCurrentAnchor();
+            }
+            const hard_end: usize = end;
+
             if (rx.valid == .Valid and config.enable_exec_caching) {
                 should_cache = true;
                 if (self.exec_cache.get(rx.id)) |mm| {
-                    if (mm.anchor_start <= start and mm.start > start) {
+                    if (mm.anchor_start == hard_start and mm.start > hard_start) {
                         // std.debug.print("findMatch cache {s} {} {}-{}\n", .{rx.expr orelse "", start, mm.start, mm.end});
                         self.regex_skips += 1;
                         return mm;
                     }
-                    if (mm.anchor_start <= start and mm.count == 0) {
+                    if (mm.anchor_start == hard_start and mm.count == 0) {
                         self.regex_skips += 1;
                         return mm;
                     }
                 }
             }
 
-            syntax.execs += 1;
-            self.regex_execs += 1;
-            var hard_start: usize = start;
-            if (rx.is_anchored) {
-                // \G in oniguruma means start of previous match
-                hard_start = self.getCurrentAnchor();
-            }
-            if (rx.is_anchored_start) {
-                // \A in oniguruma means should match only at start
-                if (start != 0) {
-                    return Match{};
-                }
-            }
-            const hard_end: usize = end;
             const reg = blk: {
                 var result: oni.Region = .{};
                 _ = @constCast(re).searchAdvanced(block, hard_start, hard_end, &result, .{}) catch |err| {
@@ -465,6 +465,7 @@ pub const Parser = struct {
                     }
                     const s: usize = @intCast(starts[i]);
                     const e: usize = @intCast(ends[i]);
+                    // suite1 #46 remove this if .. but fix endless loop first
                     if (s >= start) {
                         m.ranges[count].group = i;
                         m.ranges[count].start = s;
@@ -488,7 +489,7 @@ pub const Parser = struct {
                 // std.debug.print("{s}\n", .{syntax.content_name});
                 // }
 
-                if (should_cache) {
+                if (should_cache and (m.count == 0 or (m.count > 0 and m.start > hard_start))) {
                     self.exec_cache.put(rx.id, m) catch {};
                 }
 
@@ -534,9 +535,11 @@ pub const Parser = struct {
                     break :blk null;
                 } orelse self.findMatch(syntax, &syntax.rx_match, regex, block, start, end);
 
-                // std.debug.print("{s} ? {s} {s} {}\n", .{syntax.rx_match.expr, syntax.getName(), block[start..end], m.count});
+                // if (m.count > 0) {
+                //     std.debug.print("{s}\n\t {s} {s} {}\n", .{syntax.rx_match.expr orelse "", syntax.getName(), block[start..end], m.count});
+                // }
 
-                if (should_cache and config.enable_match_caching) {
+                if (should_cache and config.enable_match_caching and m.count == 0) {
                     if (syntax.rx_match.id != 0)
                         _ = self.match_cache.put(syntax.rx_match.id, m) catch {};
                 }
@@ -566,7 +569,7 @@ pub const Parser = struct {
                     }
                     break :blk null;
                 } orelse self.findMatch(syntax, &syntax.rx_begin, regex, block, start, end);
-                if (should_cache and config.enable_match_caching) {
+                if (should_cache and config.enable_match_caching and m.count == 0) {
                     _ = self.match_cache.put(syntax.rx_begin.id, m) catch {};
                 }
                 if (m.count > 0) {
@@ -646,9 +649,8 @@ pub const Parser = struct {
 
         const top = state.top();
         if (top) |t| {
-            const ts = t.syntax;
-            const ls = ts.resolve(ts, self.lang.syntax);
-            if (ls) |syn| {
+            const syn = t.syntax;
+            {
                 const end_match: Match = blk: {
                     if (t.rx_end.valid == .Valid) {
                         // use dynamic end_regex here if one was compiled
@@ -699,6 +701,10 @@ pub const Parser = struct {
                 const ls = p.resolve(p, self.lang.syntax);
                 if (ls) |syn| {
                     const m = self.matchBegin(@constCast(syn), block, start, end);
+                    if (self.isLooping(m)) {
+                        // disqualify
+                        continue;
+                    }
                     if (m.count > 0) {
                         // if matched correctly at the current position, no need to scan further, we have our match
                         if (m.start == start) {
@@ -709,6 +715,8 @@ pub const Parser = struct {
                             earliest_match = m;
                         } else if (earliest_match.start > m.start) {
                             // nearer to current position is the earlier match
+                            earliest_match = m;
+                        } else if (earliest_match.start == m.start and earliest_match.end < m.end) {
                             earliest_match = m;
                         }
                     }
@@ -844,6 +852,15 @@ pub const Parser = struct {
         }
     }
 
+    pub fn isLooping(self: *Parser, match: Match) bool {
+        for (self.line_matches.items) |item| {
+            if (item.syntax == match.syntax and item.anchor_start == match.anchor_start) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // feed the parser a source code line. It must be terminated by a newline character '\n'.
     pub fn parseLine(self: *Parser, state: *ParseState, block: []const u8) !void {
         if (self.processor) |proc| proc.startLine(block);
@@ -856,19 +873,14 @@ pub const Parser = struct {
         self.current_state = state;
         self.match_cache.clearRetainingCapacity();
         self.exec_cache.clearRetainingCapacity();
+        self.line_matches.clearRetainingCapacity();
 
         self.transient_strings.clear();
 
         var start: usize = 0;
         var end = block.len;
-
-        // hacky way to escape unexplained lookp :) .. can't escape push-pop infinite loop
         var last_start: usize = 0;
         var last_syntax: u64 = 0;
-
-        // hacky way to escape push-pop infinite loop
-        var last_push_pos: usize = 0;
-        var last_push_syntax: u64 = 0;
 
         self.resetCurrentAnchor();
 
@@ -880,6 +892,7 @@ pub const Parser = struct {
         while (true) {
             end = block.len;
 
+            var did_match = false;
             const start_ = start;
 
             // debug only
@@ -898,18 +911,26 @@ pub const Parser = struct {
                     var end_match: Match = self.matchEnd(state, block, start, end);
                     var pattern_match: Match = Match{};
 
-                    if (end_match.count > 0 and end_match.end + 1 >= end and start == 0) {
-                        // this is the end of the block.. don't bother with patterns
+                    if (end_match.count > 0 and end_match.start == start) {
+                        // end match is prioritized
                     } else {
                         pattern_match = self.matchPatterns(syn, syn.patterns, block, start, end);
                     }
 
                     // patter match prevails over end ...
-                    if (pattern_match.count > 0 and syn.apply_end_pattern_last) {
-                        end_match.count = 0;
-                    } else if (pattern_match.count > 0 and pattern_match.start <= end_match.start) {
-                        end_match.count = 0;
+                    if (pattern_match.count > 0) {
+                        if (syn.apply_end_pattern_last) {
+                            end_match.count = 0;
+                        } else if (pattern_match.start < end_match.start) {
+                            end_match.count = 0;
+                        } else if (pattern_match.start == end_match.start and pattern_match.end < end_match.end) {
+                            end_match.count = 0;
+                        }
                     }
+
+                    did_match = end_match.count + pattern_match.count > 0;
+
+                    // std.debug.print("end {} vs pat {}\n", .{end_match.count, pattern_match.count});
 
                     if (end_match.count > 0) {
                         // end pattern has been matched
@@ -924,7 +945,8 @@ pub const Parser = struct {
                         if (end_match.syntax) |end_syn| {
                             try self.collectMatch(end_syn, &end_match, block);
                             if (end_syn.end_captures) |end_cap| {
-                                // std.debug.print("end capture!\n", .{});
+                                try self.collectCaptures(&end_match, &end_cap, block);
+                            } else if (end_syn.captures) |end_cap| {
                                 try self.collectCaptures(&end_match, &end_cap, block);
                             }
 
@@ -939,7 +961,7 @@ pub const Parser = struct {
                                 proc.closeTag(&c);
                             }
 
-                            std.debug.print("pop {s} {}\n", .{ end_syn.getName(), end_match.anchor_start });
+                            // std.debug.print("pop {s} {}\n", .{ end_syn.getName(), end_match.anchor_start });
                         }
 
                         // pop!
@@ -950,30 +972,26 @@ pub const Parser = struct {
                             start = pattern_match.start;
                             end = pattern_match.end;
 
-                            // if it has a regexs_end.. it is a begin and should cause a push
                             if (match_syn.rx_begin.valid == .Valid) {
-                                std.debug.print("push {s} {s} {}\n", .{ match_syn.getName(), match_syn.rx_begin.expr orelse "", start_ });
+                                // std.debug.print("push {s} {s} {}\n", .{ match_syn.getName(), match_syn.rx_begin.expr orelse "", start_ });
                                 if (pattern_match.regex) |rx| {
-                                    if (last_push_pos != start_ or last_push_syntax != match_syn.id) {
-                                        if (config.enable_scope_atoms and !rx.has_references) {
-                                            if (self.atoms) |at| {
-                                                if (match_syn.atom.count == 0 and match_syn.atom.id == 0) {
-                                                    match_syn.atom.compute(match_syn.getName(), at);
-                                                    if (match_syn.atom.id == 0) {
-                                                        match_syn.atom.id = 1;
-                                                    }
+                                    if (config.enable_scope_atoms and !rx.has_references) {
+                                        if (self.atoms) |at| {
+                                            if (match_syn.atom.count == 0 and match_syn.atom.id == 0) {
+                                                match_syn.atom.compute(match_syn.getName(), at);
+                                                if (match_syn.atom.id == 0) {
+                                                    match_syn.atom.id = 1;
                                                 }
                                             }
                                         }
-
-                                        state.push(@constCast(match_syn), rx, block, pattern_match, "pattern") catch {};
-                                        if (ts.rx_begin.is_anchored and rx.is_anchored) {
-                                            end = start_;
-                                        }
-
-                                        last_push_pos = start_;
-                                        last_push_syntax = match_syn.id;
                                     }
+
+                                    state.push(@constCast(match_syn), rx, block, pattern_match, "pattern") catch {};
+                                    if (ts.rx_begin.is_anchored and rx.is_anchored) {
+                                        end = start_;
+                                    }
+
+                                    try self.line_matches.append(self.allocator, pattern_match);
                                     // fail silently?
                                 }
 

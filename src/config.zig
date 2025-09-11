@@ -1,7 +1,6 @@
 // parser settings
 pub const enable_exec_caching = true;
-// match caching fails on the test_runner TEST #56
-pub const enable_match_caching = false;
+pub const enable_match_caching = true;
 pub const enable_end_caching = true;
 
 // compute theme-based atoms for resolved scopes

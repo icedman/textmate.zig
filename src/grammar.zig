@@ -21,11 +21,7 @@ pub const Rule = struct {
     expr: ?[]const u8 = null,
     regex: ?oni.Regex = null,
     has_references: bool = false, // \1 or $1
-    is_anchored_start: bool = false,
     is_anchored: bool = false, // \G
-    is_negative_anchored: bool = false, // !\G
-    is_string_block: bool = false,
-    is_comment_block: bool = false,
 
     valid: CompileResult = .Uncompiled,
     const CompileResult = enum {
@@ -97,7 +93,7 @@ pub const Syntax = struct {
     // stats
     execs: u32 = 0,
 
-    pub fn patternHasBackReference(ptrn: []const u8) bool {
+    fn patternHasBackReference(ptrn: []const u8) bool {
         var escape = false;
         for (ptrn) |ch| {
             if (escape and std.ascii.isDigit(ch)) {
@@ -108,28 +104,33 @@ pub const Syntax = struct {
         return false;
     }
 
-    pub fn patternIsAnchored(ptrn: []const u8) bool {
+    fn patternHasAnchor(ptrn: []const u8) bool {
         var escape = false;
-        for (ptrn, 0..) |ch, i| {
-            if (escape and ch == 'G') {
+        for (ptrn) |ch| {
+            if (escape and (ch == 'G' or ch == 'A')) {
                 return true;
             }
             escape = (!escape) and (ch == '\\');
-            if (i > 8) break;
         }
         return false;
     }
 
-    pub fn patternIsAnchoredAtStart(ptrn: []const u8) bool {
-        var escape = false;
-        for (ptrn, 0..) |ch, i| {
-            if (escape and ch == 'A') {
-                return true;
+    fn sanitizePattern(ptrn: []const u8, strings_arena: *StringsArena) []const u8 {
+        if (std.mem.indexOf(u8, ptrn, "\\z")) |idx| {
+            if (ptrn.len < 512) {
+                var buf: [512]u8 = undefined; // local buffer
+                const pre = ptrn[0..idx];
+                const suf = ptrn[idx + 2 ..];
+                const sanitized = std.fmt.bufPrint(&buf, "{s}{s}{s}", .{ pre, "$(?!\\n)(?<!\\n)", suf }) catch {
+                    return ptrn;
+                };
+                const slice = strings_arena.append(sanitized) catch {
+                    return ptrn;
+                };
+                return slice;
             }
-            escape = (!escape) and (ch == '\\');
-            if (i > 8) break;
         }
-        return false;
+        return ptrn;
     }
 
     // a syntaxMap is where a name is mapped to a syntax node
@@ -205,7 +206,7 @@ pub const Syntax = struct {
             .rx_end = Rule{ .expr = if (obj.get("end")) |v| try strings_arena.append(v.string) else null },
         };
 
-        syntax.compileAllRegexes() catch {
+        syntax.compileSyntax(strings_arena) catch {
             // std.debug.print("Failed to compile regex: // TODO which one?\n", .{});
         };
 
@@ -294,7 +295,7 @@ pub const Syntax = struct {
         }
     }
 
-    pub fn compileAllRegexes(self: *Syntax) !void {
+    pub fn compileSyntax(self: *Syntax, strings_arena: *StringsArena) !void {
         // TODO, compilation will now be done a load but only when required
         const Entry = struct {
             rx_ptr: *Rule,
@@ -309,21 +310,8 @@ pub const Syntax = struct {
 
         for (entries, 0..) |entry, i| {
             if (entry.rx_ptr.*.expr) |regex| {
-                if (Syntax.patternIsAnchored(regex)) {
+                if (Syntax.patternHasAnchor(regex)) {
                     entry.rx_ptr.*.is_anchored = true;
-                    if (std.mem.indexOf(u8, regex, "!\\G")) |_| {
-                        entry.rx_ptr.*.is_negative_anchored = true;
-                    }
-                }
-                if (Syntax.patternIsAnchoredAtStart(regex)) {
-                    entry.rx_ptr.*.is_anchored_start = true;
-                }
-                const scopeName = self.getName();
-                if (std.mem.indexOf(u8, scopeName, "string")) |_| {
-                    entry.rx_ptr.*.is_string_block = true;
-                }
-                if (std.mem.indexOf(u8, scopeName, "comment")) |_| {
-                    entry.rx_ptr.*.is_comment_block = true;
                 }
                 if (i > 1 and Syntax.patternHasBackReference(regex)) {
                     // deal with back references for while and end
@@ -332,6 +320,7 @@ pub const Syntax = struct {
                     continue;
                 }
 
+                entry.rx_ptr.*.expr = Syntax.sanitizePattern(regex, strings_arena);
                 entry.rx_ptr.*.compile(regex) catch {
                     // fail silently
                 };
@@ -345,6 +334,15 @@ pub const Syntax = struct {
             r = p;
         }
         return r;
+    }
+
+    pub fn isDescendant(self: *Syntax, child: *Syntax) bool {
+        var r = child;
+        while (r.parent) |p| {
+            r = p;
+            if (p == self) return true;
+        }
+        return false;
     }
 
     pub fn resolve(self: *Syntax, syntax: *Syntax, base: ?*Syntax) ?*const Syntax {

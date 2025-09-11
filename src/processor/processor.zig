@@ -61,9 +61,6 @@ pub const Processor = struct {
             for (state.stack.items) |context| {
                 // add state tree
                 if (context.syntax.rx_begin.valid == .Valid) {
-                    // if (!context.syntax.rx_begin.is_comment_block and !context.syntax.rx_begin.is_string_block) {
-                    // continue;
-                    // }
                     const name = context.syntax.getName();
                     if (name.len > 0) {
                         const c = ParseCapture{

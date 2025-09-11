@@ -249,6 +249,7 @@ pub fn main() !void {
         _ = try par.parseLine(&state, slice);
         line_no += 1;
         reader.interface.toss(1);
+        // if (line_no > 30) break;
     } else |err| if (err != error.EndOfStream) return err;
 
     proc.endDocument();
