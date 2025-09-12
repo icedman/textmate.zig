@@ -144,7 +144,7 @@ const StateContext = struct {
     syntax: *Syntax,
 
     // The match position of the character relative to the line start
-    anchor: u32 = 0,
+    match_position: u32 = 0,
     line: u32 = 0,
 
     // Parser owns these at regex_map and responsible for oni.Regex.deinit not StateContext
@@ -217,7 +217,7 @@ pub const ParseState = struct {
         var sc = StateContext{
             .syntax = syntax,
             .line = 0,
-            .anchor = @intCast(anchor),
+            .match_position = @intCast(anchor),
         };
 
         _ = rx;
@@ -382,19 +382,10 @@ pub const Parser = struct {
         if (self.current_state) |state| {
             const top = state.top();
             if (top) |t| {
-                return t.anchor;
+                return t.match_position;
             }
         }
         return 0;
-    }
-
-    fn resetCurrentAnchor(self: *Parser) void {
-        if (self.current_state) |state| {
-            var top = state.top();
-            if (top) |*t| {
-                t.anchor = 0;
-            }
-        }
     }
 
     // findMatch. Regular expression matching. This is where all the CPU usage goes.
@@ -411,6 +402,22 @@ pub const Parser = struct {
             if (rx.is_anchored) {
                 // \G in oniguruma means start of previous match
                 hard_start = self.getCurrentAnchor();
+
+                // when pattern is merely "\\G", it is merely to re-assert matching at the last matched position
+                // in this case, simulate a successful match
+                if (rx.is_anchor_assertion) {
+                    var m = Match{
+                        .syntax = syntax,
+                        .regex = rx,
+                        .anchor_start = hard_start,
+                        .anchor_end = hard_start,
+                        .ranges = [_]MatchRange{MatchRange{ .group = 0, .start = 0, .end = 0 }} ** config.max_match_ranges,
+                    };
+                    m.count = 1;
+                    m.start = hard_start;
+                    m.end = hard_start;
+                    return m;
+                }
             }
             if (rx.is_anchored_at_start) {
                 // \A in oniguruma means start of line
@@ -486,6 +493,8 @@ pub const Parser = struct {
                         }
                         // std.debug.print("{}-{}: {s}\n", .{ s, e, block[m.ranges[count].start..m.ranges[count].end] });
                         count += 1;
+                    } else {
+                        std.debug.print("skipped {}-{} {s}\n", .{ s, e, block[m.ranges[count].start..m.ranges[count].end] });
                     }
                 }
 
@@ -895,8 +904,6 @@ pub const Parser = struct {
         var last_start: usize = 0;
         var last_syntax: u64 = 0;
 
-        self.resetCurrentAnchor();
-
         // handle while
         // todo track while count
         const exit_while = self.matchWhile(state, block);
@@ -907,6 +914,7 @@ pub const Parser = struct {
 
             var did_match = false;
             const start_ = start;
+            // const end_ = end;
 
             // debug only
             // {
@@ -974,7 +982,7 @@ pub const Parser = struct {
                                 proc.closeTag(&c);
                             }
 
-                            // std.debug.print("pop {*} {s} {s}\n", .{ end_syn, end_syn.getName(), block[end_match.start..end_match.end] });
+                            std.debug.print("pop {*} {s} {s}\n", .{ end_syn, end_syn.getName(), block[end_match.start..end_match.end] });
                         }
 
                         // pop!
@@ -986,7 +994,7 @@ pub const Parser = struct {
                             end = pattern_match.end;
 
                             if (match_syn.rx_begin.valid == .Valid) {
-                                // std.debug.print("push {*} {s} {s} {}\n", .{ match_syn, match_syn.getName(), match_syn.rx_begin.expr orelse "", start_ });
+                                std.debug.print("push {*} {s} {s} {}-{}\n", .{ match_syn, match_syn.getName(), match_syn.rx_begin.expr orelse "", start, end });
                                 if (pattern_match.regex) |rx| {
                                     if (config.enable_scope_atoms and !rx.has_references) {
                                         if (self.atoms) |at| {
@@ -1000,9 +1008,6 @@ pub const Parser = struct {
                                     }
 
                                     state.push(@constCast(match_syn), rx, block, pattern_match, "pattern") catch {};
-                                    if (ts.rx_begin.is_anchored and rx.is_anchored) {
-                                        end = start_;
-                                    }
 
                                     try self.line_matches.append(self.allocator, pattern_match);
                                     // fail silently?
@@ -1044,6 +1049,10 @@ pub const Parser = struct {
                     self.deepest = @intCast(state.size());
                 }
 
+                if (start == block.len) {
+                    break;
+                }
+
                 // endless loop?
                 if (last_start == end and last_syntax == ts.id) {
                     end += 1;
@@ -1052,10 +1061,6 @@ pub const Parser = struct {
                 last_syntax = ts.id;
                 last_start = start;
                 start = end;
-
-                if (start == block.len) {
-                    break;
-                }
             } else {
                 // no top
                 unreachable;

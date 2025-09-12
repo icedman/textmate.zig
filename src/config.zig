@@ -17,3 +17,6 @@ pub const state_stack_prune = 64; // prune off states from the stack
 
 // theme settings
 pub const enable_scope_caching = true;
+
+// processor
+pub const max_span_captures = 64;

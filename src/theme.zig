@@ -490,7 +490,13 @@ pub const Theme = struct {
         return null;
     }
 
-    pub fn getSpanStyle(self: *Theme, scopes: [32][]const u8, atoms: [32]Atom, count: u8, colors: ?*Style) void {
+    pub fn getSpanStyle(
+        self: *Theme,
+        scopes: [config.max_span_captures][]const u8,
+        atoms: [config.max_span_captures]Atom,
+        count: u8,
+        colors: ?*Style,
+    ) void {
         if (count == 0) return;
 
         var highest: usize = 0;

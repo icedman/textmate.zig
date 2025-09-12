@@ -22,6 +22,7 @@ pub const Rule = struct {
     regex: ?oni.Regex = null,
     has_references: bool = false, // \1 or $1
     is_anchored: bool = false, // \G
+    is_anchor_assertion: bool = false, // "\G"
     is_anchored_at_start: bool = false, // \A
 
     valid: CompileResult = .Uncompiled,
@@ -314,6 +315,9 @@ pub const Syntax = struct {
             if (entry.rx_ptr.*.expr) |regex| {
                 if (Syntax.patternHasAnchor(regex, 'G')) {
                     entry.rx_ptr.*.is_anchored = true;
+                    if (regex.len == 2) {
+                        entry.rx_ptr.*.is_anchor_assertion = true;
+                    }
                 }
                 if (Syntax.patternHasAnchor(regex, 'A')) {
                     entry.rx_ptr.*.is_anchored_at_start = true;

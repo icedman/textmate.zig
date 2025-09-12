@@ -3,6 +3,7 @@ const parser = @import("../parser.zig");
 const grammar = @import("../grammar.zig");
 const theme = @import("../theme.zig");
 const atms = @import("../atoms.zig");
+const config = @import("../config.zig");
 
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
@@ -12,13 +13,12 @@ const ParseState = parser.ParseState;
 const Syntax = grammar.Syntax;
 const Atom = atms.Atom;
 
-const max_span_captures = 32;
 pub const SpanCaptures = struct {
     text: []const u8,
     start: usize,
     end: usize,
-    atoms: [max_span_captures]Atom = [_]Atom{Atom{}} ** max_span_captures,
-    scopes: [max_span_captures][]const u8 = [_][]const u8{""} ** max_span_captures,
+    atoms: [config.max_span_captures]Atom = [_]Atom{Atom{}} ** config.max_span_captures,
+    scopes: [config.max_span_captures][]const u8 = [_][]const u8{""} ** config.max_span_captures,
     count: u8 = 0,
 };
 
@@ -239,7 +239,7 @@ pub const Processor = struct {
                         span.atoms[span.count] = cap.atom;
                         span.scopes[span.count] = cap.scope;
                         span.count += 1;
-                        if (span.count >= max_span_captures) break;
+                        if (span.count >= config.max_span_captures) break;
                     }
                 }
                 try self.spans.append(self.allocator, span);
