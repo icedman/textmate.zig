@@ -264,14 +264,15 @@ pub const Syntax = struct {
             regex.deinit();
         }
 
-        if (self.patterns) |pats| {
-            for (pats.items) |p| {
-                // check root because we do not free injected syntaxes owned by other Grammars
-                if (p.root() == self.root()) {
-                    p.deinit();
-                }
-            }
-        }
+        // let grammar definit us
+        // if (self.patterns) |pats| {
+        //     for (pats.items) |p| {
+        //         // check root because we do not free injected syntaxes owned by other Grammars
+        //         if (p.root() == self.root()) {
+        //             p.deinit();
+        //         }
+        //     }
+        // }
 
         const CapturesEntry = struct {
             map_ptr: *?std.StringHashMap(*Syntax),
@@ -752,9 +753,11 @@ pub const Grammar = struct {
     pub fn deinit(self: *Grammar) void {
         // std.debug.print("grammar deinit {*}\n", .{self});
         self.strings.deinit();
-        if (self.syntax) |syn| {
-            syn.deinit();
-        }
+
+        // syntax is arena allocated
+        // if (self.syntax) |syn| {
+        //     syn.deinit();
+        // }
 
         self.inject_to.deinit(self.allocator);
         self.arena.deinit();
@@ -794,7 +797,8 @@ pub const Grammar = struct {
 
         if (obj.get("injectTo")) |inject| {
             if (inject == .array) {
-                try grammar.inject_to.append(allocator, "-- placeholder --");
+                // TODO
+                // try grammar.inject_to.append(allocator, "-- placeholder --");
             }
         }
 

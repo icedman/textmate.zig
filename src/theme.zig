@@ -101,7 +101,7 @@ pub const Scope = struct {
 pub const TokenColor = struct {
     name: []const u8,
     scope: ?[][]const u8 = null,
-    settings: ?Settings = null,
+    settings: ?Style = null,
 };
 
 pub const Rgb = struct {
@@ -143,14 +143,14 @@ pub const Rgb = struct {
     }
 };
 
-pub const Settings = struct {
+pub const Style = struct {
     foreground: ?[]const u8 = null,
     background: ?[]const u8 = null,
     fontStyle: ?[]const u8 = null,
     foreground_rgb: ?Rgb = null,
     background_rgb: ?Rgb = null,
 
-    pub fn compute(self: *Settings) void {
+    pub fn compute(self: *Style) void {
         if (self.foreground) |fg| {
             self.foreground_rgb = Rgb.fromHex(fg);
         }
@@ -159,8 +159,6 @@ pub const Settings = struct {
         }
     }
 };
-
-pub const ThemeColors = Settings;
 
 pub const Theme = struct {
     allocator: Allocator,
@@ -177,7 +175,7 @@ pub const Theme = struct {
     // TODO minimize optionals
     // TODO use ArrayList .. cleaner
     author: []const u8 = "",
-    colors: ?std.StringHashMap(Settings) = null,
+    colors: ?std.StringHashMap(Style) = null,
     token_colors: ?[]TokenColor = null,
     semantic_highlighting: bool = false,
 
@@ -226,7 +224,7 @@ pub const Theme = struct {
         // Exclusions scopes...
         if (std.mem.indexOf(u8, scope_name, " - ")) |idx| {
             const sc = scope_name[0..idx];
-            const exc = Atom.fromScopeName(scope_name[idx+3..], &self.atoms);
+            const exc = Atom.fromScopeName(scope_name[idx + 3 ..], &self.atoms);
             self.addScopeForToken(sc, token, ascendant, exc) catch {};
             return;
         }
@@ -304,7 +302,7 @@ pub const Theme = struct {
         const semantic_highlighting = if (obj.get("semanticHighlighting")) |v| v.bool else false;
 
         // colors
-        var colors = std.StringHashMap(Settings).init(aa);
+        var colors = std.StringHashMap(Style).init(aa);
         errdefer colors.deinit();
         if (obj.get("colors")) |colors_val| {
             if (colors_val == .object) {
@@ -316,8 +314,7 @@ pub const Theme = struct {
                     }
                     const k = try theme.strings.append(entry.key_ptr.*);
                     const v = try theme.strings.append(entry.value_ptr.*.string);
-                    // TODO value should be settings
-                    var settings = Settings{
+                    var settings = Style{
                         .foreground = v,
                     };
                     settings.compute();
@@ -345,7 +342,7 @@ pub const Theme = struct {
             }
 
             const settings_value = o.get("settings").?;
-            const settings = try std.json.parseFromValue(Settings, aa, settings_value, .{ .ignore_unknown_fields = true });
+            const settings = try std.json.parseFromValue(Style, aa, settings_value, .{ .ignore_unknown_fields = true });
 
             const scopes: ?[][]const u8 = blk: {
                 const opt = o.get("scope") orelse break :blk null;
@@ -407,7 +404,7 @@ pub const Theme = struct {
         return theme;
     }
 
-    pub fn getScope(self: *Theme, scope: []const u8, atoms: []const Atom, colors: ?*Settings) ?*const Scope {
+    pub fn getScope(self: *Theme, scope: []const u8, atoms: []const Atom, colors: ?*Style) ?*const Scope {
         var atom = atoms[0];
 
         // std.debug.print("{s} {}\n", .{scope, atom.count});
@@ -486,10 +483,19 @@ pub const Theme = struct {
         return matched;
     }
 
-    pub fn getColor(self: *Theme, name: []const u8) ?Settings {
+    pub fn getColor(self: *Theme, name: []const u8) ?Style {
         if (self.colors.?.get(name)) |c| {
             return c;
         }
+        return null;
+    }
+
+    pub fn getSpanStyle(self: *Theme, scopes: [8][]const u8, atoms: [8][]const Atom, count: u8, colors: ?*Style) ?*const Scope {
+        _ = self;
+        _ = scopes;
+        _ = atoms;
+        _ = count;
+        _ = colors;
         return null;
     }
 };
@@ -519,7 +525,7 @@ pub fn runTests(comptime testing: anytype, verbosely: bool) !void {
     };
 
     for (entries) |entry| {
-        var colors = Settings{};
+        var colors = Style{};
         _ = thm.getScope(entry.key, &colors);
         if (colors.foreground) |fg| {
             if (verbosely) {

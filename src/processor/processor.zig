@@ -12,13 +12,25 @@ const ParseState = parser.ParseState;
 const Syntax = grammar.Syntax;
 const Atom = atms.Atom;
 
+const max_span_captures = 32;
+pub const SpanCaptures = struct {
+    text: []const u8,
+    start: usize,
+    end: usize,
+    atoms: [max_span_captures]Atom = [_]Atom{Atom{}} ** max_span_captures,
+    scopes: [max_span_captures][]const u8 = [_][]const u8{""} ** max_span_captures,
+    count: u8 = 0,
+};
+
 // TODO comptime this
 pub const Processor = struct {
     allocator: Allocator,
+    captures: ArrayList(ParseCapture),
+    spans: ArrayList(SpanCaptures),
+
     block: ?[]const u8 = null,
     theme: ?*theme.Theme = null,
     state: ?*ParseState = null,
-    captures: ArrayList(ParseCapture),
 
     start_document_fn: ?*const fn (*Processor) void = null,
     end_document_fn: ?*const fn (*Processor) void = null,
@@ -27,6 +39,9 @@ pub const Processor = struct {
     open_tag_fn: ?*const fn (*Processor, *ParseCapture) void = null,
     close_tag_fn: ?*const fn (*Processor, *ParseCapture) void = null,
     capture_fn: ?*const fn (*Processor, *ParseCapture) void = null,
+
+    // stats
+    deepest: u32 = 0,
 
     pub fn startDocument(self: *Processor) void {
         if (self.start_document_fn) |f| {
@@ -100,6 +115,10 @@ pub const Processor = struct {
         if (self.open_tag_fn) |f| {
             f(self, c);
         }
+
+        if (self.captures.items.len > self.deepest) {
+            self.deepest = @intCast(self.captures.items.len);
+        }
     }
 
     pub fn closeTag(self: *Processor, cap: *ParseCapture) void {
@@ -152,6 +171,7 @@ pub const Processor = struct {
 
     pub fn deinit(self: *Processor) void {
         self.captures.deinit(self.allocator);
+        self.spans.deinit(self.allocator);
     }
 
     fn appendTokens(self: *Processor, token: []const u8, allocator: Allocator, collect: *ArrayList([]const u8)) !void {
@@ -162,7 +182,7 @@ pub const Processor = struct {
             return;
         }
         var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
-        stdout.print("  !{s}\n", .{ token }) catch {};
+        stdout.print("  !{s}\n", .{token}) catch {};
         try collect.append(allocator, token);
     }
 
@@ -180,6 +200,60 @@ pub const Processor = struct {
             }
         }
     }
+
+    fn add_cut_point(points: *[128]usize, count: *u8, pos: usize) void {
+        if (count.* >= 128) return;
+        for (0..count.*) |idx| {
+            if (points[idx] == pos) return;
+        }
+        points[count.*] = pos;
+        count.* += 1;
+    }
+
+    pub fn produce(self: *Processor) !*ArrayList(SpanCaptures) {
+        self.spans.clearRetainingCapacity();
+
+        var cut_points: [128]usize = [_]usize{0xffff} ** 128;
+        var cut_points_count: u8 = 0;
+        for (self.captures.items) |cap| {
+            Processor.add_cut_point(&cut_points, &cut_points_count, cap.start);
+            Processor.add_cut_point(&cut_points, &cut_points_count, cap.end);
+        }
+
+        std.sort.heap(usize, cut_points[0..cut_points_count], {}, comptime std.sort.asc(usize));
+
+        if (cut_points_count < 2) return &self.spans;
+
+        for (0..cut_points_count - 1) |idx| {
+            const start = cut_points[idx];
+            const end = cut_points[idx + 1];
+            // std.debug.print(">{}-{}\n", .{start, end});
+            if (self.block) |block| {
+                var span = SpanCaptures{
+                    .text = block[start..end],
+                    .start = start,
+                    .end = end,
+                };
+                for (self.captures.items) |cap| {
+                    if (start >= cap.start and end <= cap.end) {
+                        span.atoms[span.count] = cap.atom;
+                        span.scopes[span.count] = cap.scope;
+                        span.count += 1;
+                        if (span.count >= max_span_captures) break;
+                    }
+                }
+                try self.spans.append(self.allocator, span);
+            }
+        }
+
+        return &self.spans;
+    }
+
+    pub fn dump(self: *Processor) void {
+        for (self.captures.items) |cap| {
+            std.debug.print("{s} {}-{}\n", .{ cap.scope, cap.start, cap.end });
+        }
+    }
 };
 
 pub const NullProcessor = struct {
@@ -187,6 +261,7 @@ pub const NullProcessor = struct {
         return Processor{
             .allocator = allocator,
             .captures = try ArrayList(ParseCapture).initCapacity(allocator, 32),
+            .spans = try ArrayList(SpanCaptures).initCapacity(allocator, 32),
         };
     }
 };

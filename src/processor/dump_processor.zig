@@ -1,6 +1,7 @@
 const std = @import("std");
 const processor = @import("processor.zig");
 const Processor = processor.Processor;
+const NullProcessor = processor.NullProcessor;
 const parser = @import("../parser.zig");
 const grammar = @import("../grammar.zig");
 const theme = @import("../theme.zig");
@@ -56,14 +57,12 @@ pub const DumpProcessor = struct {
 
     pub fn init(allocator: Allocator) !Processor {
         const self = DumpProcessor;
-        return Processor{
-            .allocator = allocator,
-            .start_line_fn = self.startLine,
-            .end_line_fn = self.endLine,
-            .open_tag_fn = self.openTag,
-            .close_tag_fn = self.closeTag,
-            .capture_fn = self.capture,
-            .captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
-        };
+        var proc = try NullProcessor.init(allocator);
+        proc.start_line_fn = self.startLine;
+        proc.end_line_fn = self.endLine;
+        proc.open_tag_fn = self.openTag;
+        proc.close_tag_fn = self.closeTag;
+        proc.capture_fn = self.capture;
+        return proc;
     }
 };

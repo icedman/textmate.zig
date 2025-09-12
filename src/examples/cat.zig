@@ -15,7 +15,7 @@ const RenderProcessor = lib.RenderProcessor;
 const RenderHtmlProcessor = lib.RenderHtmlProcessor;
 
 // dump leaks
-const TEST_VERBOSELY = true;
+const TEST_WITH_GPA = true;
 
 fn printUsage() void {
     var stdout_buffer: [1024]u8 = undefined;
@@ -41,7 +41,7 @@ pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
 
-    const allocator = if (TEST_VERBOSELY and builtin.mode == .Debug) gpa.allocator() else std.heap.page_allocator;
+    const allocator = if (TEST_WITH_GPA and builtin.mode == .Debug) gpa.allocator() else std.heap.page_allocator;
 
     try oni.init(&.{oni.Encoding.utf8});
     try oni.testing.ensureInit();
@@ -250,6 +250,25 @@ pub fn main() !void {
         line_no += 1;
         reader.interface.toss(1);
         // if (line_no > 30) break;
+        //
+        // const spans = try proc.produce();
+        // for (spans.items) |span| {
+        //     std.debug.print("{s}", .{span.text});
+        //     if (span.text.len == 1 and span.text[0] == ' ') {
+        //         continue;
+        //     }
+        //     std.debug.print("(", .{});
+        //     for (0..span.count) |idx| {
+        //         // const atom = span.atoms[idx];
+        //         const scope = span.scopes[idx];
+        //         if (idx > 0) {
+        //             std.debug.print(" ", .{});
+        //         }
+        //         std.debug.print("{s}", .{scope});
+        //     }
+        //     std.debug.print(") ", .{});
+        // }
+        // std.debug.print("\n", .{});
     } else |err| if (err != error.EndOfStream) return err;
 
     proc.endDocument();
@@ -257,21 +276,25 @@ pub fn main() !void {
     const elapsed = @as(f64, @floatFromInt(end - start)) / 1_000_000_000.0;
 
     if (stats) {
-        stdout.print("==================\n", .{}) catch {};
-        stdout.print("lines: {}\n", .{line_no - 1}) catch {};
-        stdout.print("execs: {}\n", .{par.regex_execs}) catch {};
+        std.debug.print("==================\n", .{});
+        std.debug.print("lines: {}\n", .{line_no - 1});
+        std.debug.print("execs: {}\n", .{par.regex_execs});
         if (line_no > 0) {
-            stdout.print("execs/line: {}\n", .{par.regex_execs / line_no}) catch {};
+            std.debug.print("execs/line: {}\n", .{par.regex_execs / line_no});
         }
-        stdout.print("skips: {}\n", .{par.regex_skips}) catch {};
-        stdout.print("warmup in {d:.6}s\n", .{warm_elapsed}) catch {};
-        stdout.print("done in {d:.6}s\n", .{elapsed}) catch {};
-        stdout.print("state depth: {}\n", .{state.size()}) catch {};
-        // stdout.print("retained: {}\n", .{proc.retained_captures.items.len}) catch {};
-        stdout.print("grammar: {s}\n", .{gmr.name}) catch {};
-        stdout.print("theme: {s}\n", .{thm.name}) catch {};
-        stdout.print("theme atoms: {}\n", .{thm.atoms.count()}) catch {};
+        std.debug.print("skips: {}\n", .{par.regex_skips});
+        std.debug.print("warmup in {d:.6}s\n", .{warm_elapsed});
+        std.debug.print("done in {d:.6}s\n", .{elapsed});
+        std.debug.print("state depth: {}\n", .{state.size()});
+        std.debug.print("max state depth: {}\n", .{par.deepest});
+        std.debug.print("max processor depth: {}\n", .{proc.deepest});
+        // std.debug.print("retained: {}\n", .{proc.retained_captures.items.len});
+        std.debug.print("grammar: {s}\n", .{gmr.name});
+        std.debug.print("theme: {s}\n", .{thm.name});
+        std.debug.print("theme atoms: {}\n", .{thm.atoms.count()});
+        std.debug.print("-----\n", .{});
         // state.dump();
+        // proc.dump();
     }
 
     stdout.flush() catch {};

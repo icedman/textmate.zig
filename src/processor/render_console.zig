@@ -1,6 +1,7 @@
 const std = @import("std");
 const processor = @import("processor.zig");
 const Processor = processor.Processor;
+const NullProcessor = processor.NullProcessor;
 const parser = @import("../parser.zig");
 const grammar = @import("../grammar.zig");
 const theme = @import("../theme.zig");
@@ -55,7 +56,7 @@ pub const RenderProcessor = struct {
                     if (i == captures.items[ci].start) {
                         cap = captures.items[ci];
 
-                        var colors = theme.Settings{};
+                        var colors = theme.Style{};
                         atoms[0] = cap.atom;
 
                         const scope = thm.getScope(cap.scope, &atoms, &colors);
@@ -113,10 +114,8 @@ pub const RenderProcessor = struct {
 
     pub fn init(allocator: Allocator) !Processor {
         const self = RenderProcessor;
-        return Processor{
-            .allocator = allocator,
-            .end_line_fn = self.endLine,
-            .captures = try std.ArrayList(ParseCapture).initCapacity(allocator, 32),
-        };
+        var proc = try NullProcessor.init(allocator);
+        proc.end_line_fn = self.endLine;
+        return proc;
     }
 };

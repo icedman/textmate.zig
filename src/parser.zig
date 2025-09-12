@@ -144,10 +144,10 @@ const StateContext = struct {
     syntax: *Syntax,
 
     // The match position of the character relative to the line start
-    line: u32 = 0,
     anchor: u32 = 0,
+    line: u32 = 0,
 
-    // Parser owns these at regex_map and responsible for oni.Regex.deinit not Self
+    // Parser owns these at regex_map and responsible for oni.Regex.deinit not StateContext
     rx_while: Rule = Rule{},
     rx_end: Rule = Rule{},
 
@@ -337,6 +337,8 @@ pub const Parser = struct {
     // stats
     regex_execs: u32 = 0,
     regex_skips: u32 = 0,
+    deepest: u32 = 0,
+
     current_state: ?*ParseState = null,
 
     pub fn init(allocator: Allocator, lang: *grammar.Grammar) !Parser {
@@ -452,7 +454,7 @@ pub const Parser = struct {
                     .anchor_end = hard_end,
                     .ranges = [_]MatchRange{MatchRange{ .group = 0, .start = 0, .end = 0 }} ** config.max_match_ranges,
                 };
-        
+
                 // if (r.count() > 0) {
                 //     std.debug.print("findMatch {} [{s}] {s}\n", .{rx.id, block, rx.expr orelse ""});
                 // }
@@ -573,7 +575,7 @@ pub const Parser = struct {
                     }
                     break :blk null;
                 } orelse self.findMatch(syntax, &syntax.rx_begin, regex, block, start, end);
-                
+
                 if (self.isLooping(m)) {
                     // disqualify
                     return Match{};
@@ -1042,6 +1044,10 @@ pub const Parser = struct {
                     break;
                 }
 
+                if (state.size() > self.deepest) {
+                    self.deepest = @intCast(state.size());
+                }
+
                 // endless loop?
                 if (last_start == end and last_syntax == ts.id) {
                     end += 1;
@@ -1064,6 +1070,7 @@ pub const Parser = struct {
     pub fn resetStats(self: *Parser) void {
         self.regex_execs = 0;
         self.regex_skips = 0;
+        self.deepest = 0;
     }
 
     pub fn serialize(self: *Parser, state: *ParseState, serial: *std.ArrayList(StateContextPack)) !void {
