@@ -490,13 +490,42 @@ pub const Theme = struct {
         return null;
     }
 
-    pub fn getSpanStyle(self: *Theme, scopes: [8][]const u8, atoms: [8][]const Atom, count: u8, colors: ?*Style) ?*const Scope {
-        _ = self;
-        _ = scopes;
-        _ = atoms;
-        _ = count;
-        _ = colors;
-        return null;
+    pub fn getSpanStyle(self: *Theme, scopes: [32][]const u8, atoms: [32]Atom, count: u8, colors: ?*Style) void {
+        if (count == 0) return;
+
+        var highest: usize = 0;
+        for (0..count) |idx| {
+            var atom = atoms[idx];
+            const scope = scopes[idx];
+            if (atom.id == 0) {
+                atom.compute(scope, &self.atoms);
+            }
+
+            var matched: ?*Scope = null;
+
+            for (self.scopes.items) |*sc| {
+                if (atom.id <= 1) continue;
+                var m: usize = Atom.cmp(atom, sc.atom);
+                if (m > 0) {
+                    m += (idx * 100);
+                }
+                if (m > highest) {
+                    highest = m;
+                    matched = sc;
+                }
+            }
+
+            if (colors) |cc| {
+                if (matched) |mm| {
+                    if (mm.token) |tk| {
+                        if (tk.settings) |ts| {
+                            cc.foreground = ts.foreground;
+                            cc.foreground_rgb = ts.foreground_rgb;
+                        }
+                    }
+                }
+            }
+        }
     }
 };
 

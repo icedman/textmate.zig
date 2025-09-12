@@ -27,6 +27,29 @@ pub const RenderProcessor = struct {
         var stdout_buffer: [1024]u8 = undefined;
         var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
         const stdout = &stdout_writer.interface;
+
+        const spans = self.produce() catch {
+            return;
+        };
+        if (self.theme) |thm| {
+            for (spans.items) |span| {
+                var style = theme.Style{};
+                thm.getSpanStyle(span.scopes, span.atoms, span.count, &style); 
+                if (style.foreground_rgb) |fg| {
+                    setColorRgb(stdout, fg) catch {};
+                }
+                stdout.print("{s}", .{span.text}) catch {};
+                resetColor(stdout) catch {};
+            }
+        }
+
+        stdout.flush() catch {};
+    }
+
+    pub fn _endLine(self: *Processor) void {
+        var stdout_buffer: [1024]u8 = undefined;
+        var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+        const stdout = &stdout_writer.interface;
         // var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
 
         var atoms: [4]Atom = [_]Atom{Atom{}} ** 4;

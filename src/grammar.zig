@@ -265,14 +265,14 @@ pub const Syntax = struct {
         }
 
         // let grammar definit us
-        // if (self.patterns) |pats| {
-        //     for (pats.items) |p| {
-        //         // check root because we do not free injected syntaxes owned by other Grammars
-        //         if (p.root() == self.root()) {
-        //             p.deinit();
-        //         }
-        //     }
-        // }
+        if (self.patterns) |pats| {
+            for (pats.items) |p| {
+                // check root because we do not free injected syntaxes owned by other Grammars
+                if (p.root() == self.root()) {
+                    p.deinit();
+                }
+            }
+        }
 
         const CapturesEntry = struct {
             map_ptr: *?std.StringHashMap(*Syntax),

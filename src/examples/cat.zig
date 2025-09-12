@@ -250,7 +250,6 @@ pub fn main() !void {
         line_no += 1;
         reader.interface.toss(1);
         // if (line_no > 30) break;
-        //
         // const spans = try proc.produce();
         // for (spans.items) |span| {
         //     std.debug.print("{s}", .{span.text});
@@ -259,12 +258,12 @@ pub fn main() !void {
         //     }
         //     std.debug.print("(", .{});
         //     for (0..span.count) |idx| {
-        //         // const atom = span.atoms[idx];
+        //         const atom = span.atoms[idx];
         //         const scope = span.scopes[idx];
         //         if (idx > 0) {
         //             std.debug.print(" ", .{});
         //         }
-        //         std.debug.print("{s}", .{scope});
+        //         std.debug.print("{s}[{}]", .{scope, atom.count});
         //     }
         //     std.debug.print(") ", .{});
         // }

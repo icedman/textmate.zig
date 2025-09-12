@@ -1040,10 +1040,6 @@ pub const Parser = struct {
                     unreachable;
                 }
 
-                if (start == block.len) {
-                    break;
-                }
-
                 if (state.size() > self.deepest) {
                     self.deepest = @intCast(state.size());
                 }
@@ -1056,6 +1052,10 @@ pub const Parser = struct {
                 last_syntax = ts.id;
                 last_start = start;
                 start = end;
+
+                if (start == block.len) {
+                    break;
+                }
             } else {
                 // no top
                 unreachable;
