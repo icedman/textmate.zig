@@ -1,7 +1,8 @@
 // parser settings
-pub const enable_exec_caching = true;
-pub const enable_match_caching = true;
-pub const enable_end_caching = true;
+const caching = true;
+pub const enable_exec_caching = caching and true;
+pub const enable_match_caching = caching and true;
+pub const enable_end_caching = caching and true;
 
 // compute theme-based atoms for resolved scopes
 pub const enable_scope_atoms = true;

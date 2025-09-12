@@ -22,6 +22,7 @@ pub const Rule = struct {
     regex: ?oni.Regex = null,
     has_references: bool = false, // \1 or $1
     is_anchored: bool = false, // \G
+    is_anchored_at_start: bool = false, // \A
 
     valid: CompileResult = .Uncompiled,
     const CompileResult = enum {
@@ -104,10 +105,10 @@ pub const Syntax = struct {
         return false;
     }
 
-    fn patternHasAnchor(ptrn: []const u8) bool {
+    fn patternHasAnchor(ptrn: []const u8, anchor: u8) bool {
         var escape = false;
         for (ptrn) |ch| {
-            if (escape and (ch == 'G' or ch == 'A')) {
+            if (escape and ch == anchor) {
                 return true;
             }
             escape = (!escape) and (ch == '\\');
@@ -310,8 +311,11 @@ pub const Syntax = struct {
 
         for (entries, 0..) |entry, i| {
             if (entry.rx_ptr.*.expr) |regex| {
-                if (Syntax.patternHasAnchor(regex)) {
+                if (Syntax.patternHasAnchor(regex, 'G')) {
                     entry.rx_ptr.*.is_anchored = true;
+                }
+                if (Syntax.patternHasAnchor(regex, 'A')) {
+                    entry.rx_ptr.*.is_anchored_at_start = true;
                 }
                 if (i > 1 and Syntax.patternHasBackReference(regex)) {
                     // deal with back references for while and end

@@ -26,7 +26,7 @@ var line_tests: usize = 0;
 var line_tests_passed: usize = 0;
 var line_tests_failed: usize = 0;
 
-const end_on_fail = true;
+const end_on_fail = false;
 
 fn compare_tokens(hay: *ArrayList([]const u8), needles: std.json.Value) bool {
     var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);

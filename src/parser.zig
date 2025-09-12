@@ -407,8 +407,12 @@ pub const Parser = struct {
             self.regex_execs += 1;
             var hard_start: usize = start;
             if (rx.is_anchored) {
-                // \G or \A in oniguruma means start of previous match
+                // \G in oniguruma means start of previous match
                 hard_start = self.getCurrentAnchor();
+            }
+            if (rx.is_anchored_at_start) {
+                // \A in oniguruma means start of line
+                hard_start = 0;
             }
             const hard_end: usize = end;
 
@@ -448,6 +452,10 @@ pub const Parser = struct {
                     .anchor_end = hard_end,
                     .ranges = [_]MatchRange{MatchRange{ .group = 0, .start = 0, .end = 0 }} ** config.max_match_ranges,
                 };
+        
+                // if (r.count() > 0) {
+                //     std.debug.print("findMatch {} [{s}] {s}\n", .{rx.id, block, rx.expr orelse ""});
+                // }
 
                 var count: u8 = 0;
                 var i: u16 = 0;
@@ -483,8 +491,8 @@ pub const Parser = struct {
 
                 // if (count > 0) {
                 // std.debug.print(">>>>>>>>>>>{s}\n", .{rx.expr orelse ""});
-                // std.debug.print("{} {}\n", .{start, hard_start});
-                // std.debug.print("{s}\n", .{syntax.name});
+                // std.debug.print("{} {}\n", .{m.start, m.end});
+                // std.debug.print("{s}\n", .{syntax.getName()});
                 // std.debug.print("{s}\n", .{syntax.scope_name});
                 // std.debug.print("{s}\n", .{syntax.content_name});
                 // }
@@ -510,10 +518,6 @@ pub const Parser = struct {
     ///     - Cache also matches with match position ahead of current position
     ///     - Matched expression may be defeated by earlier matches but it may be usefyl as current position moves forward
     fn matchBegin(self: *Parser, syntax: *Syntax, block: []const u8, start: usize, end: usize) Match {
-        if (block.len == 0) {
-            return Match{};
-        }
-
         // match
         if (syntax.rx_match.valid == .Valid) {
             if (syntax.rx_match.regex) |regex| {
@@ -569,18 +573,25 @@ pub const Parser = struct {
                     }
                     break :blk null;
                 } orelse self.findMatch(syntax, &syntax.rx_begin, regex, block, start, end);
+                
+                if (self.isLooping(m)) {
+                    // disqualify
+                    return Match{};
+                }
+
                 if (should_cache and config.enable_match_caching and m.count == 0) {
                     _ = self.match_cache.put(syntax.rx_begin.id, m) catch {};
                 }
+
                 if (m.count > 0) {
                     return m;
                 }
             }
         }
 
-        if (syntax.rx_end.regex != null or syntax.rx_while.regex != null) {
-            return Match{};
-        }
+        // if (syntax.rx_end.regex != null or syntax.rx_while.regex != null) {
+        //     return Match{};
+        // }
 
         // if all this syntax has are patterns, check patterns
         if (syntax.rx_match.valid != .Valid and syntax.rx_begin.valid != .Valid) {
@@ -701,11 +712,8 @@ pub const Parser = struct {
                 const ls = p.resolve(p, self.lang.syntax);
                 if (ls) |syn| {
                     const m = self.matchBegin(@constCast(syn), block, start, end);
-                    if (self.isLooping(m)) {
-                        // disqualify
-                        continue;
-                    }
                     if (m.count > 0) {
+                        // std.debug.print(" m: {s} {}-{} {s}\n", .{m.syntax.?.getName(), m.start, m.end, block[m.start..m.end]});
                         // if matched correctly at the current position, no need to scan further, we have our match
                         if (m.start == start) {
                             earliest_match = m;
@@ -722,6 +730,9 @@ pub const Parser = struct {
                     }
                 }
             }
+            // if (earliest_match.count > 0) {
+            //     std.debug.print("result: {s}\n", .{earliest_match.syntax.?.getName()});
+            // }
         }
         return earliest_match;
     }
@@ -854,7 +865,7 @@ pub const Parser = struct {
 
     pub fn isLooping(self: *Parser, match: Match) bool {
         for (self.line_matches.items) |item| {
-            if (item.syntax == match.syntax and item.anchor_start == match.anchor_start) {
+            if (item.regex == match.regex and item.start == match.start) {
                 return true;
             }
         }
@@ -911,8 +922,8 @@ pub const Parser = struct {
                     var end_match: Match = self.matchEnd(state, block, start, end);
                     var pattern_match: Match = Match{};
 
-                    if (end_match.count > 0 and end_match.start == start) {
-                        // end match is prioritized
+                    if (end_match.count > 0 and end_match.start == start and end_match.end + 1 >= end) {
+                        // end match is prioritized, remove?
                     } else {
                         pattern_match = self.matchPatterns(syn, syn.patterns, block, start, end);
                     }
@@ -961,7 +972,7 @@ pub const Parser = struct {
                                 proc.closeTag(&c);
                             }
 
-                            // std.debug.print("pop {s} {}\n", .{ end_syn.getName(), end_match.anchor_start });
+                            // std.debug.print("pop {*} {s} {s}\n", .{ end_syn, end_syn.getName(), block[end_match.start..end_match.end] });
                         }
 
                         // pop!
@@ -973,7 +984,7 @@ pub const Parser = struct {
                             end = pattern_match.end;
 
                             if (match_syn.rx_begin.valid == .Valid) {
-                                // std.debug.print("push {s} {s} {}\n", .{ match_syn.getName(), match_syn.rx_begin.expr orelse "", start_ });
+                                // std.debug.print("push {*} {s} {s} {}\n", .{ match_syn, match_syn.getName(), match_syn.rx_begin.expr orelse "", start_ });
                                 if (pattern_match.regex) |rx| {
                                     if (config.enable_scope_atoms and !rx.has_references) {
                                         if (self.atoms) |at| {
@@ -1032,8 +1043,8 @@ pub const Parser = struct {
                 }
 
                 // endless loop?
-                if (last_start == start and last_syntax == ts.id) {
-                    break;
+                if (last_start == end and last_syntax == ts.id) {
+                    end += 1;
                 }
 
                 last_syntax = ts.id;

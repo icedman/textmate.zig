@@ -224,15 +224,10 @@ pub const Theme = struct {
         if (scope_name.len == 0) return;
 
         // Exclusions scopes...
-        if (std.mem.indexOf(u8, scope_name, " - ")) |_| {
-            // split by comma and make atoms for the same tokenColor
-            // TODO ... disregard exclusionist scope
-            var sc = scope_name[0..];
-            while (std.mem.indexOf(u8, sc, " - ")) |idx| {
-                const ss = sc[0..idx];
-                self.addScopeForToken(ss, token, ascendant, exclusion) catch {};
-                return;
-            }
+        if (std.mem.indexOf(u8, scope_name, " - ")) |idx| {
+            const sc = scope_name[0..idx];
+            const exc = Atom.fromScopeName(scope_name[idx+3..], &self.atoms);
+            self.addScopeForToken(sc, token, ascendant, exc) catch {};
             return;
         }
 

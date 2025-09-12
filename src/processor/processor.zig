@@ -154,6 +154,18 @@ pub const Processor = struct {
         self.captures.deinit(self.allocator);
     }
 
+    fn appendTokens(self: *Processor, token: []const u8, allocator: Allocator, collect: *ArrayList([]const u8)) !void {
+        const idx = std.mem.indexOf(u8, token, " ") orelse 0;
+        if (idx > 0) {
+            try self.appendTokens(token[0..idx], allocator, collect);
+            try self.appendTokens(token[idx + 1 ..], allocator, collect);
+            return;
+        }
+        var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
+        stdout.print("  !{s}\n", .{ token }) catch {};
+        try collect.append(allocator, token);
+    }
+
     pub fn query(self: *Processor, start: usize, end: usize, allocator: Allocator, collect: ?*ArrayList([]const u8)) !void {
         var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
         if (self.block) |b| {
@@ -161,9 +173,9 @@ pub const Processor = struct {
             for (self.captures.items) |cap| {
                 if (start >= cap.start and end <= cap.end) {
                     if (collect) |c| {
-                        try c.append(allocator, cap.scope);
+                        try self.appendTokens(cap.scope, allocator, c);
                     }
-                    stdout.print("  !{s} {}-{}\n", .{ cap.scope, cap.start, cap.end }) catch {};
+                    // stdout.print("  ![{s}] {}-{}\n", .{ cap.scope, cap.start, cap.end }) catch {};
                 }
             }
         }
