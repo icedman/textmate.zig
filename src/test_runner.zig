@@ -65,7 +65,7 @@ pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_p
             if (gmrs == .array) {
                 for (gmrs.array.items) |g| {
                     const s = try std.fmt.bufPrint(&buf, "{s}/{s}", .{ base_path, g.string });
-                    gml.addGrammar(s) catch {
+                    _ = gml.addGrammar(s) catch {
                         // skip test if grammars can't be loaded (plists)
                         return false;
                     };

@@ -399,7 +399,8 @@ pub const Syntax = struct {
 
                 if (GrammarLibrary.getLibrary()) |gml| {
                     const gmr = gml.grammarFromScopeName(source_scope) catch {
-                        std.debug.print("unable to load grammar {s}\n", .{source_scope});
+                        syntax.include_path = null;
+                        // std.debug.print("unable to load grammar {s}\n", .{source_scope});
                         return null;
                     };
 
@@ -536,8 +537,8 @@ pub const GrammarLibrary = struct {
         try embedded.listGrammars(self.allocator, &self.grammars);
     }
 
-    pub fn addGrammar(self: *GrammarLibrary, path: []const u8) !void {
-        try resources.addGrammar(self.allocator, path, &self.grammars);
+    pub fn addGrammar(self: *GrammarLibrary, path: []const u8) !GrammarInfo {
+        return try resources.addGrammar(self.allocator, path, &self.grammars);
     }
 
     pub fn applyInjectors(self: *GrammarLibrary, grammar: *Grammar) void {

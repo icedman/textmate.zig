@@ -309,6 +309,16 @@ fn testTheme(allocator: std.mem.Allocator) !void {
     }
 }
 
+pub fn toHash(atoms: []const Atom) u64 {
+    var hasher = std.hash.Fnv1a_64.init();
+    for (atoms) |atom| {
+        var buf: [16]u8 = undefined;
+        std.mem.writeInt(u128, &buf, atom.id, .little);
+        hasher.update(&buf);
+    }
+    return hasher.final();
+}
+
 test "scopes" {
     const allocator = std.testing.allocator;
     // try testLoadingAllThemes(allocator);

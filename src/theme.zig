@@ -39,9 +39,33 @@ pub const ThemeLibrary = struct {
         try resources.listThemes(self.allocator, path, &self.themes);
     }
 
+    pub fn addTheme(self: *ThemeLibrary, path: []const u8) !ThemeInfo {
+        return try resources.addTheme(self.allocator, path, &self.themes);
+    }
+
     pub fn addEmbeddedThemes(self: *ThemeLibrary) !void {
         // _ = self;
         try embedded.listThemes(self.allocator, &self.themes);
+    }
+
+    pub fn themeFromId(self: *ThemeLibrary, id: usize) !*Theme {
+        for (self.themes.items) |item| {
+            if (item.id == id) {
+                if (self.cache.get(item.id)) |g| {
+                    return g;
+                }
+                if (item.embedded_file) |file| {
+                    const t = try Theme.initWithData(self.allocator, file);
+                    try self.cache.put(item.id, t);
+                    return t;
+                }
+                const p: []const u8 = &item.full_path;
+                const t = try Theme.init(self.allocator, strings.toSlice([]const u8, p));
+                try self.cache.put(item.id, t);
+                return t;
+            }
+        }
+        return error.NotFound;
     }
 
     pub fn themeFromName(self: *ThemeLibrary, name: []const u8) !*Theme {
@@ -88,20 +112,12 @@ pub const ThemeLibrary = struct {
 
 pub const Scope = struct {
     atom: Atom = Atom{},
-    token: ?*TokenColor = null,
+    style: Style = Style{},
 
     // having ascendant(s) - one for now - will allow this atom to score better
     ascendant: Atom = Atom{},
     // having exclusion(s) - one for now - will allow this atom to fail
     exclusion: Atom = Atom{},
-
-    // TODO subsume TokenColor here
-};
-
-pub const TokenColor = struct {
-    name: []const u8,
-    scope: ?[][]const u8 = null,
-    settings: ?Style = null,
 };
 
 pub const Rgb = struct {
@@ -185,9 +201,17 @@ pub const Theme = struct {
     scopes: std.ArrayList(Scope),
     cache: std.StringHashMap(*Scope),
     cache_by_atom: std.AutoHashMap(u128, *Scope),
+    cache_by_atoms: std.AutoHashMap(u64, Style),
 
     // any string allocated is held here
     strings: StringsArena,
+
+    // this is used only in json parsing
+    const TokenColor = struct {
+        name: []const u8,
+        scope: ?[][]const u8 = null,
+        settings: ?Style = null,
+    };
 
     pub fn init(allocator: Allocator, source_path: []const u8) !*Theme {
         const file = std.fs.cwd().openFile(source_path, .{}) catch |err| {
@@ -212,6 +236,7 @@ pub const Theme = struct {
 
         self.cache.deinit();
         self.cache_by_atom.deinit();
+        self.cache_by_atoms.deinit();
 
         self.arena.deinit();
 
@@ -264,9 +289,9 @@ pub const Theme = struct {
 
         try self.scopes.append(self.allocator, Scope{
             .atom = Atom.fromScopeName(scope_name, &self.atoms),
+            .style = token.settings orelse Style{},
             .ascendant = ascendant,
             .exclusion = exclusion,
-            .token = token,
         });
     }
 
@@ -278,6 +303,7 @@ pub const Theme = struct {
             .scopes = try std.ArrayList(Scope).initCapacity(allocator, 512),
             .cache = std.StringHashMap(*Scope).init(allocator),
             .cache_by_atom = std.AutoHashMap(u128, *Scope).init(allocator),
+            .cache_by_atoms = std.AutoHashMap(u64, Style).init(allocator),
             .arena = ArenaAllocator.init(allocator),
             .strings = try StringsArena.init(allocator),
             .name = "",
@@ -407,8 +433,6 @@ pub const Theme = struct {
     pub fn getScope(self: *Theme, scope: []const u8, atoms: []const Atom, colors: ?*Style) ?*const Scope {
         var atom = atoms[0];
 
-        // std.debug.print("{s} {}\n", .{scope, atom.count});
-
         if (scope.len == 0 and atom.count == 0) return null;
 
         // This caching should be done per grammar, not per theme.
@@ -418,24 +442,18 @@ pub const Theme = struct {
             if (atom.id > 0) {
                 if (self.cache_by_atom.get(atom.id)) |cached| {
                     if (colors) |c| {
-                        if (cached.token) |token| {
-                            if (token.settings) |settings| {
-                                c.foreground = settings.foreground;
-                                c.foreground_rgb = settings.foreground_rgb;
-                            }
-                        }
+                        const style = cached.style;
+                        c.foreground = style.foreground;
+                        c.foreground_rgb = style.foreground_rgb;
                     }
                     return cached;
                 }
             } else if (scope.len > 0) {
                 if (self.cache.get(scope)) |cached| {
                     if (colors) |c| {
-                        if (cached.token) |token| {
-                            if (token.settings) |settings| {
-                                c.foreground = settings.foreground;
-                                c.foreground_rgb = settings.foreground_rgb;
-                            }
-                        }
+                        const style = cached.style;
+                        c.foreground = style.foreground;
+                        c.foreground_rgb = style.foreground_rgb;
                     }
                     return cached;
                 }
@@ -460,12 +478,9 @@ pub const Theme = struct {
         }
         if (colors) |cc| {
             if (matched) |mm| {
-                if (mm.token) |tk| {
-                    if (tk.settings) |ts| {
-                        cc.foreground = ts.foreground;
-                        cc.foreground_rgb = ts.foreground_rgb;
-                    }
-                }
+                const ts = mm.style;
+                cc.foreground = ts.foreground;
+                cc.foreground_rgb = ts.foreground_rgb;
 
                 if (enable_cache) {
                     if (scope.len > 0) {
@@ -483,31 +498,33 @@ pub const Theme = struct {
         return matched;
     }
 
-    pub fn getColor(self: *Theme, name: []const u8) ?Style {
-        if (self.colors.?.get(name)) |c| {
-            return c;
-        }
-        return null;
-    }
-
     pub fn getSpanStyle(
         self: *Theme,
         scopes: [config.max_span_captures][]const u8,
         atoms: [config.max_span_captures]Atom,
         count: u8,
         colors: ?*Style,
-    ) void {
-        if (count == 0) return;
+    ) !bool {
+        if (count == 0) return false;
+
+        // TODO exclusion and ascendant
+
+        const id = atms.toHash(atoms[0..count]);
+        const enable_cache = config.enable_scope_caching;
+        if (enable_cache) {
+            if (self.cache_by_atoms.get(id)) |cached| {
+                if (colors) |c| {
+                    @constCast(c).* = cached;
+                    return true;
+                }
+            }
+        }
 
         var highest: usize = 0;
         for (0..count) |idx| {
-            var atom = atoms[idx];
+            const atom = atoms[idx];
             const scope = scopes[idx];
-
-            // TODO compute this at syntax
-            if (atom.id == 0) {
-                atom.compute(scope, &self.atoms);
-            }
+            _ = scope;
 
             var matched: ?*Scope = null;
 
@@ -525,15 +542,27 @@ pub const Theme = struct {
 
             if (colors) |cc| {
                 if (matched) |mm| {
-                    if (mm.token) |tk| {
-                        if (tk.settings) |ts| {
-                            cc.foreground = ts.foreground;
-                            cc.foreground_rgb = ts.foreground_rgb;
-                        }
-                    }
+                    const ts = mm.style;
+                    cc.foreground = ts.foreground;
+                    cc.foreground_rgb = ts.foreground_rgb;
                 }
             }
         }
+
+        if (enable_cache) {
+            if (colors) |cc| {
+                try self.cache_by_atoms.put(id, cc.*);
+            }
+        }
+
+        return true;
+    }
+
+    pub fn getColor(self: *Theme, name: []const u8) ?Style {
+        if (self.colors.?.get(name)) |c| {
+            return c;
+        }
+        return null;
     }
 };
 

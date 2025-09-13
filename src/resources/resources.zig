@@ -130,10 +130,11 @@ pub fn listGrammars(allocator: Allocator, path: []const u8, list: *std.ArrayList
     }
 }
 
-pub fn addGrammar(allocator: Allocator, path: []const u8, list: *std.ArrayList(GrammarInfo)) !void {
+pub fn addGrammar(allocator: Allocator, path: []const u8, list: *std.ArrayList(GrammarInfo)) !GrammarInfo {
     var gi = try getGrammarInfo(allocator, path, path);
     gi.id = list.items.len + 1;
     try list.append(allocator, gi);
+    return gi;
 }
 
 test "get grammars" {
@@ -204,6 +205,13 @@ pub fn listThemes(allocator: Allocator, path: []const u8, list: *std.ArrayList(T
 pub fn addThemes(allocator: Allocator, path: []const u8, list: *std.ArrayList(ThemeInfo)) !void {
     const ti = try getThemeInfo(allocator, path, path);
     try list.append(allocator, ti);
+}
+
+pub fn addTheme(allocator: Allocator, path: []const u8, list: *std.ArrayList(ThemeInfo)) !ThemeInfo{
+    var gi = try getThemeInfo(allocator, path, path);
+    gi.id = list.items.len + 1;
+    try list.append(allocator, gi);
+    return gi;
 }
 
 // This is only used at build time to generate embedded.zig

@@ -155,11 +155,11 @@ pub fn main() !void {
     var thm: *Theme = undefined;
     if (ThemeLibrary.getLibrary()) |thl| {
         if (std.mem.indexOf(u8, theme_path orelse "", ".json")) |_| {
-            thm = Theme.init(allocator, theme_path orelse "") catch {
-                std.debug.print("unable to open theme file\n", .{});
+            const ti = try thl.addTheme(theme_path orelse "");
+            thm = thl.themeFromId(ti.id) catch {
+                std.debug.print("unable to open theme\n", .{});
                 return;
             };
-            defer thm.deinit();
         } else {
             thm = thl.themeFromName(theme_path orelse "dracula-soft") catch {
                 std.debug.print("unable to open theme\n", .{});
@@ -174,11 +174,11 @@ pub fn main() !void {
     if (GrammarLibrary.getLibrary()) |gml| {
         if (grammar_path) |gp| {
             if (std.mem.indexOf(u8, gp, ".json")) |_| {
-                gmr = Grammar.init(allocator, gp) catch {
-                    std.debug.print("unable to open grammar file\n", .{});
+                const gi = try gml.addGrammar(gp);
+                gmr = gml.grammarFromId(gi.id) catch {
+                    std.debug.print("unable to open grammar {s}\n", .{gp});
                     return;
                 };
-                defer gmr.deinit();
             } else {
                 gmr = gml.grammarFromScopeName(gp) catch {
                     std.debug.print("unable to open grammar from scope name\n", .{});
