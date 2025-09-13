@@ -879,7 +879,7 @@ pub const Parser = struct {
 
     fn isLooping(self: *Parser, match: Match) bool {
         for (self.line_matches.items) |item| {
-            if (item.regex == match.regex and item.start == match.start) {
+            if (item.regex == match.regex and item.start == match.start and item.end == match.end) {
                 return true;
             }
         }
@@ -906,6 +906,7 @@ pub const Parser = struct {
         var end = block.len;
         var last_start: usize = 0;
         var last_syntax: u64 = 0;
+        var last_stack_size: usize = state.size();
 
         // handle while
         // todo track while count
@@ -1014,6 +1015,10 @@ pub const Parser = struct {
                                     }
 
                                     state.push(@constCast(match_syn), rx, block, pattern_match, "pattern") catch {};
+                                    // TODO fix anchors
+                                    if (ts.rx_begin.is_anchored and rx.is_anchored) {
+                                        end = start_;
+                                    }
 
                                     try self.line_matches.append(self.allocator, pattern_match);
                                     // fail silently?
@@ -1060,16 +1065,14 @@ pub const Parser = struct {
                 }
 
                 // endless loop?
-                if (last_start == end and last_syntax == ts.id) {
+                if (last_start == end and last_syntax == ts.id and last_stack_size == state.size()) {
                     end += 1;
                 }
 
                 last_syntax = ts.id;
                 last_start = start;
+                last_stack_size = state.size();
                 start = end;
-            } else {
-                // no top
-                unreachable;
             }
         }
 

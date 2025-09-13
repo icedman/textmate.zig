@@ -462,7 +462,6 @@ pub const Syntax = struct {
         if (self.scope_name.len > 0) {
             return self.scope_name;
         }
-        // no need to return name (match is unscoped?)
         return self.name;
     }
 
