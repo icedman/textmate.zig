@@ -5,7 +5,7 @@
 		"rviz",
 		"reek",
 		"clang-format",
-		"yaml-tmlanguage",
+		"yaml-tmLanguage.json",
 		"syntax",
 		"sublime-syntax"
 	],

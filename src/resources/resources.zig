@@ -37,11 +37,11 @@ pub const ThemeInfo = struct {
 };
 
 pub fn getGrammarInfo(allocator: Allocator, path: []const u8, full_path: []const u8) !GrammarInfo {
-    if (std.mem.indexOf(u8, path, ".plist")) |_| {
-        return error.InvalidGrammar;
-    }
+    // if (std.mem.indexOf(u8, path, ".plist")) |_| {
+    //     return error.InvalidGrammar;
+    // }
     // std.debug.print("{s}\n", .{path});
-    // _ = path;
+    _ = path;
 
     const file = try std.fs.cwd().openFile(full_path, .{});
     defer file.close();

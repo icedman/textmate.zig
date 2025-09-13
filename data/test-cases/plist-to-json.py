@@ -12,7 +12,7 @@ def plist_to_json(plist_path, json_path):
 
 def convert_directory(directory):
     for filename in os.listdir(directory):
-        if filename.lower().endswith(".plist"):
+        if filename.lower().endswith(".plist") or filename.lower().endswith(".tmLanguage"):
             plist_path = os.path.join(directory, filename)
             json_path = plist_path + ".json"  # append ".json" to filename
             try:

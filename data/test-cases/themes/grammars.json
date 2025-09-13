@@ -2,12 +2,12 @@
 	{
 		"language": "bat",
 		"scopeName": "source.dosbatch",
-		"path": "./syntaxes/Batch File.tmLanguage"
+		"path": "./syntaxes/Batch File.tmLanguage.json"
 	},
 	{
 		"language": "clojure",
 		"scopeName": "source.clojure",
-		"path": "./syntaxes/Clojure.tmLanguage"
+		"path": "./syntaxes/Clojure.tmLanguage.json"
 	},
 	{
 		"language": "coffeescript",
@@ -26,22 +26,22 @@
 	},
 	{
 		"scopeName": "source.c.platform",
-		"path": "./syntaxes/Platform.tmLanguage"
+		"path": "./syntaxes/Platform.tmLanguage.json"
 	},
 	{
 		"language": "css",
 		"scopeName": "source.css",
-		"path": "./syntaxes/css.plist"
+		"path": "./syntaxes/css.json"
 	},
 	{
 		"language": "diff",
 		"scopeName": "source.diff",
-		"path": "./syntaxes/diff.tmLanguage"
+		"path": "./syntaxes/diff.tmLanguage.json"
 	},
 	{
 		"language": "dockerfile",
 		"scopeName": "source.dockerfile",
-		"path": "./syntaxes/Dockerfile.tmLanguage"
+		"path": "./syntaxes/Dockerfile.tmLanguage.json"
 	},
 	{
 		"language": "fsharp",
@@ -51,12 +51,12 @@
 	{
 		"language": "git-commit",
 		"scopeName": "text.git-commit",
-		"path": "./syntaxes/git-commit.tmLanguage"
+		"path": "./syntaxes/git-commit.tmLanguage.json"
 	},
 	{
 		"language": "git-rebase",
 		"scopeName": "text.git-rebase",
-		"path": "./syntaxes/git-rebase.tmLanguage"
+		"path": "./syntaxes/git-rebase.tmLanguage.json"
 	},
 	{
 		"language": "go",
@@ -66,7 +66,7 @@
 	{
 		"language": "groovy",
 		"scopeName": "source.groovy",
-		"path": "./syntaxes/Groovy.tmLanguage"
+		"path": "./syntaxes/Groovy.tmLanguage.json"
 	},
 	{
 		"language": "handlebars",
@@ -88,12 +88,12 @@
 	{
 		"language": "ini",
 		"scopeName": "source.properties",
-		"path": "./syntaxes/properties.plist"
+		"path": "./syntaxes/properties.json"
 	},
 	{
 		"language": "properties",
 		"scopeName": "source.properties",
-		"path": "./syntaxes/properties.plist"
+		"path": "./syntaxes/properties.json"
 	},
 	{
 		"language": "jade",
@@ -117,12 +117,12 @@
 	},
 	{
 		"scopeName": "source.js.regexp",
-		"path": "./syntaxes/Regular Expressions (JavaScript).tmLanguage"
+		"path": "./syntaxes/Regular Expressions (JavaScript).tmLanguage.json"
 	},
 	{
 		"language": "json",
 		"scopeName": "source.json",
-		"path": "./syntaxes/JSON.tmLanguage"
+		"path": "./syntaxes/JSON.tmLanguage.json"
 	},
 	{
 		"language": "less",
@@ -142,22 +142,22 @@
 	{
 		"language": "markdown",
 		"scopeName": "text.html.markdown",
-		"path": "./syntaxes/markdown.tmLanguage"
+		"path": "./syntaxes/markdown.tmLanguage.json"
 	},
 	{
 		"language": "objective-c",
 		"scopeName": "source.objc",
-		"path": "./syntaxes/Objective-C.tmLanguage"
+		"path": "./syntaxes/Objective-C.tmLanguage.json"
 	},
 	{
 		"language": "perl",
 		"scopeName": "source.perl",
-		"path": "./syntaxes/Perl.plist"
+		"path": "./syntaxes/Perl.json"
 	},
 	{
 		"language": "perl6",
 		"scopeName": "source.perl.6",
-		"path": "./syntaxes/Perl 6.tmLanguage"
+		"path": "./syntaxes/Perl 6.tmLanguage.json"
 	},
 	{
 		"language": "php",
@@ -176,7 +176,7 @@
 	{
 		"language": "powershell",
 		"scopeName": "source.powershell",
-		"path": "./syntaxes/PowershellSyntax.tmLanguage"
+		"path": "./syntaxes/PowershellSyntax.tmLanguage.json"
 	},
 	{
 		"language": "python",
@@ -190,7 +190,7 @@
 	{
 		"language": "r",
 		"scopeName": "source.r",
-		"path": "./syntaxes/R.plist"
+		"path": "./syntaxes/R.json"
 	},
 	{
 		"language": "razor",
@@ -200,7 +200,7 @@
 	{
 		"language": "ruby",
 		"scopeName": "source.ruby",
-		"path": "./syntaxes/Ruby.plist"
+		"path": "./syntaxes/Ruby.json"
 	},
 	{
 		"language": "rust",
@@ -225,7 +225,7 @@
 	{
 		"language": "sql",
 		"scopeName": "source.sql",
-		"path": "./syntaxes/SQL.plist"
+		"path": "./syntaxes/SQL.json"
 	},
 	{
 		"language": "swift",
@@ -245,7 +245,7 @@
 	{
 		"language": "vb",
 		"scopeName": "source.asp.vb.net",
-		"path": "./syntaxes/ASPVBnet.plist"
+		"path": "./syntaxes/ASPVBnet.json"
 	},
 	{
 		"language": "xml",

@@ -207,7 +207,7 @@ pub const Syntax = struct {
             .rx_while = Rule{ .expr = if (obj.get("while")) |v| try strings_arena.append(v.string) else null },
             .rx_end = Rule{ .expr = if (obj.get("end")) |v| try strings_arena.append(v.string) else null },
         };
-        
+
         const include = obj.get("include");
         if (include) |path| {
             syntax.include_path = try strings_arena.append(path.string);

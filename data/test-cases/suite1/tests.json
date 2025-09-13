@@ -72,9 +72,9 @@
 	},
 	{
 		"grammars": [
-			"fixtures/markdown.plist"
+			"fixtures/markdown.plist.json"
 		],
-		"grammarPath": "fixtures/markdown.plist",
+		"grammarPath": "fixtures/markdown.plist.json",
 		"desc": "Nested repositories in Markdown",
 		"lines": [
 			{
@@ -158,9 +158,9 @@
 	},
 	{
 		"grammars": [
-			"fixtures/aspvbnet.plist"
+			"fixtures/aspvbnet.plist.json"
 		],
-		"grammarPath": "fixtures/aspvbnet.plist",
+		"grammarPath": "fixtures/aspvbnet.plist.json",
 		"desc": "asp",
 		"lines": [
 			{
@@ -222,9 +222,9 @@
 	},
 	{
 		"grammars": [
-			"fixtures/aspvbnet.plist"
+			"fixtures/aspvbnet.plist.json"
 		],
-		"grammarPath": "fixtures/aspvbnet.plist",
+		"grammarPath": "fixtures/aspvbnet.plist.json",
 		"desc": "asp2",
 		"lines": [
 			{
@@ -286,11 +286,11 @@
 	},
 	{
 		"grammars": [
-			"fixtures/php.plist",
+			"fixtures/php.plist.json",
 			"fixtures/javascript.json",
 			"fixtures/html.json"
 		],
-		"grammarPath": "fixtures/php.plist",
+		"grammarPath": "fixtures/php.plist.json",
 		"desc": "Injections in PHP",
 		"lines": [
 			{
@@ -579,9 +579,9 @@
 	},
 	{
 		"grammars": [
-			"fixtures/Jade.tmLanguage"
+			"fixtures/Jade.tmLanguage.json"
 		],
-		"grammarPath": "fixtures/Jade.tmLanguage",
+		"grammarPath": "fixtures/Jade.tmLanguage.json",
 		"desc": "Jade",
 		"lines": [
 			{
@@ -620,9 +620,9 @@
 	},
 	{
 		"grammars": [
-			"fixtures/Perl.plist"
+			"fixtures/Perl.plist.json"
 		],
-		"grammarPath": "fixtures/Perl.plist",
+		"grammarPath": "fixtures/Perl.plist.json",
 		"desc": "Perl",
 		"lines": [
 			{
@@ -712,9 +712,9 @@
 	},
 	{
 		"grammars": [
-			"fixtures/Ruby.plist"
+			"fixtures/Ruby.plist.json"
 		],
-		"grammarPath": "fixtures/Ruby.plist",
+		"grammarPath": "fixtures/Ruby.plist.json",
 		"desc": "Ruby",
 		"lines": [
 			{
@@ -774,9 +774,9 @@
 	},
 	{
 		"grammars": [
-			"fixtures/Makefile.plist"
+			"fixtures/Makefile.plist.json"
 		],
-		"grammarPath": "fixtures/Makefile.plist",
+		"grammarPath": "fixtures/Makefile.plist.json",
 		"desc": "Issue #8",
 		"lines": [
 			{
@@ -1006,9 +1006,9 @@
 	},
 	{
 		"grammars": [
-			"fixtures/testlang12.plist"
+			"fixtures/testlang12.plist.json"
 		],
-		"grammarPath": "fixtures/testlang12.plist",
+		"grammarPath": "fixtures/testlang12.plist.json",
 		"desc": "Issue #12",
 		"lines": [
 			{
@@ -1135,9 +1135,9 @@
 	},
 	{
 		"grammars": [
-			"fixtures/Markdown.tmLanguage"
+			"fixtures/Markdown.tmLanguage.json"
 		],
-		"grammarPath": "fixtures/Markdown.tmLanguage",
+		"grammarPath": "fixtures/Markdown.tmLanguage.json",
 		"desc": "Issue #10",
 		"lines": [
 			{
@@ -1322,9 +1322,9 @@
 	},
 	{
 		"grammars": [
-			"fixtures/Pug.tmLanguage"
+			"fixtures/Pug.tmLanguage.json"
 		],
-		"grammarPath": "fixtures/Pug.tmLanguage",
+		"grammarPath": "fixtures/Pug.tmLanguage.json",
 		"desc": "Issue #82",
 		"lines": [
 			{
@@ -1424,9 +1424,9 @@
 	},
 	{
 		"grammars": [
-			"fixtures/66.plist"
+			"fixtures/66.plist.json"
 		],
-		"grammarPath": "fixtures/66.plist",
+		"grammarPath": "fixtures/66.plist.json",
 		"desc": "Issue #66",
 		"lines": [
 			{
@@ -1520,9 +1520,9 @@
 	},
 	{
 		"grammars": [
-			"fixtures/YAML.tmLanguage"
+			"fixtures/YAML.tmLanguage.json"
 		],
-		"grammarPath": "fixtures/YAML.tmLanguage",
+		"grammarPath": "fixtures/YAML.tmLanguage.json",
 		"desc": "Issue #119",
 		"lines": [
 			{

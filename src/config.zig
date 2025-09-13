@@ -21,5 +21,4 @@ pub const enable_scope_caching = true;
 // processor
 pub const max_span_captures = 64;
 
-
 const builtin = @import("builtin");

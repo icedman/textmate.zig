@@ -1,9 +1,9 @@
 [
 	{
 		"grammars": [
-			"fixtures/whileLang.plist"
+			"fixtures/whileLang.plist.json"
 		],
-		"grammarPath": "fixtures/whileLang.plist",
+		"grammarPath": "fixtures/whileLang.plist.json",
 		"desc": "While should match begin and stop on next line if while condition fails",
 		"lines": [
 			{
@@ -48,9 +48,9 @@
 	},
 	{
 		"grammars": [
-			"fixtures/whileLang.plist"
+			"fixtures/whileLang.plist.json"
 		],
-		"grammarPath": "fixtures/whileLang.plist",
+		"grammarPath": "fixtures/whileLang.plist.json",
 		"desc": "While should match multiple lines while condition holds",
 		"lines": [
 			{
@@ -130,9 +130,9 @@
 	},
 	{
 		"grammars": [
-			"fixtures/whileLang.plist"
+			"fixtures/whileLang.plist.json"
 		],
-		"grammarPath": "fixtures/whileLang.plist",
+		"grammarPath": "fixtures/whileLang.plist.json",
 		"desc": "While condition can match anywhere in line",
 		"lines": [
 			{
@@ -193,9 +193,9 @@
 	},
 	{
 		"grammars": [
-			"fixtures/whileLang.plist"
+			"fixtures/whileLang.plist.json"
 		],
-		"grammarPath": "fixtures/whileLang.plist",
+		"grammarPath": "fixtures/whileLang.plist.json",
 		"desc": "Begin of while should consume entire rest of line.",
 		"lines": [
 			{
@@ -261,9 +261,9 @@
 	},
 	{
 		"grammars": [
-			"fixtures/whileLang.plist"
+			"fixtures/whileLang.plist.json"
 		],
-		"grammarPath": "fixtures/whileLang.plist",
+		"grammarPath": "fixtures/whileLang.plist.json",
 		"desc": "Nested whiles should match using only inner most while on a mached line",
 		"lines": [
 			{
@@ -328,9 +328,9 @@
 	},
 	{
 		"grammars": [
-			"fixtures/whileLang.plist"
+			"fixtures/whileLang.plist.json"
 		],
-		"grammarPath": "fixtures/whileLang.plist",
+		"grammarPath": "fixtures/whileLang.plist.json",
 		"desc": "Nested whiles should check line for outer most while to inner most while",
 		"lines": [
 			{
@@ -368,9 +368,9 @@
 	},
 	{
 		"grammars": [
-			"fixtures/whileLang.plist"
+			"fixtures/whileLang.plist.json"
 		],
-		"grammarPath": "fixtures/whileLang.plist",
+		"grammarPath": "fixtures/whileLang.plist.json",
 		"desc": "Nested whiles should move line ahead before checking other conditions",
 		"lines": [
 			{
@@ -424,9 +424,9 @@
 	},
 	{
 		"grammars": [
-			"fixtures/whileLang.plist"
+			"fixtures/whileLang.plist.json"
 		],
-		"grammarPath": "fixtures/whileLang.plist",
+		"grammarPath": "fixtures/whileLang.plist.json",
 		"desc": "Nested whiles should check line for outer most while to inner most while",
 		"lines": [
 			{
@@ -464,9 +464,9 @@
 	},
 	{
 		"grammars": [
-			"fixtures/whileLang.plist"
+			"fixtures/whileLang.plist.json"
 		],
-		"grammarPath": "fixtures/whileLang.plist",
+		"grammarPath": "fixtures/whileLang.plist.json",
 		"desc": "Should Correctly handle anchor in while rule",
 		"lines": [
 			{

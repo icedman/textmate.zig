@@ -10,7 +10,7 @@ const ParseState = lib.ParseState;
 const NullProcessor = lib.NullProcessor;
 const DumpProcessor = lib.DumpProcessor;
 const RenderProcessor = lib.RenderProcessor;
-const RenderHtmlProcessor = lib.RenderHtmlProcessor;
+const TestProcessor = NullProcessor;
 const Rgb = lib.Rgb;
 const util = lib.AnsiTerminal;
 
@@ -67,7 +67,7 @@ pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_p
                     const s = try std.fmt.bufPrint(&buf, "{s}/{s}", .{ base_path, g.string });
                     gml.addGrammar(s) catch {
                         // skip test if grammars can't be loaded (plists)
-                        return true;
+                        return false;
                     };
                 }
             }
@@ -79,12 +79,12 @@ pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_p
     if (grammar_path) |p| {
         if (p == .string) {
             const s = try std.fmt.bufPrint(&buf, "{s}/{s}", .{ base_path, p.string });
-            if (std.mem.indexOf(u8, s, "json")) |_| {
-                // we support only json files
-            } else {
-                try stdout.print("unsupported file {s}\n", .{s});
-                return error.UnsupportedFile;
-            }
+            // if (std.mem.indexOf(u8, s, "json")) |_| {
+            //     // we support only json files
+            // } else {
+            //     try stdout.print("unsupported file {s}\n", .{s});
+            //     return error.UnsupportedFile;
+            // }
             try stdout.print("{s}\n", .{s});
             gmr = try Grammar.init(allocator, s);
             // gmr.syntax.?.dump(0, false);
@@ -105,7 +105,7 @@ pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_p
         var state = try par.initState();
         defer state.deinit();
 
-        var proc = try DumpProcessor.init(allocator);
+        var proc = try TestProcessor.init(allocator);
         defer proc.deinit();
 
         par.processor = &proc;
@@ -192,14 +192,19 @@ pub fn run_test_suit(allocator: std.mem.Allocator, base_path: []const u8, source
     if (root == .array) {
         for (root.array.items) |item| {
             if (item == .object) {
-                if (item.object.get("skip")) |_| {
-                    std.debug.print("skipping...{s}\n", .{item.object.get("desc").?.string});
-                    continue;
-                }
-                if (!try run_parse_test(allocator, item, base_path)) {
+                // if (item.object.get("skip")) |_| {
+                //     std.debug.print("skipping...{s}\n", .{item.object.get("desc").?.string});
+                //     continue;
+                // }
+                const res = run_parse_test(allocator, item, base_path) catch {
+                    std.debug.print("unable to finish test\n", .{});
                     if (end_on_fail) {
                         return false;
                     }
+                    return true;
+                };
+                if (res == false and end_on_fail) {
+                    return false;
                 }
             }
         }
@@ -266,7 +271,7 @@ pub fn main() !void {
 
     _ = try run_test_suit(allocator, "data/test-cases/first-mate", "tests.json");
     _ = try run_test_suit(allocator, "data/test-cases/suite1", "tests.json");
-    // _ = try run_test_suit(allocator, "data/test-cases/suite1", "whileTests.json");
+    _ = try run_test_suit(allocator, "data/test-cases/suite1", "whileTests.json");
     // try run_theme_library(allocator);
     // try run_grammar_library(allocator);
 
