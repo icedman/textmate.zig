@@ -503,6 +503,8 @@ pub const Theme = struct {
         for (0..count) |idx| {
             var atom = atoms[idx];
             const scope = scopes[idx];
+
+            // TODO compute this at syntax
             if (atom.id == 0) {
                 atom.compute(scope, &self.atoms);
             }

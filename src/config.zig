@@ -7,7 +7,7 @@ pub const enable_end_caching = caching and true;
 // compute theme-based atoms for resolved scopes
 pub const enable_scope_atoms = true;
 // skip theme-ignored atoms
-pub const enable_scope_atoms_skip = false;
+pub const enable_scope_atoms_skip = (builtin.mode != .Debug);
 
 pub const max_line_len = 1024; // a line longer will not be parsed
 pub const max_match_ranges = 9; // max $1 in grammar files is just 8
@@ -20,3 +20,6 @@ pub const enable_scope_caching = true;
 
 // processor
 pub const max_span_captures = 64;
+
+
+const builtin = @import("builtin");

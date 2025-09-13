@@ -185,17 +185,17 @@ pub const Syntax = struct {
             syntax.deinit();
         }
 
-        const include = obj.get("include");
-        if (include) |path| {
-            syntax.* = Syntax{
-                .id = @intFromPtr(syntax),
-                .name = "",
-                .content_name = "",
-                .scope_name = "",
-                .include_path = try strings_arena.append(path.string),
-            };
-            return syntax;
-        }
+        // const include = obj.get("include");
+        // if (include) |path| {
+        //     syntax.* = Syntax{
+        //         .id = @intFromPtr(syntax),
+        //         .name = "",
+        //         .content_name = "",
+        //         .scope_name = "",
+        //         .include_path = try strings_arena.append(path.string),
+        //     };
+        //     return syntax;
+        // }
 
         syntax.* = Syntax{
             .id = @intFromPtr(syntax),
@@ -207,6 +207,11 @@ pub const Syntax = struct {
             .rx_while = Rule{ .expr = if (obj.get("while")) |v| try strings_arena.append(v.string) else null },
             .rx_end = Rule{ .expr = if (obj.get("end")) |v| try strings_arena.append(v.string) else null },
         };
+        
+        const include = obj.get("include");
+        if (include) |path| {
+            syntax.include_path = try strings_arena.append(path.string);
+        }
 
         syntax.compileSyntax(strings_arena) catch {
             // std.debug.print("Failed to compile regex: // TODO which one?\n", .{});

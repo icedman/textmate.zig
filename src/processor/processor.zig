@@ -238,10 +238,34 @@ pub const Processor = struct {
                     if (start >= cap.start and end <= cap.end) {
                         span.atoms[span.count] = cap.atom;
                         span.scopes[span.count] = cap.scope;
+
+                        if (span.atoms[span.count].id == 0) {
+                            if (self.theme) |thm| {
+                                span.atoms[span.count].compute(cap.scope, &thm.atoms);
+                            }
+                        }
+
+                        if (span.count > 0) {
+                            if (span.atoms[span.count].id == span.atoms[span.count-1].id) continue;
+                        }
+
                         span.count += 1;
                         if (span.count >= config.max_span_captures) break;
                     }
                 }
+
+                // const max_spans = 6;
+                // const max_spans_half = max_spans >> 1;
+                // if (span.count > max_spans) {
+                //     const tail_atoms = span.atoms[span.count - max_spans_half .. span.count];
+                //     const tail_scopes = span.scopes[span.count - max_spans_half .. span.count];
+                //     for(0..max_spans_half) |si| {
+                //         span.atoms[max_spans_half + si] = tail_atoms[si];
+                //         span.scopes[max_spans_half + si] = tail_scopes[si];
+                //     }
+                //     span.count = max_spans;
+                // }
+
                 try self.spans.append(self.allocator, span);
             }
         }
