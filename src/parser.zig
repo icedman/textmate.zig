@@ -145,7 +145,7 @@ const StateContext = struct {
 
     // The match position of the character relative to the line start
     match_position: u32 = 0,
-    line: u32 = 0,
+    enter_position: u32 = 0,
 
     // Parser owns these at regex_map and responsible for oni.Regex.deinit not StateContext
     rx_while: Rule = Rule{},
@@ -213,10 +213,11 @@ pub const ParseState = struct {
     }
 
     pub fn push(self: *ParseState, syntax: *Syntax, rx: *Rule, block: []const u8, match: Match, where: []const u8) !void {
+        const enter = match.anchor_start;
         const anchor = match.start;
         var sc = StateContext{
             .syntax = syntax,
-            .line = 0,
+            .enter_position = @intCast(enter),
             .match_position = @intCast(anchor),
         };
 
@@ -378,14 +379,14 @@ pub const Parser = struct {
         return error.InvalidGrammar;
     }
 
-    fn getCurrentAnchor(self: *Parser) usize {
+    fn getLastMatchPositions(self: *Parser) struct {usize, usize} {
         if (self.current_state) |state| {
             const top = state.top();
             if (top) |t| {
-                return t.match_position;
+                return .{t.enter_position, t.match_position};
             }
         }
-        return 0;
+        return .{0, 0};
     }
 
     // findMatch. Regular expression matching. This is where all the CPU usage goes.
@@ -398,10 +399,14 @@ pub const Parser = struct {
 
             syntax.execs += 1;
             self.regex_execs += 1;
+            var enter: usize = start;
             var hard_start: usize = start;
             if (rx.is_anchored) {
                 // \G in oniguruma means start of previous match
-                hard_start = self.getCurrentAnchor();
+                const last_match_pos = self.getLastMatchPositions();
+                enter = last_match_pos[0];
+                hard_start = last_match_pos[1];
+                // hard_start = self.getCurrentAnchor();
 
                 // when pattern is merely "\\G", it is merely to re-assert matching at the last matched position
                 // in this case, simulate a successful match
@@ -616,9 +621,10 @@ pub const Parser = struct {
     }
 
     // TODO while matches could have captures
-    pub fn matchWhile(self: *Parser, state: *ParseState, block: []const u8) ?*Syntax {
+    pub fn matchWhile(self: *Parser, state: *ParseState, block: []const u8) Match {
+        var last_match = Match{};
         var state_depth = state.size();
-        const start: usize = 0;
+        var start: usize = 0;
         const end = block.len;
         while (state_depth > 1) : (state_depth -= 1) {
             const top = state.at(state_depth - 1);
@@ -648,13 +654,16 @@ pub const Parser = struct {
                             while (state.size() >= state_depth) {
                                 state.pop("matchWhile");
                             }
-                            return @constCast(syn);
+                            last_match = m;
+                            start = m.end;
+                            // return m;
+                            // return @constCast(syn);
                         }
                     }
                 }
             }
         }
-        return null;
+        return last_match;
     }
 
     /// TODO matchEnd must also be cached. Also, some end expressions are similar (should also be cached)
@@ -910,8 +919,10 @@ pub const Parser = struct {
 
         // handle while
         // todo track while count
-        const exit_while = self.matchWhile(state, block);
-        _ = exit_while;
+        const while_match = self.matchWhile(state, block);
+        if (while_match.count > 0) {
+            start = while_match.end;
+        }
 
         while (true) {
             end = block.len;

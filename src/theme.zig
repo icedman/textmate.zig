@@ -543,8 +543,10 @@ pub const Theme = struct {
             if (colors) |cc| {
                 if (matched) |mm| {
                     const ts = mm.style;
-                    cc.foreground = ts.foreground;
-                    cc.foreground_rgb = ts.foreground_rgb;
+                    cc.foreground = ts.foreground orelse cc.foreground;
+                    cc.foreground_rgb = ts.foreground_rgb orelse cc.foreground_rgb;
+                    cc.background = ts.background orelse cc.background;
+                    cc.background_rgb = ts.background_rgb orelse cc.background_rgb;
                 }
             }
         }

@@ -167,8 +167,6 @@ pub fn main() !void {
             };
         }
     }
-    // let the library deinit library-loaded thee
-    // defer thm.deinit();
 
     var gmr: *Grammar = undefined;
     if (GrammarLibrary.getLibrary()) |gml| {
@@ -192,9 +190,6 @@ pub fn main() !void {
             };
         }
     }
-
-    // let the library deinit library-loaded grammars
-    // defer gmr.deinit();
 
     var par = try Parser.init(allocator, gmr);
     defer par.deinit();

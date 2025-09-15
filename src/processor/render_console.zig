@@ -33,11 +33,21 @@ pub const RenderProcessor = struct {
         };
 
         if (self.theme) |thm| {
+            const default_style = theme.Style{
+                .foreground_rgb = (thm.getColor("editor.foreground") orelse
+                    thm.getColor("foreground") orelse theme.Style{}).foreground_rgb,
+                // all colors in "colors" map will be in the foreground -> this is going to be a pitfall
+                .background_rgb = (thm.getColor("editor.background") orelse
+                    thm.getColor("background") orelse theme.Style{}).foreground_rgb, 
+            };
             for (spans.items) |span| {
-                var style = theme.Style{};
+                var style = default_style;
                 _ = thm.getSpanStyle(span.scopes, span.atoms, span.count, &style) catch {}; 
                 if (style.foreground_rgb) |fg| {
                     setColorRgb(stdout, fg) catch {};
+                }
+                if (style.background_rgb) |bg| {
+                    setBgColorRgb(stdout, bg) catch {};
                 }
                 stdout.print("{s}", .{span.text}) catch {};
                 resetColor(stdout) catch {};
