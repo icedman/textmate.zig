@@ -277,7 +277,7 @@ pub const ParseState = struct {
             }
         }
 
-        _ = self.stack.append(self.allocator, sc) catch {};
+        _ = try self.stack.append(self.allocator, sc);
         _ = where;
         // std.debug.print("push {s}\n", .{syntax.getName()});
     }
@@ -379,14 +379,14 @@ pub const Parser = struct {
         return error.InvalidGrammar;
     }
 
-    fn getLastMatchPositions(self: *Parser) struct {usize, usize} {
+    fn getLastMatchPositions(self: *Parser) struct { usize, usize } {
         if (self.current_state) |state| {
             const top = state.top();
             if (top) |t| {
-                return .{t.enter_position, t.match_position};
+                return .{ t.enter_position, t.match_position };
             }
         }
-        return .{0, 0};
+        return .{ 0, 0 };
     }
 
     // findMatch. Regular expression matching. This is where all the CPU usage goes.
@@ -1025,7 +1025,7 @@ pub const Parser = struct {
                                         }
                                     }
 
-                                    state.push(@constCast(match_syn), rx, block, pattern_match, "pattern") catch {};
+                                    try state.push(@constCast(match_syn), rx, block, pattern_match, "pattern");
                                     // TODO fix anchors
                                     if (ts.rx_begin.is_anchored and rx.is_anchored) {
                                         end = start_;
@@ -1101,7 +1101,7 @@ pub const Parser = struct {
     pub fn serialize(self: *Parser, state: *ParseState, serial: *std.ArrayList(StateContextPack)) !void {
         serial.clearRetainingCapacity();
         for (state.stack.items) |*item| {
-            serial.append(item.serialize(self)) catch {};
+            try serial.append(item.serialize(self));
         }
     }
 
@@ -1109,8 +1109,8 @@ pub const Parser = struct {
         state.stack.clearRetainingCapacity();
         for (serial.items) |item| {
             var sc = StateContext{ .syntax = self.lang.syntax.? };
-            sc.deserialize(self, item) catch {};
-            state.stack.append(sc) catch {};
+            try sc.deserialize(self, item);
+            try state.stack.append(sc);
         }
     }
 };

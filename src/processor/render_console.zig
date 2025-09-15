@@ -27,10 +27,7 @@ pub const RenderProcessor = struct {
         var stdout_buffer: [1024]u8 = undefined;
         var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
         const stdout = &stdout_writer.interface;
-
-        const spans = self.produce() catch {
-            return;
-        };
+        const spans = self.produce() catch @panic("unable to produce");
 
         if (self.theme) |thm| {
             const default_style = theme.Style{
@@ -49,7 +46,17 @@ pub const RenderProcessor = struct {
                 if (style.background_rgb) |bg| {
                     setBgColorRgb(stdout, bg) catch {};
                 }
-                stdout.print("{s}", .{span.text}) catch {};
+                // stdout.print("{s}", .{span.text}) catch {};
+                for(span.text) |ch| {
+                    switch(ch) {
+                        '\t' => {
+                           stdout.print("    ", .{}) catch {};
+                        },
+                        else =>  {
+                           stdout.print("{c}", .{ch}) catch {};
+                        }
+                    }
+                }
                 resetColor(stdout) catch {};
             }
         }

@@ -250,7 +250,7 @@ pub const Theme = struct {
         if (std.mem.indexOf(u8, scope_name, " - ")) |idx| {
             const sc = scope_name[0..idx];
             const exc = Atom.fromScopeName(scope_name[idx + 3 ..], &self.atoms);
-            self.addScopeForToken(sc, token, ascendant, exc) catch {};
+            try self.addScopeForToken(sc, token, ascendant, exc);
             return;
         }
 
@@ -260,11 +260,11 @@ pub const Theme = struct {
             var sc = scope_name[0..];
             while (std.mem.indexOf(u8, sc, ",")) |idx| {
                 const ss = sc[0..idx];
-                self.addScopeForToken(ss, token, ascendant, exclusion) catch {};
+                try self.addScopeForToken(ss, token, ascendant, exclusion);
                 sc = sc[idx + 1 ..];
                 while (sc.len > 1 and sc[0] == ' ') sc = sc[1..];
             }
-            self.addScopeForToken(sc, token, ascendant, exclusion) catch {};
+            try self.addScopeForToken(sc, token, ascendant, exclusion);
             return;
         }
 
@@ -277,13 +277,13 @@ pub const Theme = struct {
                 if (asc.id == 0) {
                     asc = Atom.fromScopeName(ss, &self.atoms);
                 } else {
-                    self.addScopeForToken(ss, token, asc, exclusion) catch {};
+                    try self.addScopeForToken(ss, token, asc, exclusion);
                     return;
                 }
                 sc = sc[idx + 1 ..];
                 while (sc.len > 1 and sc[0] == ' ') sc = sc[1..];
             }
-            self.addScopeForToken(sc, token, asc, exclusion) catch {};
+            try self.addScopeForToken(sc, token, asc, exclusion);
             return;
         }
 
@@ -423,7 +423,7 @@ pub const Theme = struct {
         for (token_colors, 0..) |tokenColor, ti| {
             if (tokenColor.scope) |sc| {
                 for (sc) |scope_name| {
-                    theme.addScopeForToken(scope_name, &token_colors[ti], Atom{}, Atom{}) catch {};
+                    try theme.addScopeForToken(scope_name, &token_colors[ti], Atom{}, Atom{});
                 }
             }
         }
