@@ -35,11 +35,11 @@ pub const RenderProcessor = struct {
                     thm.getColor("foreground") orelse theme.Style{}).foreground_rgb,
                 // all colors in "colors" map will be in the foreground -> this is going to be a pitfall
                 .background_rgb = (thm.getColor("editor.background") orelse
-                    thm.getColor("background") orelse theme.Style{}).foreground_rgb, 
+                    thm.getColor("background") orelse theme.Style{}).foreground_rgb,
             };
             for (spans.items) |span| {
                 var style = default_style;
-                _ = thm.getSpanStyle(span.scopes, span.atoms, span.count, &style) catch {}; 
+                _ = thm.getSpanStyle(span.scopes, span.atoms, span.count, &style) catch {};
                 if (style.foreground_rgb) |fg| {
                     setColorRgb(stdout, fg) catch {};
                 }
@@ -47,14 +47,14 @@ pub const RenderProcessor = struct {
                     setBgColorRgb(stdout, bg) catch {};
                 }
                 // stdout.print("{s}", .{span.text}) catch {};
-                for(span.text) |ch| {
-                    switch(ch) {
+                for (span.text) |ch| {
+                    switch (ch) {
                         '\t' => {
-                           stdout.print("    ", .{}) catch {};
+                            stdout.print("    ", .{}) catch {};
                         },
-                        else =>  {
-                           stdout.print("{c}", .{ch}) catch {};
-                        }
+                        else => {
+                            stdout.print("{c}", .{ch}) catch {};
+                        },
                     }
                 }
                 resetColor(stdout) catch {};

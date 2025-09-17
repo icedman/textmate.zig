@@ -247,7 +247,7 @@ pub const Processor = struct {
                         }
 
                         if (span.count > 0) {
-                            if (span.atoms[span.count].id == span.atoms[span.count-1].id) continue;
+                            if (span.atoms[span.count].id == span.atoms[span.count - 1].id) continue;
                         }
 
                         span.count += 1;

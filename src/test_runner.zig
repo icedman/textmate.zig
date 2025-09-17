@@ -181,8 +181,9 @@ pub fn run_test_suit(allocator: std.mem.Allocator, base_path: []const u8, source
 
     const file = try std.fs.cwd().openFile(file_path, .{});
     defer file.close();
-    const file_size = (try file.stat()).size;
-    const file_contents = try file.readToEndAlloc(allocator, file_size);
+    // const file_size = (try file.stat()).size;
+    // const file_contents = try file.readToEndAlloc(allocator, file_size);
+    const file_contents = try std.fs.cwd().readFileAlloc(source_path, allocator, .limited(1 << 30));
     defer allocator.free(file_contents);
 
     const parsed = try std.json.parseFromSlice(std.json.Value, allocator, file_contents, .{ .ignore_unknown_fields = true });

@@ -20,10 +20,10 @@ pub fn build(b: *std.Build) void {
                 defer assets_buffer.deinit(bb.allocator);
 
                 const themes_path = try bb.build_root.join(bb.allocator, &.{"src/resources/themes"});
-                try res.generateEmbeddedThemesFile(bb.allocator, assets_buffer.writer(bb.allocator), "theme_", themes_path);
+                try res.generateEmbeddedThemesFile(bb.allocator, &assets_buffer, "theme_", themes_path);
 
                 const grammars_path = try bb.build_root.join(bb.allocator, &.{"src/resources/grammars"});
-                try res.generateEmbeddedGrammarsFile(bb.allocator, assets_buffer.writer(bb.allocator), "grammar_", grammars_path);
+                try res.generateEmbeddedGrammarsFile(bb.allocator, &assets_buffer, "grammar_", grammars_path);
 
                 const embed_path = try bb.cache_root.join(bb.allocator, &.{"embedded.zig"});
                 std.debug.print("{s}\n", .{embed_path});

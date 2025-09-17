@@ -45,8 +45,9 @@ pub fn getGrammarInfo(allocator: Allocator, path: []const u8, full_path: []const
 
     const file = try std.fs.cwd().openFile(full_path, .{});
     defer file.close();
-    const file_size = (try file.stat()).size;
-    const file_contents = try file.readToEndAlloc(allocator, file_size);
+    // const file_size = (try file.stat()).size;
+    // const file_contents = try file.readToEndAlloc(allocator, file_size);
+    const file_contents = try std.fs.cwd().readFileAlloc(full_path, allocator, .limited(1 << 30));
     defer allocator.free(file_contents);
 
     const parsed = try std.json.parseFromSlice(std.json.Value, allocator, file_contents, .{ .ignore_unknown_fields = true });
@@ -150,8 +151,9 @@ pub fn getThemeInfo(allocator: Allocator, path: []const u8, full_path: []const u
 
     const file = try std.fs.cwd().openFile(full_path, .{});
     defer file.close();
-    const file_size = (try file.stat()).size;
-    const file_contents = try file.readToEndAlloc(allocator, file_size);
+    // const file_size = (try file.stat()).size;
+    const file_contents = try std.fs.cwd().readFileAlloc(full_path, allocator, .limited(1 << 30));
+    // try file.readToEndAlloc(allocator, file_size);
     defer allocator.free(file_contents);
 
     const parsed = try std.json.parseFromSlice(std.json.Value, allocator, file_contents, .{ .ignore_unknown_fields = true });
@@ -207,7 +209,7 @@ pub fn addThemes(allocator: Allocator, path: []const u8, list: *std.ArrayList(Th
     try list.append(allocator, ti);
 }
 
-pub fn addTheme(allocator: Allocator, path: []const u8, list: *std.ArrayList(ThemeInfo)) !ThemeInfo{
+pub fn addTheme(allocator: Allocator, path: []const u8, list: *std.ArrayList(ThemeInfo)) !ThemeInfo {
     var gi = try getThemeInfo(allocator, path, path);
     gi.id = list.items.len + 1;
     try list.append(allocator, gi);
@@ -220,7 +222,7 @@ pub fn generateEmbeddedThemesFile(allocator: Allocator, writer: anytype, prefix:
     defer list.deinit(allocator);
     try listThemes(allocator, path, &list);
 
-    try writer.print("{s}", .{
+    try writer.print(allocator, "{s}", .{
         \\// This is a generated file. Do not edit manually
         \\const std = @import("std");
         \\const res = @import("resources.zig");
@@ -237,14 +239,14 @@ pub fn generateEmbeddedThemesFile(allocator: Allocator, writer: anytype, prefix:
         const nps = strings.toSlice([]const u8, np);
         var idx = (std.mem.indexOf(u8, nps, "src") orelse 0) + "src".len + 1;
         idx += (std.mem.indexOf(u8, nps[idx..], "resources") orelse 0) + "resources".len + 1;
-        try writer.print("const {s}{} = @embedFile(\"{s}\");\n", .{ prefix, embed_id, nps[idx..] });
+        try writer.print(allocator, "const {s}{} = @embedFile(\"{s}\");\n", .{ prefix, embed_id, nps[idx..] });
         embed_id += 1;
     }
 
     embed_id = 1;
 
     // try writer.print("\npub fn listThemes(allocator: Allocator, list: *std.ArrayList(ThemeInfo)) !void {c}\n", .{'{'});
-    try writer.print("{s}", .{
+    try writer.print(allocator, "{s}", .{
         \\
         \\pub fn listThemes(allocator: Allocator, list: *std.ArrayList(ThemeInfo)) !void {
         \\
@@ -253,17 +255,17 @@ pub fn generateEmbeddedThemesFile(allocator: Allocator, writer: anytype, prefix:
     for (list.items) |item| {
         const np: []const u8 = &item.name;
         const nps = strings.toSlice([]const u8, np);
-        try writer.print("    {c}\n", .{'{'});
-        try writer.print("        const bytes: []const u8 = {s}{}[0..{s}{}.len];\n", .{ prefix, embed_id, prefix, embed_id });
-        try writer.print("        var ti = ThemeInfo{c} .embedded_file = bytes {c};\n", .{ '{', '}' });
-        try writer.print("        @memcpy(ti.name[0..\"{s}\".len], \"{s}\");\n", .{ nps, nps });
-        try writer.print("        ti.id = list.items.len + 1;\n", .{});
-        try writer.print("        try list.append(allocator, ti);\n", .{});
-        try writer.print("    {c}\n", .{'}'});
+        try writer.print(allocator, "    {c}\n", .{'{'});
+        try writer.print(allocator, "        const bytes: []const u8 = {s}{}[0..{s}{}.len];\n", .{ prefix, embed_id, prefix, embed_id });
+        try writer.print(allocator, "        var ti = ThemeInfo{c} .embedded_file = bytes {c};\n", .{ '{', '}' });
+        try writer.print(allocator, "        @memcpy(ti.name[0..\"{s}\".len], \"{s}\");\n", .{ nps, nps });
+        try writer.print(allocator, "        ti.id = list.items.len + 1;\n", .{});
+        try writer.print(allocator, "        try list.append(allocator, ti);\n", .{});
+        try writer.print(allocator, "    {c}\n", .{'}'});
         embed_id += 1;
     }
 
-    try writer.print("{c}\n", .{'}'});
+    try writer.print(allocator, "{c}\n", .{'}'});
 }
 
 pub fn generateEmbeddedGrammarsFile(allocator: Allocator, writer: anytype, prefix: []const u8, path: []const u8) !void {
@@ -271,7 +273,7 @@ pub fn generateEmbeddedGrammarsFile(allocator: Allocator, writer: anytype, prefi
     defer list.deinit(allocator);
     try listGrammars(allocator, path, &list);
 
-    try writer.print("{s}", .{
+    try writer.print(allocator, "{s}", .{
         \\
         \\const GrammarInfo = res.GrammarInfo;
         \\
@@ -284,13 +286,13 @@ pub fn generateEmbeddedGrammarsFile(allocator: Allocator, writer: anytype, prefi
         const nps = strings.toSlice([]const u8, np);
         var idx = (std.mem.indexOf(u8, nps, "src") orelse 0) + "src".len + 1;
         idx += (std.mem.indexOf(u8, nps[idx..], "resources") orelse 0) + "resources".len + 1;
-        try writer.print("const {s}{} = @embedFile(\"{s}\");\n", .{ prefix, embed_id, nps[idx..] });
+        try writer.print(allocator, "const {s}{} = @embedFile(\"{s}\");\n", .{ prefix, embed_id, nps[idx..] });
         embed_id += 1;
     }
 
     embed_id = 1;
 
-    try writer.print("{s}", .{
+    try writer.print(allocator, "{s}", .{
         \\
         \\pub fn listGrammars(allocator: Allocator, list: *std.ArrayList(GrammarInfo)) !void {
         \\
@@ -300,34 +302,34 @@ pub fn generateEmbeddedGrammarsFile(allocator: Allocator, writer: anytype, prefi
         const nps = strings.toSlice([]const u8, np);
         const sp: []const u8 = &item.scope_name;
         const sps = strings.toSlice([]const u8, sp);
-        try writer.print("    {c}\n", .{'{'});
-        try writer.print("        const bytes: []const u8 = {s}{}[0..{s}{}.len];\n", .{ prefix, embed_id, prefix, embed_id });
-        try writer.print("        var gi = GrammarInfo{c} .embedded_file = bytes, .file_types_count = {}, .inject_to_count = {}, .inject_only = {} {c};\n", .{
+        try writer.print(allocator, "    {c}\n", .{'{'});
+        try writer.print(allocator, "        const bytes: []const u8 = {s}{}[0..{s}{}.len];\n", .{ prefix, embed_id, prefix, embed_id });
+        try writer.print(allocator, "        var gi = GrammarInfo{c} .embedded_file = bytes, .file_types_count = {}, .inject_to_count = {}, .inject_only = {} {c};\n", .{
             '{',
             item.file_types_count,
             item.inject_to_count,
             item.inject_only,
             '}',
         });
-        try writer.print("        @memcpy(gi.name[0..\"{s}\".len], \"{s}\");\n", .{ nps, nps });
-        try writer.print("        @memcpy(gi.scope_name[0..\"{s}\".len], \"{s}\");\n", .{ sps, sps });
+        try writer.print(allocator, "        @memcpy(gi.name[0..\"{s}\".len], \"{s}\");\n", .{ nps, nps });
+        try writer.print(allocator, "        @memcpy(gi.scope_name[0..\"{s}\".len], \"{s}\");\n", .{ sps, sps });
         for (0..item.file_types_count) |fi| {
             const fp: []const u8 = &item.file_types[fi];
             const fps = strings.toSlice([]const u8, fp);
-            try writer.print("        @memcpy(gi.file_types[{}][0..\"{s}\".len], \"{s}\");\n", .{ fi, fps, fps });
+            try writer.print(allocator, "        @memcpy(gi.file_types[{}][0..\"{s}\".len], \"{s}\");\n", .{ fi, fps, fps });
         }
         for (0..item.inject_to_count) |fi| {
             const fp: []const u8 = &item.inject_to[fi];
             const fps = strings.toSlice([]const u8, fp);
-            try writer.print("        @memcpy(gi.inject_to[{}][0..\"{s}\".len], \"{s}\");\n", .{ fi, fps, fps });
+            try writer.print(allocator, "        @memcpy(gi.inject_to[{}][0..\"{s}\".len], \"{s}\");\n", .{ fi, fps, fps });
         }
-        try writer.print("        gi.id = list.items.len + 1;\n", .{});
-        try writer.print("        try list.append(allocator, gi);\n", .{});
-        try writer.print("    {c}\n", .{'}'});
+        try writer.print(allocator, "        gi.id = list.items.len + 1;\n", .{});
+        try writer.print(allocator, "        try list.append(allocator, gi);\n", .{});
+        try writer.print(allocator, "    {c}\n", .{'}'});
         embed_id += 1;
     }
 
-    try writer.print("{c}\n", .{'}'});
+    try writer.print(allocator, "{c}\n", .{'}'});
 }
 
 test "get themes" {

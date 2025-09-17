@@ -219,8 +219,9 @@ pub const Theme = struct {
             return err;
         };
         defer file.close();
-        const file_size = (try file.stat()).size;
-        const file_contents = try file.readToEndAlloc(allocator, file_size);
+        // const file_size = (try file.stat()).size;
+        // const file_contents = try file.readToEndAlloc(allocator, file_size);
+        const file_contents = try std.fs.cwd().readFileAlloc(source_path, allocator, .limited(1 << 30));
         defer allocator.free(file_contents);
         return Theme.parse(allocator, file_contents);
     }

@@ -747,8 +747,9 @@ pub const Grammar = struct {
     pub fn init(allocator: Allocator, source_path: []const u8) !*Grammar {
         const file = try std.fs.cwd().openFile(source_path, .{});
         defer file.close();
-        const file_size = (try file.stat()).size;
-        const file_contents = try file.readToEndAlloc(allocator, file_size);
+        // const file_size = (try file.stat()).size;
+        // const file_contents = try file.readToEndAlloc(allocator, file_size);
+        const file_contents = try std.fs.cwd().readFileAlloc(source_path, allocator, .limited(1 << 30));
         defer allocator.free(file_contents);
         // TODO apply injectors
         return Grammar.parse(allocator, file_contents);
