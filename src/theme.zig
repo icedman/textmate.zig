@@ -214,11 +214,11 @@ pub const Theme = struct {
     };
 
     pub fn init(allocator: Allocator, source_path: []const u8) !*Theme {
-        const file = std.fs.cwd().openFile(source_path, .{}) catch |err| {
-            std.debug.print("unable to open {s}\n", .{source_path});
-            return err;
-        };
-        defer file.close();
+        // const file = std.fs.cwd().openFile(source_path, .{}) catch |err| {
+        //     std.debug.print("unable to open {s}\n", .{source_path});
+        //     return err;
+        // };
+        // defer file.close();
         // const file_size = (try file.stat()).size;
         // const file_contents = try file.readToEndAlloc(allocator, file_size);
         const file_contents = try std.fs.cwd().readFileAlloc(source_path, allocator, .limited(1 << 30));
