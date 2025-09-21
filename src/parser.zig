@@ -324,7 +324,7 @@ pub const Parser = struct {
     // regex level cache
     exec_cache: std.AutoHashMap(u64, Match),
     // matches at line parse - to watch endless loops
-    line_matches: std.ArrayList(Match),
+    begin_matches: std.ArrayList(Match),
 
     // runtime-compiled (with dynamic patterns) are save for sharing a (de)serialization
     regex_map: std.AutoHashMap(u64, grammar.Rule),
@@ -334,6 +334,7 @@ pub const Parser = struct {
 
     strings: StringsArena,
     transient_strings: StringsArena,
+    first_line: bool = false,
 
     // stats
     regex_execs: u32 = 0,
@@ -348,7 +349,7 @@ pub const Parser = struct {
             .lang = lang,
             .match_cache = std.AutoHashMap(u64, Match).init(allocator),
             .exec_cache = std.AutoHashMap(u64, Match).init(allocator),
-            .line_matches = try std.ArrayList(Match).initCapacity(allocator, 32),
+            .begin_matches = try std.ArrayList(Match).initCapacity(allocator, 32),
             .regex_map = std.AutoHashMap(u64, grammar.Rule).init(allocator),
             .strings = try StringsArena.init(allocator),
             .transient_strings = try StringsArena.init(allocator),
@@ -358,7 +359,7 @@ pub const Parser = struct {
     pub fn deinit(self: *Parser) void {
         self.match_cache.deinit();
         self.exec_cache.deinit();
-        self.line_matches.deinit(self.allocator);
+        self.begin_matches.deinit(self.allocator);
 
         var it = self.regex_map.iterator();
         while (it.next()) |kv| {
@@ -447,7 +448,10 @@ pub const Parser = struct {
 
             const reg = blk: {
                 var result: oni.Region = .{};
-                _ = @constCast(re).searchAdvanced(block, hard_start, hard_end, &result, .{}) catch |err| {
+                _ = @constCast(re).searchAdvanced(block, hard_start, hard_end, &result, .{
+                    .not_begin_string = !self.first_line,
+                    .not_end_string = (hard_start != hard_end and block[hard_end - 1] == '\n'),
+                }) catch |err| {
                     if (err == error.Mismatch) {
                         break :blk null; // return null instead
                     } else {
@@ -887,7 +891,7 @@ pub const Parser = struct {
     }
 
     fn isLooping(self: *Parser, match: Match) bool {
-        for (self.line_matches.items) |item| {
+        for (self.begin_matches.items) |item| {
             if (item.regex == match.regex and item.start == match.start and item.end == match.end) {
                 return true;
             }
@@ -896,7 +900,7 @@ pub const Parser = struct {
     }
 
     // feed the parser a source code line. It must be terminated by a newline character '\n'.
-    pub fn parseLine(self: *Parser, state: *ParseState, block: []const u8) !void {
+    pub fn parseLine(self: *Parser, state: *ParseState, block: []const u8, first_line: bool) !void {
         if (self.processor) |proc| proc.startLine(block);
 
         if (block.len > config.max_line_len) {
@@ -907,9 +911,10 @@ pub const Parser = struct {
         self.current_state = state;
         self.match_cache.clearRetainingCapacity();
         self.exec_cache.clearRetainingCapacity();
-        self.line_matches.clearRetainingCapacity();
+        self.begin_matches.clearRetainingCapacity();
 
         self.transient_strings.clear();
+        self.first_line = first_line;
 
         var start: usize = 0;
         var end = block.len;
@@ -947,7 +952,7 @@ pub const Parser = struct {
                     var end_match: Match = self.matchEnd(state, block, start, end);
                     var pattern_match: Match = Match{};
 
-                    if (end_match.count > 0 and end_match.start == start and end_match.end + 1 >= end) {
+                    if (!syn.apply_end_pattern_last and end_match.count > 0 and end_match.start == start and end_match.end + 1 >= end) {
                         // end match is prioritized, remove?
                     } else {
                         pattern_match = self.matchPatterns(syn, syn.patterns, block, start, end);
@@ -1031,7 +1036,7 @@ pub const Parser = struct {
                                         end = start_;
                                     }
 
-                                    try self.line_matches.append(self.allocator, pattern_match);
+                                    try self.begin_matches.append(self.allocator, pattern_match);
                                     // fail silently?
                                 }
 
@@ -1089,6 +1094,7 @@ pub const Parser = struct {
 
         if (self.processor) |proc| proc.endLine();
         self.current_state = null;
+        self.first_line = false;
     }
 
     // begin merely resets all stats

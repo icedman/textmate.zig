@@ -121,6 +121,7 @@ pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_p
         if (lines) |ll| {
             if (ll == .array) {
                 proc.startDocument();
+                var first_line = true;
                 for (ll.array.items) |l| {
                     collect.clearRetainingCapacity();
 
@@ -128,7 +129,8 @@ pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_p
                     lineSlice.clearRetainingCapacity();
                     try lineSlice.appendSlice(allocator, line);
                     try lineSlice.appendSlice(allocator, "\n");
-                    _ = try par.parseLine(&state, lineSlice.items);
+                    _ = try par.parseLine(&state, lineSlice.items, first_line);
+                    first_line = false;
                     try stdout.print("Line: {s} {}\n", .{ line, line.len });
 
                     const tokens = l.object.get("tokens").?.array;
@@ -183,7 +185,7 @@ pub fn run_test_suit(allocator: std.mem.Allocator, base_path: []const u8, source
     defer file.close();
     // const file_size = (try file.stat()).size;
     // const file_contents = try file.readToEndAlloc(allocator, file_size);
-    const file_contents = try std.fs.cwd().readFileAlloc(source_path, allocator, .limited(1 << 30));
+    const file_contents = try std.fs.cwd().readFileAlloc(file_path, allocator, .limited(1 << 30));
     defer allocator.free(file_contents);
 
     const parsed = try std.json.parseFromSlice(std.json.Value, allocator, file_contents, .{ .ignore_unknown_fields = true });
