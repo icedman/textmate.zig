@@ -22,10 +22,8 @@ pub const Rule = struct {
     regex: ?oni.Regex = null,
     has_references: bool = false, // \1 or $1
     is_anchored: bool = false, // \G
-    is_negative_anchored: bool = false, // !\G
+    is_anchor_assertion: bool = false, // "\G"
     is_anchored_at_start: bool = false, // \A
-    is_anchor_assertion: bool = false, // "\G" when the pattern is merely a \G
-    //
 
     valid: CompileResult = .Uncompiled,
     const CompileResult = enum {
@@ -162,7 +160,6 @@ pub const Syntax = struct {
                             // std.debug.print("error in parseSyntaxMap {s}\n", .{k});
                             return err;
                         };
-                        // std.debug.print("xxx {s}\n", .{k});
                         syntax.parent = parent;
                         try res.put(k, syntax);
                     } else if (v == .string) {
@@ -181,8 +178,24 @@ pub const Syntax = struct {
         const obj = json.object;
         var syntax = try allocator.create(Syntax);
         errdefer {
+            // const name = if (obj.get("name")) |v| v.string else "";
+            // const content_name = if (obj.get("contentName")) |v| v.string else "";
+            // const scope_name = if (obj.get("scopeName")) |v| v.string else "";
+            // std.debug.print("syntax init failed n:{s} c:{s} s:{s}\n", .{name, content_name, scope_name});
             syntax.deinit();
         }
+
+        // const include = obj.get("include");
+        // if (include) |path| {
+        //     syntax.* = Syntax{
+        //         .id = @intFromPtr(syntax),
+        //         .name = "",
+        //         .content_name = "",
+        //         .scope_name = "",
+        //         .include_path = try strings_arena.append(path.string),
+        //     };
+        //     return syntax;
+        // }
 
         syntax.* = Syntax{
             .id = @intFromPtr(syntax),
@@ -309,9 +322,6 @@ pub const Syntax = struct {
                     entry.rx_ptr.*.is_anchored = true;
                     if (regex.len == 2) {
                         entry.rx_ptr.*.is_anchor_assertion = true;
-                    }
-                    if (std.mem.indexOf(u8, regex, "!\\G")) |_| {
-                        entry.rx_ptr.*.is_negative_anchored = true;
                     }
                 }
                 if (Syntax.patternHasAnchor(regex, 'A')) {
@@ -735,8 +745,8 @@ pub const Grammar = struct {
     strings: StringsArena,
 
     pub fn init(allocator: Allocator, source_path: []const u8) !*Grammar {
-        // const file = try std.fs.cwd().openFile(source_path, .{});
-        // defer file.close();
+        const file = try std.fs.cwd().openFile(source_path, .{});
+        defer file.close();
         // const file_size = (try file.stat()).size;
         // const file_contents = try file.readToEndAlloc(allocator, file_size);
         const file_contents = try std.fs.cwd().readFileAlloc(source_path, allocator, .limited(1 << 30));

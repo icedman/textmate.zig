@@ -237,13 +237,11 @@ pub fn main() !void {
 
     proc.state = &state;
 
-    var first_line = true;
     while (reader.interface.streamDelimiter(&line_writer.writer, '\n')) |_| {
         try line_writer.writer.print("\n", .{});
         const slice: []u8 = line_writer.written();
         line_writer.clearRetainingCapacity();
-        _ = try par.parseLine(&state, slice, first_line);
-        first_line = false;
+        _ = try par.parseLine(&state, slice);
         line_no += 1;
         reader.interface.toss(1);
         // if (line_no > 30) break;
