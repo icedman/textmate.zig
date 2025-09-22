@@ -40,7 +40,6 @@ const Match = struct {
 
     // is this expensive to pass around (copy)
     ranges: [config.max_match_ranges]MatchRange = undefined,
-    // = [_]MatchRange{MatchRange{ .group = 0, .start = 0, .end = 0 }} ** config.max_match_ranges,
     count: u8 = 0,
 
     // this is just start and end of ranges[0]
@@ -51,7 +50,6 @@ const Match = struct {
     anchor_start: usize = 0,
     anchor_end: usize = 0,
 
-    // todo convert to ArrayList(u8) - slower but safer
     fn applyRef(
         self: *const Match,
         block: []const u8,
@@ -138,14 +136,19 @@ const Match = struct {
 // StateContext holds the context of a single character match is made for a Syntax
 // It is store only if the Syntax would require further matching with its children patterns
 // This should be serializable as this is what the parse state stack contains
-
-const StateContextPack = packed struct { syntax: u64, line: u32, anchor: u32, rx_while: u64, rx_end: u64 };
+const StateContextPack = packed struct {
+    syntax: u64,
+    anchor_start: u32,
+    start: u32,
+    rx_while: u64,
+    rx_end: u64,
+};
 const StateContext = struct {
     syntax: *Syntax,
 
     // The match position of the character relative to the line start
-    match_position: u32 = 0,
-    enter_position: u32 = 0,
+    anchor_start: u32 = 0,
+    start: u32 = 0,
 
     // Parser owns these at regex_map and responsible for oni.Regex.deinit not StateContext
     rx_while: Rule = Rule{},
@@ -153,13 +156,19 @@ const StateContext = struct {
 
     pub fn serialize(self: *StateContext, parser: *Parser) StateContextPack {
         _ = parser;
-        return .{ self.syntax.id, self.line, self.anchor, self.rx_while.id, self.rx_end.id };
+        return .{
+            self.syntax.id,
+            self.anchor_start,
+            self.start,
+            self.rx_while.id,
+            self.rx_end.id,
+        };
     }
 
     pub fn deserialize(self: *StateContext, parser: *Parser, serial: StateContextPack) !void {
         self.syntax = @ptrFromInt(serial.syntax);
-        self.line = serial.line;
-        self.anchor = serial.anchor;
+        self.anchor_start = serial.anchor_start;
+        self.start = serial.start;
         self.rx_end = parser.regex_map.get(serial.rx_end) orelse Rule{};
         self.rx_while = parser.regex_map.get(serial.rx_while) orelse Rule{};
     }
@@ -213,12 +222,10 @@ pub const ParseState = struct {
     }
 
     pub fn push(self: *ParseState, syntax: *Syntax, rx: *Rule, block: []const u8, match: Match, where: []const u8) !void {
-        const enter = match.anchor_start;
-        const anchor = match.start;
         var sc = StateContext{
             .syntax = syntax,
-            .enter_position = @intCast(enter),
-            .match_position = @intCast(anchor),
+            .anchor_start = @intCast(match.anchor_start),
+            .start = @intCast(match.start),
         };
 
         _ = rx;
@@ -380,14 +387,14 @@ pub const Parser = struct {
         return error.InvalidGrammar;
     }
 
-    fn getLastMatchPositions(self: *Parser) struct { usize, usize } {
+    fn getLastMatchPositions(self: *Parser) Match {
         if (self.current_state) |state| {
             const top = state.top();
             if (top) |t| {
-                return .{ t.enter_position, t.match_position };
+                return Match{ .anchor_start = t.anchor_start, .start = t.start };
             }
         }
-        return .{ 0, 0 };
+        return Match{};
     }
 
     // findMatch. Regular expression matching. This is where all the CPU usage goes.
@@ -400,13 +407,11 @@ pub const Parser = struct {
 
             syntax.execs += 1;
             self.regex_execs += 1;
-            var enter: usize = start;
             var hard_start: usize = start;
             if (rx.is_anchored) {
                 // \G in oniguruma means start of previous match
                 const last_match_pos = self.getLastMatchPositions();
-                enter = last_match_pos[0];
-                hard_start = last_match_pos[1];
+                hard_start = last_match_pos.start;
                 // hard_start = self.getCurrentAnchor();
 
                 // when pattern is merely "\\G", it is merely to re-assert matching at the last matched position
@@ -597,7 +602,7 @@ pub const Parser = struct {
                     break :blk null;
                 } orelse self.findMatch(syntax, &syntax.rx_begin, regex, block, start, end);
 
-                if (self.isLooping(m)) {
+                if (self.hasCycle(m)) {
                     // disqualify
                     return Match{};
                 }
@@ -890,7 +895,7 @@ pub const Parser = struct {
         }
     }
 
-    fn isLooping(self: *Parser, match: Match) bool {
+    fn hasCycle(self: *Parser, match: Match) bool {
         for (self.begin_matches.items) |item| {
             if (item.regex == match.regex and item.start == match.start and item.end == match.end) {
                 return true;
