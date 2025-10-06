@@ -100,6 +100,23 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(less_exe);
     const run_less_cmd = b.addRunArtifact(less_exe);
 
+    // Build export-module as a shared library for running via Lua
+
+    const lua_mod = b.createModule(.{
+        .root_source_file = b.path("src/lua_module.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    lua_mod.addImport("textmate_lib", lib_mod);
+    const lua_library = b.addLibrary(.{
+        .name = "lua_textmate",
+        .root_module = lua_mod,
+        .linkage = .dynamic,
+    });
+    lua_library.linkSystemLibrary("lua");
+    lua_library.linkSystemLibrary("luajit");
+    b.installArtifact(lua_library);
+    
     const test_runner_exe = b.addExecutable(.{
         .name = "test_runner",
         .root_module = test_runner_mod,
