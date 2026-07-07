@@ -20,13 +20,15 @@ pub const RenderHtmlProcessor = struct {
         var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
 
         if (self.theme) |thm| {
-            const default_color = thm.getColor("editor.background") orelse
-                thm.getColor("background");
-            if (default_color) |c| {
-                if (c.foreground) |fg| {
-                    stdout.print("<html><body style=\"background: {s};\"><span>", .{fg[0..7]}) catch {};
-                }
-            }
+            const bg_color = thm.getColor("editor.background") orelse
+                thm.getColor("background") orelse theme.Style{};
+            const fg_color = thm.getColor("editor.foreground") orelse
+                thm.getColor("foreground") orelse theme.Style{};
+
+            const bg = bg_color.foreground orelse "#1e1e1e";
+            const fg = fg_color.foreground orelse "#ffffff";
+
+            stdout.print("<html><body style=\"background: {s}; color: {s};\"><pre style=\"font-family: monospace; margin: 0;\">", .{ bg, fg }) catch {};
         }
 
         stdout.flush() catch {};
@@ -36,97 +38,61 @@ pub const RenderHtmlProcessor = struct {
         _ = self;
         var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
 
-        stdout.print("</body></html>", .{}) catch {};
+        stdout.writeAll("</pre></body></html>") catch {};
         stdout.flush() catch {};
+    }
+
+    fn writeEscaped(stdout: anytype, text: []const u8) void {
+        var last_idx: usize = 0;
+        for (text, 0..) |ch, i| {
+            const replacement = switch (ch) {
+                '&' => "&amp;",
+                '<' => "&lt;",
+                '>' => "&gt;",
+                '"' => "&quot;",
+                '\'' => "&#39;",
+                else => null,
+            };
+            if (replacement) |rep| {
+                if (i > last_idx) {
+                    _ = stdout.write(text[last_idx..i]) catch {};
+                }
+                _ = stdout.write(rep) catch {};
+                last_idx = i + 1;
+            }
+        }
+        if (text.len > last_idx) {
+            _ = stdout.write(text[last_idx..]) catch {};
+        }
     }
 
     pub fn endLine(self: *Processor) void {
         var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
-
-        var atoms: [4]Atom = [_]Atom{Atom{}} ** 4;
+        const spans = self.produce() catch @panic("unable to produce");
 
         if (self.theme) |thm| {
-            const captures = self.captures;
-            const block = self.block orelse "";
+            const default_style = theme.Style{
+                .foreground_rgb = (thm.getColor("editor.foreground") orelse
+                    thm.getColor("foreground") orelse theme.Style{}).foreground_rgb,
+                .background_rgb = (thm.getColor("editor.background") orelse
+                    thm.getColor("background") orelse theme.Style{}).foreground_rgb,
+            };
+            for (spans.items) |span| {
+                var style = default_style;
+                _ = thm.getSpanStyle(span.scopes, span.atoms, span.count, &style) catch {};
 
-            var color_stack: [32]Rgb = [_]Rgb{Rgb{}} ** 32;
-            var color_stack_idx: usize = 0;
-            var current_color = Rgb{};
-            var current_scope: []const u8 = "";
-
-            const default_color = thm.getColor("editor.foreground") orelse
-                thm.getColor("foreground");
-
-            if (default_color) |c| {
-                if (c.foreground_rgb) |fg| {
-                    color_stack[color_stack_idx] = fg;
-                    color_stack_idx += 1;
-                }
-            }
-
-            for (block, 0..) |ch, i| {
-                if (ch == '\n') break;
-                var cap: ParseCapture = ParseCapture{};
-                for (0..captures.items.len) |ci| {
-                    if (i == captures.items[ci].start) {
-                        cap = captures.items[ci];
-
-                        var colors = theme.Style{};
-                        atoms[0] = cap.atom;
-
-                        const scope = thm.getScope(cap.scope, &atoms, &colors);
-                        _ = scope;
-
-                        current_scope = cap.scope;
-
-                        // std.debug.print("{}? ", .{scope_name.len});
-
-                        // if (colors.foreground) |fgs| {
-                        //     std.debug.print("{s}\n", .{fgs});
-                        // }
-
-                        if (colors.foreground_rgb) |fg| {
-                            color_stack[color_stack_idx] = fg;
-                        } else {
-                            color_stack[color_stack_idx] = color_stack[color_stack_idx - 1];
-                        }
-
-                        color_stack_idx += 1;
-                    }
-                }
-
-                const top_color = color_stack[color_stack_idx - 1];
-                if (top_color.r != current_color.r or
-                    top_color.g != current_color.g or
-                    top_color.b != current_color.b)
-                {
-                    current_color = top_color;
-                    stdout.print("<span title=\"{s}\" style=\"color: rgb({},{},{});\">", .{ current_scope, top_color.r, top_color.g, top_color.b }) catch {};
-                }
-
-                // _ = ch;
-                if (ch == ' ') {
-                    stdout.print("&nbsp;", .{}) catch {};
-                } else if (ch == '\t') {
-                    stdout.print("&nbsp;&nbsp;&nbsp;", .{}) catch {};
+                if (style.foreground_rgb) |fg| {
+                    stdout.print("<span style=\"color: rgb({},{},{});\">", .{ fg.r, fg.g, fg.b }) catch {};
                 } else {
-                    stdout.print("{c}", .{ch}) catch {};
+                    stdout.writeAll("<span>") catch {};
                 }
 
-                for (0..captures.items.len) |ci| {
-                    if (i + 1 == captures.items[ci].end) {
-                        if (color_stack_idx > 1) {
-                            color_stack_idx -= 1;
-                        }
-                        current_color = Rgb{};
-                        stdout.print("</span>", .{}) catch {};
-                    }
-                }
+                writeEscaped(stdout, span.text);
+
+                stdout.writeAll("</span>") catch {};
             }
-
-            stdout.print("<br/>\n", .{}) catch {};
         } else {
-            stdout.print("theme is not set\n", .{}) catch {};
+            stdout.writeAll("theme is not set\n") catch {};
         }
 
         stdout.flush() catch {};
