@@ -124,11 +124,14 @@ const Match = struct {
     }
 
     pub fn dump(self: *const Match, block: []const u8) void {
+        _ = block;
         for (0..self.count) |i| {
             const r = self.ranges[i];
             const s = r.start;
             const e = r.end;
-            std.debug.print("{} {s}\n", .{ i, block[s..e] });
+            _ = s;
+            _ = e;
+            // std.debug.print("{} {s}\n", .{ i, block[s..e] });
         }
     }
 };
@@ -275,7 +278,7 @@ pub const ParseState = struct {
                                 sc.rx_while = r;
                             } else {
                                 sc.rx_while.compile(expr) catch {
-                                    std.debug.print("unable to compile {s} < {s}<\n", .{ regexs, expr });
+                                    // std.debug.print("unable to compile {s} < {s}<\n", .{ regexs, expr });
                                 };
                                 if (sc.rx_while.id > 0) {
                                     try self.owner.regex_map.put(sc.rx_while.id, sc.rx_while);
@@ -306,14 +309,15 @@ pub const ParseState = struct {
                 const ts = t.syntax;
                 const ls = ts.resolve(ts, t.syntax);
                 if (ls) |syn| {
-                    std.debug.print("{} {*} {s}\n", .{ i, syn, syn.getName() });
-                    if (syn.rx_match.expr) |r| {
-                        std.debug.print("  match: {s}\n", .{r});
-                    }
-                    if (syn.rx_begin.expr) |r| {
-                        std.debug.print("  begin: {s}\n", .{r});
-                        std.debug.print("  end: {s}\n", .{syn.rx_end.expr orelse ""});
-                    }
+                    _ = syn;
+                    // std.debug.print("{} {*} {s}\n", .{ i, syn, syn.getName() });
+                    // if (syn.rx_match.expr) |r| {
+                    //     std.debug.print("  match: {s}\n", .{r});
+                    // }
+                    // if (syn.rx_begin.expr) |r| {
+                    //     std.debug.print("  begin: {s}\n", .{r});
+                    //     std.debug.print("  end: {s}\n", .{syn.rx_end.expr orelse ""});
+                    // }
                 }
             }
         }
@@ -396,7 +400,7 @@ pub const Parser = struct {
     fn getAnchorPosition(self: *Parser) i32 {
         if (self.current_state) |state| {
             if (state.top()) |t| {
-                std.debug.print("getAnchorPosition top={s} anchor={}\n", .{ t.syntax.getName(), t.anchor_position });
+                // std.debug.print("getAnchorPosition top={s} anchor={}\n", .{ t.syntax.getName(), t.anchor_position });
                 return t.anchor_position;
             }
         }
@@ -766,7 +770,7 @@ pub const Parser = struct {
         const top = state.top();
         if (top) |t| {
             const syn = t.syntax;
-            std.debug.print("matchEnd state={*} top={s} t.anchor_position={}\n", .{ state, syn.getName(), t.anchor_position });
+            // std.debug.print("matchEnd state={*} top={s} t.anchor_position={}\n", .{ state, syn.getName(), t.anchor_position });
             self.current_anchor_position = t.anchor_position;
             {
                 var end_match: Match = blk: {
@@ -998,10 +1002,10 @@ pub const Parser = struct {
     pub fn parseLine(self: *Parser, state: *ParseState, block: []const u8, first_line: bool) !void {
         if (self.processor) |proc| proc.startLine(block);
 
-        std.debug.print("\n--- parseLine: '{s}' (len={}, first_line={}) state={*} ---\n", .{ block, block.len, first_line, state });
-        std.debug.print("Initial stack state:\n", .{});
-        state.dump();
-        std.debug.print("----------------------------------------\n", .{});
+        // std.debug.print("\n--- parseLine: '{s}' (len={}, first_line={}) state={*} ---\n", .{ block, block.len, first_line, state });
+        // std.debug.print("Initial stack state:\n", .{});
+        // state.dump();
+        // std.debug.print("----------------------------------------\n", .{});
 
         if (block.len > config.max_line_len) {
             if (self.processor) |proc| proc.endLine();

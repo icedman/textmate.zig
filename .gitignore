@@ -34,3 +34,5 @@ Desktop.ini
 *.diff
 
 *_.zig
+
+resources/
