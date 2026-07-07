@@ -720,6 +720,7 @@ pub const Parser = struct {
                                 .start = start,
                                 .end = start,
                                 .syntax = pop_ctx.syntax,
+                                .atom = pop_ctx.syntax.atom,
                                 .scope = name,
                             };
                             proc.closeTag(&c);
@@ -870,22 +871,21 @@ pub const Parser = struct {
             var c = Capture{
                 .start = match.start,
                 .end = match.end,
+                .syntax = @constCast(syntax),
             };
             var cscope = try ArrayList(u8).initCapacity(self.allocator, name.len + 24);
             defer cscope.deinit(self.allocator);
             if (try match.applyCaptures(block, name, &cscope, self.allocator) == 0) {
                 if (match.regex) |rx| {
                     if (config.enable_scope_atoms and !rx.has_references) {
-                        if (!rx.has_references) {
-                            if (self.atoms) |at| {
-                                if (syntax.atom.count == 0 and syntax.atom.id == 0) {
-                                    @constCast(syntax).atom.compute(name, at);
-                                    if (syntax.atom.id == 0) {
-                                        @constCast(syntax).atom.id = 1;
-                                    }
-                                    c.syntax = @constCast(syntax);
+                        if (self.atoms) |at| {
+                            if (syntax.atom.count == 0 and syntax.atom.id == 0) {
+                                @constCast(syntax).atom.compute(name, at);
+                                if (syntax.atom.id == 0) {
+                                    @constCast(syntax).atom.id = 1;
                                 }
                             }
+                            c.atom = syntax.atom;
                         }
                     }
                 }
@@ -914,6 +914,7 @@ pub const Parser = struct {
                     var c = Capture{
                         .start = range.start,
                         .end = range.end,
+                        .syntax = syn,
                     };
 
                     // theme is not interested in this
@@ -930,8 +931,8 @@ pub const Parser = struct {
                                         if (syn.atom.id == 0) {
                                             syn.atom.id = 1;
                                         }
-                                        c.syntax = syn;
                                     }
+                                    c.atom = syn.atom;
                                 }
                             }
                         }
@@ -969,12 +970,23 @@ pub const Parser = struct {
                                         var c = Capture{
                                             .start = range.start,
                                             .end = range.end,
+                                            .syntax = p,
                                         };
 
                                         var cscope = try ArrayList(u8).initCapacity(self.allocator, p.name.len + 24);
                                         defer cscope.deinit(self.allocator);
                                         if (try m.applyCaptures(block, p.name, &cscope, self.allocator) == 0) {
-                                            // TODO atom
+                                            if (config.enable_scope_atoms) {
+                                                if (self.atoms) |at| {
+                                                    if (p.atom.count == 0 and p.atom.id == 0) {
+                                                        p.atom.compute(p.getName(), at);
+                                                        if (p.atom.id == 0) {
+                                                            p.atom.id = 1;
+                                                        }
+                                                    }
+                                                    c.atom = p.atom;
+                                                }
+                                            }
                                         }
                                         c.scope = try self.transient_strings.appendUnique(cscope.items);
                                         proc.capture(&c);
@@ -1113,6 +1125,7 @@ pub const Parser = struct {
                                     .start = end_match.start,
                                     .end = end_match.end,
                                     .syntax = end_syn,
+                                    .atom = end_syn.atom,
                                     .scope = name,
                                 };
                                 proc.closeTag(&c);
@@ -1159,6 +1172,7 @@ pub const Parser = struct {
                                         .start = pattern_match.start,
                                         .end = pattern_match.end,
                                         .syntax = match_syn,
+                                        .atom = match_syn.atom,
                                         .scope = name,
                                     };
                                     proc.openTag(&c);

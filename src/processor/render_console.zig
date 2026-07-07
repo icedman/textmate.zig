@@ -46,16 +46,18 @@ pub const RenderProcessor = struct {
                 if (style.background_rgb) |bg| {
                     setBgColorRgb(stdout, bg) catch {};
                 }
-                // stdout.print("{s}", .{span.text}) catch {};
-                for (span.text) |ch| {
-                    switch (ch) {
-                        '\t' => {
-                            stdout.print("    ", .{}) catch {};
-                        },
-                        else => {
-                            stdout.print("{c}", .{ch}) catch {};
-                        },
+                var last_idx: usize = 0;
+                for (span.text, 0..) |ch, i| {
+                    if (ch == '\t') {
+                        if (i > last_idx) {
+                            stdout.writeAll(span.text[last_idx..i]) catch {};
+                        }
+                        stdout.writeAll("    ") catch {};
+                        last_idx = i + 1;
                     }
+                }
+                if (span.text.len > last_idx) {
+                    stdout.writeAll(span.text[last_idx..]) catch {};
                 }
                 resetColor(stdout) catch {};
             }
