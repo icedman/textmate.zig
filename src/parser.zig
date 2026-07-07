@@ -149,10 +149,12 @@ const StateContext = struct {
     // The match position of the character relative to the line start
     anchor_start: u32 = 0,
     start: u32 = 0,
+    zero_width_begin: bool = false,
 
     // Parser owns these at regex_map and responsible for oni.Regex.deinit not StateContext
     rx_while: Rule = Rule{},
     rx_end: Rule = Rule{},
+    anchor_position: i32 = -1,
 
     pub fn serialize(self: *StateContext, parser: *Parser) StateContextPack {
         _ = parser;
@@ -226,6 +228,8 @@ pub const ParseState = struct {
             .syntax = syntax,
             .anchor_start = @intCast(match.anchor_start),
             .start = @intCast(match.start),
+            .zero_width_begin = (match.start == match.end),
+            .anchor_position = @intCast(match.end),
         };
 
         _ = rx;
@@ -342,6 +346,8 @@ pub const Parser = struct {
     strings: StringsArena,
     transient_strings: StringsArena,
     first_line: bool = false,
+    cycle_detected: bool = false,
+    current_anchor_position: i32 = -1,
 
     // stats
     regex_execs: u32 = 0,
@@ -387,6 +393,16 @@ pub const Parser = struct {
         return error.InvalidGrammar;
     }
 
+    fn getAnchorPosition(self: *Parser) i32 {
+        if (self.current_state) |state| {
+            if (state.top()) |t| {
+                std.debug.print("getAnchorPosition top={s} anchor={}\n", .{ t.syntax.getName(), t.anchor_position });
+                return t.anchor_position;
+            }
+        }
+        return -1;
+    }
+
     fn getLastMatchPositions(self: *Parser) Match {
         if (self.current_state) |state| {
             const top = state.top();
@@ -399,7 +415,7 @@ pub const Parser = struct {
 
     // findMatch. Regular expression matching. This is where all the CPU usage goes.
     fn findMatch(self: *Parser, syntax: *Syntax, rx: *Rule, regex: ?oni.Regex, block: []const u8, start: usize, end: usize) Match {
-        // std.debug.print("findMatch {} [{s}] {s}\n", .{rx.id, block, rx.expr orelse ""});
+        std.debug.print("findMatch syntax='{s}' pattern='{s}' start={} end={} anchor_pos={}\n", .{ syntax.getName(), rx.expr orelse "", start, end, self.current_anchor_position });
 
         if (regex) |*re| {
             // check cache
@@ -407,16 +423,17 @@ pub const Parser = struct {
 
             syntax.execs += 1;
             self.regex_execs += 1;
-            var hard_start: usize = start;
+            const hard_start: usize = start;
+            const anchor_pos = self.current_anchor_position;
             if (rx.is_anchored) {
                 // \G in oniguruma means start of previous match
-                const last_match_pos = self.getLastMatchPositions();
-                hard_start = last_match_pos.start;
-                // hard_start = self.getCurrentAnchor();
 
                 // when pattern is merely "\\G", it is merely to re-assert matching at the last matched position
                 // in this case, simulate a successful match
                 if (rx.is_anchor_assertion) {
+                    if (anchor_pos == -1 or hard_start != @as(usize, @intCast(anchor_pos))) {
+                        return Match{};
+                    }
                     var m = Match{
                         .syntax = syntax,
                         .regex = rx,
@@ -430,39 +447,54 @@ pub const Parser = struct {
                     return m;
                 }
             }
-            if (rx.is_anchored_at_start) {
-                // \A in oniguruma means start of line
-                hard_start = 0;
-            }
             const hard_end: usize = end;
 
             if (rx.valid == .Valid and config.enable_exec_caching) {
-                should_cache = true;
-                if (self.exec_cache.get(rx.id)) |mm| {
-                    if (mm.anchor_start == hard_start and mm.start > hard_start) {
-                        // std.debug.print("findMatch cache {s} {} {}-{}\n", .{rx.expr orelse "", start, mm.start, mm.end});
-                        self.regex_skips += 1;
-                        return mm;
-                    }
-                    if (mm.anchor_start == hard_start and mm.count == 0) {
-                        self.regex_skips += 1;
-                        return mm;
+                should_cache = !rx.is_anchored and !rx.is_anchored_at_start;
+                if (should_cache) {
+                    if (self.exec_cache.get(rx.id)) |mm| {
+                        if (mm.anchor_start == hard_start and mm.start > hard_start) {
+                            // std.debug.print("findMatch cache {s} {} {}-{}\n", .{rx.expr orelse "", start, mm.start, mm.end});
+                            self.regex_skips += 1;
+                            return mm;
+                        }
+                        if (mm.anchor_start == hard_start and mm.count == 0) {
+                            self.regex_skips += 1;
+                            return mm;
+                        }
                     }
                 }
             }
 
+            const not_begin_pos = blk: {
+                if (rx.is_anchored) {
+                    break :blk (anchor_pos == -1 or hard_start != @as(usize, @intCast(anchor_pos)));
+                }
+                break :blk false;
+            };
+
             const reg = blk: {
                 var result: oni.Region = .{};
+                if (std.mem.eql(u8, rx.expr orelse "", "\\A") or std.mem.eql(u8, rx.expr orelse "", "^(?=\\s)")) {
+                    std.debug.print("findMatch query: pattern='{s}', first_line={}, not_begin_string={}, options_int={X}, expected={X}\n", .{rx.expr orelse "", self.first_line, !self.first_line, @as(oni.Option, .{ .not_begin_string = !self.first_line }).int(), oni.c.c.ONIG_OPTION_NOT_BEGIN_STRING});
+                }
                 _ = @constCast(re).searchAdvanced(block, hard_start, hard_end, &result, .{
                     .not_begin_string = !self.first_line,
                     .not_end_string = (hard_start != hard_end and block[hard_end - 1] == '\n'),
+                    .not_begin_position = not_begin_pos,
                 }) catch |err| {
                     if (err == error.Mismatch) {
+                        if (std.mem.eql(u8, rx.expr orelse "", "\\A") or std.mem.eql(u8, rx.expr orelse "", "^(?=\\s)")) {
+                            std.debug.print("findMatch query mismatch: pattern='{s}'\n", .{rx.expr orelse ""});
+                        }
                         break :blk null; // return null instead
                     } else {
                         return Match{};
                     }
                 };
+                if (std.mem.eql(u8, rx.expr orelse "", "\\A") or std.mem.eql(u8, rx.expr orelse "", "^(?=\\s)")) {
+                    std.debug.print("findMatch query MATCHED: pattern='{s}', range: {}-{}\n", .{rx.expr orelse "", result.starts()[0], result.ends()[0]});
+                }
                 break :blk result;
             };
 
@@ -523,7 +555,9 @@ pub const Parser = struct {
                 // }
 
                 if (should_cache and (m.count == 0 or (m.count > 0 and m.start > hard_start))) {
-                    self.exec_cache.put(rx.id, m) catch {};
+                    if (!rx.is_anchored and !rx.is_anchored_at_start) {
+                        self.exec_cache.put(rx.id, m) catch {};
+                    }
                 }
 
                 return m;
@@ -545,6 +579,7 @@ pub const Parser = struct {
     fn matchBegin(self: *Parser, syntax_: *Syntax, block: []const u8, start: usize, end: usize) Match {
         // guard against unresolved syntax being passed
         const syntax = @constCast(syntax_.resolve(syntax_, self.lang.syntax) orelse syntax_);
+        self.current_anchor_position = self.getAnchorPosition();
 
         // match
         if (syntax.rx_match.valid == .Valid) {
@@ -552,6 +587,9 @@ pub const Parser = struct {
                 // check of matching has been previously cached (for the same position in the buffer)
                 var should_cache = false;
                 const m = blk: {
+                    if (syntax.rx_match.is_anchored or syntax.rx_match.is_anchored_at_start) {
+                        break :blk null;
+                    }
                     const mm = self.match_cache.get(syntax.rx_match.id) orelse {
                         should_cache = true;
                         break :blk null;
@@ -572,8 +610,8 @@ pub const Parser = struct {
                 // }
 
                 if (should_cache and config.enable_match_caching and m.count == 0) {
-                    if (syntax.rx_match.id != 0)
-                        _ = self.match_cache.put(syntax.rx_match.id, m) catch {};
+                    if (syntax.rx_match.id != 0 and !syntax.rx_match.is_anchored and !syntax.rx_match.is_anchored_at_start)
+                         _ = self.match_cache.put(syntax.rx_match.id, m) catch {};
                 }
                 if (m.count > 0) {
                     return m;
@@ -587,6 +625,9 @@ pub const Parser = struct {
                 // check of matching has been previously cached (for the same position in the buffer)
                 var should_cache = false;
                 const m = blk: {
+                    if (syntax.rx_begin.is_anchored or syntax.rx_begin.is_anchored_at_start) {
+                        break :blk null;
+                    }
                     const mm = self.match_cache.get(syntax.rx_begin.id) orelse {
                         should_cache = true;
                         break :blk null;
@@ -608,7 +649,8 @@ pub const Parser = struct {
                 }
 
                 if (should_cache and config.enable_match_caching and m.count == 0) {
-                    _ = self.match_cache.put(syntax.rx_begin.id, m) catch {};
+                    if (!syntax.rx_begin.is_anchored and !syntax.rx_begin.is_anchored_at_start)
+                        _ = self.match_cache.put(syntax.rx_begin.id, m) catch {};
                 }
 
                 if (m.count > 0) {
@@ -629,50 +671,69 @@ pub const Parser = struct {
         return Match{};
     }
 
-    // TODO while matches could have captures
-    pub fn matchWhile(self: *Parser, state: *ParseState, block: []const u8) Match {
-        var last_match = Match{};
-        var state_depth = state.size();
+    pub fn matchWhile(self: *Parser, state: *ParseState, block: []const u8) !Match {
         var start: usize = 0;
         const end = block.len;
-        while (state_depth > 1) : (state_depth -= 1) {
-            const top = state.at(state_depth - 1);
-            if (top) |t| {
-                const ts = t.syntax;
-                const ls = ts.resolve(ts, self.lang.syntax);
-                if (ls) |syn| {
-                    if (ts.rx_while.expr != null) {
-                        const m: Match = blk: {
-                            if (t.rx_while.valid == .Valid) {
-                                // use dynamic while_regex here if one was compiled
-                                // not caching or result in this case
-                                // TODO caching is possible though
-                                const m = self.findMatch(@constCast(syn), @constCast(&syn.rx_while), t.rx_while.regex, block, start, end);
-                                break :blk m;
-                            }
-                            // while_match without caching
-                            if (syn.rx_while.regex) |r| {
-                                const m = self.findMatch(@constCast(syn), @constCast(&syn.rx_while), r, block, start, end);
-                                break :blk m;
-                            }
-                            break :blk Match{ .count = 1 };
-                        };
+        var i: usize = 1;
+        var last_successful_match = Match{};
 
-                        if (m.count == 0) {
-                            // std.debug.print("pop {s} [{s}]\n", .{ syn.rx_while.expr orelse "", block });
-                            while (state.size() >= state_depth) {
-                                state.pop("matchWhile");
-                            }
-                            last_match = m;
-                            start = m.end;
-                            // return m;
-                            // return @constCast(syn);
-                        }
+        while (i < state.stack.items.len) {
+            const ctx = &state.stack.items[i];
+            const syn = ctx.syntax;
+            const ls = syn.resolve(syn, self.lang.syntax) orelse syn;
+
+            if (ls.rx_while.expr != null) {
+                ctx.anchor_position = @intCast(start);
+                self.current_anchor_position = ctx.anchor_position;
+                const m: Match = blk: {
+                    if (ctx.rx_while.valid == .Valid) {
+                        break :blk self.findMatch(@constCast(ls), @constCast(&ls.rx_while), ctx.rx_while.regex, block, start, end);
                     }
+                    if (ls.rx_while.regex) |r| {
+                        break :blk self.findMatch(@constCast(ls), @constCast(&ls.rx_while), r, block, start, end);
+                    }
+                    break :blk Match{ .count = 1, .start = start, .end = start };
+                };
+
+                if (m.count == 0) {
+                    while (state.stack.items.len > i) {
+                        const pop_ctx = state.stack.items[state.stack.items.len - 1];
+                        if (self.processor) |proc| {
+                            const name = pop_ctx.syntax.getName();
+                            var c = ParseCapture{
+                                .start = start,
+                                .end = start,
+                                .syntax = pop_ctx.syntax,
+                                .scope = name,
+                            };
+                            proc.closeTag(&c);
+                        }
+                        state.pop("matchWhile");
+                    }
+                    break;
+                } else {
+                    if (ls.while_captures) |*while_cap| {
+                        try self.collectCaptures(&m, while_cap, block);
+                    } else if (ls.captures) |*cap| {
+                        try self.collectCaptures(&m, cap, block);
+                    }
+
+                    ctx.start = @intCast(m.end);
+                    ctx.anchor_start = @intCast(m.start);
+
+                    start = m.end;
+                    last_successful_match = m;
+                    i += 1;
                 }
+            } else {
+                i += 1;
             }
         }
-        return last_match;
+
+        if (start > 0) {
+            return last_successful_match;
+        }
+        return Match{};
     }
 
     /// TODO matchEnd must also be cached. Also, some end expressions are similar (should also be cached)
@@ -693,8 +754,10 @@ pub const Parser = struct {
         const top = state.top();
         if (top) |t| {
             const syn = t.syntax;
+            std.debug.print("matchEnd state={*} top={s} t.anchor_position={}\n", .{ state, syn.getName(), t.anchor_position });
+            self.current_anchor_position = t.anchor_position;
             {
-                const end_match: Match = blk: {
+                var end_match: Match = blk: {
                     if (t.rx_end.valid == .Valid) {
                         // use dynamic end_regex here if one was compiled
                         // not caching or result in this case
@@ -706,6 +769,9 @@ pub const Parser = struct {
                     // end_match with caching
                     var should_cache = false;
                     const m = inner_blk: {
+                        if (syn.rx_end.is_anchored or syn.rx_end.is_anchored_at_start) {
+                            break :inner_blk null;
+                        }
                         const mm = self.match_cache.get(syn.rx_end.id) orelse {
                             should_cache = true;
                             break :inner_blk null;
@@ -722,11 +788,15 @@ pub const Parser = struct {
                     } orelse self.findMatch(@constCast(syn), @constCast(&syn.rx_end), syn.rx_end.regex, block, start, end);
 
                     if (should_cache and config.enable_end_caching) {
-                        _ = self.match_cache.put(syn.rx_end.id, m) catch {};
+                        if (!syn.rx_end.is_anchored and !syn.rx_end.is_anchored_at_start)
+                            _ = self.match_cache.put(syn.rx_end.id, m) catch {};
                     }
 
                     break :blk m;
                 };
+                if (t.zero_width_begin and end_match.count > 0 and end_match.start == t.start and end_match.end == t.start) {
+                    end_match.count = 0;
+                }
                 if (end_match.count > 0) {
                     return end_match;
                 }
@@ -865,6 +935,7 @@ pub const Parser = struct {
                         if (rx.regex) |regex| {
                             // std.debug.print(">> {s} <<\n", .{p.rx_match.expr orelse ""});
                             // std.debug.print(">> {s} <<\n", .{block[ps..pe]});
+                            self.current_anchor_position = @intCast(ps);
                             const m = self.findMatch(p, &p.rx_match, regex, block, ps, pe);
                             if (m.count > 0) {
                                 // std.debug.print("count {}\n", .{m.count});
@@ -898,6 +969,7 @@ pub const Parser = struct {
     fn hasCycle(self: *Parser, match: Match) bool {
         for (self.begin_matches.items) |item| {
             if (item.regex == match.regex and item.start == match.start and item.end == match.end) {
+                self.cycle_detected = true;
                 return true;
             }
         }
@@ -908,9 +980,21 @@ pub const Parser = struct {
     pub fn parseLine(self: *Parser, state: *ParseState, block: []const u8, first_line: bool) !void {
         if (self.processor) |proc| proc.startLine(block);
 
+        std.debug.print("\n--- parseLine: '{s}' (len={}, first_line={}) state={*} ---\n", .{ block, block.len, first_line, state });
+        std.debug.print("Initial stack state:\n", .{});
+        state.dump();
+        std.debug.print("----------------------------------------\n", .{});
+
         if (block.len > config.max_line_len) {
             if (self.processor) |proc| proc.endLine();
             return;
+        }
+
+        for (state.stack.items) |*sc| {
+            sc.anchor_position = -1;
+        }
+        for (state.stack.items) |sc| {
+            std.debug.print("DEBUG STACK: {s} anchor={}\n", .{ sc.syntax.getName(), sc.anchor_position });
         }
 
         self.current_state = state;
@@ -920,6 +1004,7 @@ pub const Parser = struct {
 
         self.transient_strings.clear();
         self.first_line = first_line;
+        self.cycle_detected = false;
 
         var start: usize = 0;
         var end = block.len;
@@ -929,7 +1014,7 @@ pub const Parser = struct {
 
         // handle while
         // todo track while count
-        const while_match = self.matchWhile(state, block);
+        const while_match = try self.matchWhile(state, block);
         if (while_match.count > 0) {
             start = while_match.end;
         }
@@ -961,6 +1046,9 @@ pub const Parser = struct {
                         // end match is prioritized, remove?
                     } else {
                         pattern_match = self.matchPatterns(syn, syn.patterns, block, start, end);
+                        if (self.cycle_detected) {
+                            break;
+                        }
                     }
 
                     // patter match prevails over end ...
@@ -1085,9 +1173,13 @@ pub const Parser = struct {
                     break;
                 }
 
-                // endless loop?
-                if (last_start == end and last_syntax == ts.id and last_stack_size == state.size()) {
-                    end += 1;
+                if (start_ == end) {
+                    if (state.size() == last_stack_size) {
+                        if (state.size() > 1) {
+                            _ = state.pop("zeroWidthLoop");
+                        }
+                        break;
+                    }
                 }
 
                 last_syntax = ts.id;
@@ -1136,8 +1228,8 @@ test "test references" {
     m.ranges[1].group = 2;
     m.ranges[1].start = 3;
     m.ranges[1].end = 5;
-    var output = ArrayList(u8).initCapacity(std.testing.allocator, 64);
-    defer output.deinit();
+    var output = try ArrayList(u8).initCapacity(std.testing.allocator, 64);
+    defer output.deinit(std.testing.allocator);
     _ = try m.applyReferences(block, "hello \\1 world \\2.", &output, std.testing.allocator);
 
     const expectedOutput = "hello ab world de.";

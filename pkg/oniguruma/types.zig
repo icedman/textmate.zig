@@ -65,6 +65,8 @@ pub const Option = packed struct(c_uint) {
     noteol: bool = false,
     posix_region: bool = false,
     check_validity_of_string: bool = false,
+    _pad1: bool = false,
+    _pad2: bool = false,
     // compile time
     ignorecase_is_ascii: bool = false,
     word_is_ascii: bool = false,
@@ -80,17 +82,38 @@ pub const Option = packed struct(c_uint) {
     callback_each_match: bool = false,
     match_whole_string: bool = false,
 
-    _padding: u7 = 0,
+    _padding: u5 = 0,
 
     pub fn int(self: Option) c_uint {
         return @bitCast(self);
     }
-
-    test "order" {
-        const testing = std.testing;
-        const opt: Option = .{ .extend = true };
-        try testing.expectEqual(c.ONIG_OPTION_EXTEND, opt.int());
-    }
 };
 
-test {}
+test "order" {
+    std.debug.print("\nONIG_OPTION_IGNORECASE: {X}\n", .{c.ONIG_OPTION_IGNORECASE});
+    std.debug.print("ONIG_OPTION_EXTEND: {X}\n", .{c.ONIG_OPTION_EXTEND});
+    std.debug.print("ONIG_OPTION_MULTILINE: {X}\n", .{c.ONIG_OPTION_MULTILINE});
+    std.debug.print("ONIG_OPTION_SINGLELINE: {X}\n", .{c.ONIG_OPTION_SINGLELINE});
+    std.debug.print("ONIG_OPTION_FIND_LONGEST: {X}\n", .{c.ONIG_OPTION_FIND_LONGEST});
+    std.debug.print("ONIG_OPTION_FIND_NOT_EMPTY: {X}\n", .{c.ONIG_OPTION_FIND_NOT_EMPTY});
+    std.debug.print("ONIG_OPTION_NEGATE_SINGLELINE: {X}\n", .{c.ONIG_OPTION_NEGATE_SINGLELINE});
+    std.debug.print("ONIG_OPTION_DONT_CAPTURE_GROUP: {X}\n", .{c.ONIG_OPTION_DONT_CAPTURE_GROUP});
+    std.debug.print("ONIG_OPTION_CAPTURE_GROUP: {X}\n", .{c.ONIG_OPTION_CAPTURE_GROUP});
+    std.debug.print("ONIG_OPTION_NOTBOL: {X}\n", .{c.ONIG_OPTION_NOTBOL});
+    std.debug.print("ONIG_OPTION_NOTEOL: {X}\n", .{c.ONIG_OPTION_NOTEOL});
+    std.debug.print("ONIG_OPTION_POSIX_REGION: {X}\n", .{c.ONIG_OPTION_POSIX_REGION});
+    std.debug.print("ONIG_OPTION_CHECK_VALIDITY_OF_STRING: {X}\n", .{c.ONIG_OPTION_CHECK_VALIDITY_OF_STRING});
+    std.debug.print("ONIG_OPTION_IGNORECASE_IS_ASCII: {X}\n", .{c.ONIG_OPTION_IGNORECASE_IS_ASCII});
+    std.debug.print("ONIG_OPTION_WORD_IS_ASCII: {X}\n", .{c.ONIG_OPTION_WORD_IS_ASCII});
+    std.debug.print("ONIG_OPTION_DIGIT_IS_ASCII: {X}\n", .{c.ONIG_OPTION_DIGIT_IS_ASCII});
+    std.debug.print("ONIG_OPTION_SPACE_IS_ASCII: {X}\n", .{c.ONIG_OPTION_SPACE_IS_ASCII});
+    std.debug.print("ONIG_OPTION_POSIX_IS_ASCII: {X}\n", .{c.ONIG_OPTION_POSIX_IS_ASCII});
+    std.debug.print("ONIG_OPTION_TEXT_SEGMENT_EXTENDED_GRAPHEME_CLUSTER: {X}\n", .{c.ONIG_OPTION_TEXT_SEGMENT_EXTENDED_GRAPHEME_CLUSTER});
+    std.debug.print("ONIG_OPTION_TEXT_SEGMENT_WORD: {X}\n", .{c.ONIG_OPTION_TEXT_SEGMENT_WORD});
+    std.debug.print("ONIG_OPTION_NOT_BEGIN_STRING: {X}\n", .{c.ONIG_OPTION_NOT_BEGIN_STRING});
+    std.debug.print("ONIG_OPTION_NOT_END_STRING: {X}\n", .{c.ONIG_OPTION_NOT_END_STRING});
+    std.debug.print("ONIG_OPTION_NOT_BEGIN_POSITION: {X}\n", .{c.ONIG_OPTION_NOT_BEGIN_POSITION});
+    std.debug.print("ONIG_OPTION_CALLBACK_EACH_MATCH: {X}\n", .{c.ONIG_OPTION_CALLBACK_EACH_MATCH});
+    std.debug.print("ONIG_OPTION_MATCH_WHOLE_STRING: {X}\n", .{c.ONIG_OPTION_MATCH_WHOLE_STRING});
+    try std.testing.expect(false); // force print
+}

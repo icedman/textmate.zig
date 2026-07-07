@@ -132,6 +132,7 @@ pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_p
                     _ = try par.parseLine(&state, lineSlice.items, first_line);
                     first_line = false;
                     try stdout.print("Line: {s} {}\n", .{ line, line.len });
+                    proc.dump();
 
                     const tokens = l.object.get("tokens").?.array;
                     var idx: usize = 0;

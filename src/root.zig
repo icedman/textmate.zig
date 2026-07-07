@@ -35,3 +35,7 @@ pub const RenderHtmlProcessor = processor.RenderHtmlProcessor;
 pub const AnsiTerminal = util;
 
 const testing = std.testing;
+
+test {
+    testing.refAllDecls(@This());
+}

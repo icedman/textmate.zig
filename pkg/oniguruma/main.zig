@@ -13,6 +13,7 @@ pub const Encoding = types.Encoding;
 pub const Regex = regex.Regex;
 pub const Region = region.Region;
 pub const Syntax = types.Syntax;
+pub const Option = types.Option;
 
 test {
     @import("std").testing.refAllDecls(@This());
