@@ -149,6 +149,7 @@ pub fn build(b: *std.Build) void {
     if (b.args) |args| {
         run_cat_cmd.addArgs(args);
         run_less_cmd.addArgs(args);
+        run_test_runner_cmd.addArgs(args);
     }
 
     // This creates a build step. It will be visible in the `zig build --help` menu,

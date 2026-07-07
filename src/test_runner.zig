@@ -26,7 +26,7 @@ var line_tests: usize = 0;
 var line_tests_passed: usize = 0;
 var line_tests_failed: usize = 0;
 
-const end_on_fail = false;
+var end_on_fail = false;
 
 fn compare_tokens(hay: *ArrayList([]const u8), needles: std.json.Value) bool {
     var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
@@ -273,9 +273,19 @@ pub fn main() !void {
 
     const allocator = gpa.allocator();
 
-    _ = try run_test_suit(allocator, "data/test-cases/first-mate", "tests.json");
-    _ = try run_test_suit(allocator, "data/test-cases/suite1", "tests.json");
-    _ = try run_test_suit(allocator, "data/test-cases/suite1", "whileTests.json");
+    var args = std.process.args();
+    _ = args.next(); // skip binary name
+    while (args.next()) |arg| {
+        if (std.mem.eql(u8, arg, "--end-on-fail") or std.mem.eql(u8, arg, "-e")) {
+            end_on_fail = true;
+        }
+    }
+
+    if (try run_test_suit(allocator, "data/test-cases/first-mate", "tests.json")) {
+        if (try run_test_suit(allocator, "data/test-cases/suite1", "tests.json")) {
+            _ = try run_test_suit(allocator, "data/test-cases/suite1", "whileTests.json");
+        }
+    }
     // try run_theme_library(allocator);
     // try run_grammar_library(allocator);
 
