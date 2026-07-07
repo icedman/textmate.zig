@@ -415,9 +415,12 @@ pub const Parser = struct {
 
     // findMatch. Regular expression matching. This is where all the CPU usage goes.
     fn findMatch(self: *Parser, syntax: *Syntax, rx: *Rule, regex: ?oni.Regex, block: []const u8, start: usize, end: usize) Match {
-        std.debug.print("findMatch syntax='{s}' pattern='{s}' start={} end={} anchor_pos={}\n", .{ syntax.getName(), rx.expr orelse "", start, end, self.current_anchor_position });
+        // std.debug.print("findMatch syntax='{s}' pattern='{s}' start={} end={} anchor_pos={}\n", .{ syntax.getName(), rx.expr orelse "", start, end, self.current_anchor_position });
 
         if (regex) |*re| {
+            if (rx.is_anchored_at_start and !self.first_line) {
+                return Match{};
+            }
             // check cache
             var should_cache = false;
 
@@ -456,11 +459,17 @@ pub const Parser = struct {
                         if (mm.anchor_start == hard_start and mm.start > hard_start) {
                             // std.debug.print("findMatch cache {s} {} {}-{}\n", .{rx.expr orelse "", start, mm.start, mm.end});
                             self.regex_skips += 1;
-                            return mm;
+                            var res = mm;
+                            res.syntax = syntax;
+                            res.regex = rx;
+                            return res;
                         }
                         if (mm.anchor_start == hard_start and mm.count == 0) {
                             self.regex_skips += 1;
-                            return mm;
+                            var res = mm;
+                            res.syntax = syntax;
+                            res.regex = rx;
+                            return res;
                         }
                     }
                 }
@@ -475,26 +484,17 @@ pub const Parser = struct {
 
             const reg = blk: {
                 var result: oni.Region = .{};
-                if (std.mem.eql(u8, rx.expr orelse "", "\\A") or std.mem.eql(u8, rx.expr orelse "", "^(?=\\s)")) {
-                    std.debug.print("findMatch query: pattern='{s}', first_line={}, not_begin_string={}, options_int={X}, expected={X}\n", .{rx.expr orelse "", self.first_line, !self.first_line, @as(oni.Option, .{ .not_begin_string = !self.first_line }).int(), oni.c.c.ONIG_OPTION_NOT_BEGIN_STRING});
-                }
                 _ = @constCast(re).searchAdvanced(block, hard_start, hard_end, &result, .{
-                    .not_begin_string = !self.first_line,
+                    .not_begin_string = false,
                     .not_end_string = (hard_start != hard_end and block[hard_end - 1] == '\n'),
                     .not_begin_position = not_begin_pos,
                 }) catch |err| {
                     if (err == error.Mismatch) {
-                        if (std.mem.eql(u8, rx.expr orelse "", "\\A") or std.mem.eql(u8, rx.expr orelse "", "^(?=\\s)")) {
-                            std.debug.print("findMatch query mismatch: pattern='{s}'\n", .{rx.expr orelse ""});
-                        }
                         break :blk null; // return null instead
                     } else {
                         return Match{};
                     }
                 };
-                if (std.mem.eql(u8, rx.expr orelse "", "\\A") or std.mem.eql(u8, rx.expr orelse "", "^(?=\\s)")) {
-                    std.debug.print("findMatch query MATCHED: pattern='{s}', range: {}-{}\n", .{rx.expr orelse "", result.starts()[0], result.ends()[0]});
-                }
                 break :blk result;
             };
 
@@ -579,7 +579,7 @@ pub const Parser = struct {
     fn matchBegin(self: *Parser, syntax_: *Syntax, block: []const u8, start: usize, end: usize) Match {
         // guard against unresolved syntax being passed
         const syntax = @constCast(syntax_.resolve(syntax_, self.lang.syntax) orelse syntax_);
-        self.current_anchor_position = self.getAnchorPosition();
+        self.current_anchor_position = @intCast(start);
 
         // match
         if (syntax.rx_match.valid == .Valid) {
@@ -596,11 +596,17 @@ pub const Parser = struct {
                     };
                     if (mm.anchor_start <= start and mm.start >= start) {
                         self.regex_skips += 1;
-                        break :blk mm;
+                        var res = mm;
+                        res.syntax = syntax;
+                        res.regex = &syntax.rx_match;
+                        break :blk res;
                     }
                     if (mm.anchor_start <= start and mm.count == 0) {
                         self.regex_skips += 1;
-                        break :blk mm;
+                        var res = mm;
+                        res.syntax = syntax;
+                        res.regex = &syntax.rx_match;
+                        break :blk res;
                     }
                     break :blk null;
                 } orelse self.findMatch(syntax, &syntax.rx_match, regex, block, start, end);
@@ -634,11 +640,17 @@ pub const Parser = struct {
                     };
                     if (mm.anchor_start <= start and mm.start >= start) {
                         self.regex_skips += 1;
-                        break :blk mm;
+                        var res = mm;
+                        res.syntax = syntax;
+                        res.regex = &syntax.rx_begin;
+                        break :blk res;
                     }
                     if (mm.anchor_start <= start and mm.count == 0) {
                         self.regex_skips += 1;
-                        break :blk mm;
+                        var res = mm;
+                        res.syntax = syntax;
+                        res.regex = &syntax.rx_begin;
+                        break :blk res;
                     }
                     break :blk null;
                 } orelse self.findMatch(syntax, &syntax.rx_begin, regex, block, start, end);
@@ -778,11 +790,17 @@ pub const Parser = struct {
                         };
                         if (mm.anchor_start <= start and mm.start >= start) {
                             self.regex_skips += 1;
-                            break :inner_blk mm;
+                            var res = mm;
+                            res.syntax = @constCast(syn);
+                            res.regex = &syn.rx_end;
+                            break :inner_blk res;
                         }
                         if (mm.anchor_start <= start and mm.count == 0) {
                             self.regex_skips += 1;
-                            break :inner_blk mm;
+                            var res = mm;
+                            res.syntax = @constCast(syn);
+                            res.regex = &syn.rx_end;
+                            break :inner_blk res;
                         }
                         break :inner_blk null;
                     } orelse self.findMatch(@constCast(syn), @constCast(&syn.rx_end), syn.rx_end.regex, block, start, end);
@@ -992,9 +1010,7 @@ pub const Parser = struct {
 
         for (state.stack.items) |*sc| {
             sc.anchor_position = -1;
-        }
-        for (state.stack.items) |sc| {
-            std.debug.print("DEBUG STACK: {s} anchor={}\n", .{ sc.syntax.getName(), sc.anchor_position });
+            sc.zero_width_begin = false;
         }
 
         self.current_state = state;
