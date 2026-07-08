@@ -6,6 +6,117 @@ const atoms = @import("atoms.zig");
 const config = @import("config.zig");
 const processor = @import("processor/processor.zig");
 
+fn matchesScope(scopes: []const []const u8, target: []const u8) bool {
+    for (scopes) |s| {
+        if (std.mem.startsWith(u8, s, target)) {
+            if (s.len == target.len or s[target.len] == '.') {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+const SelectorEvaluator = struct {
+    scopes: []const []const u8,
+    expr: []const u8,
+    pos: usize = 0,
+
+    fn init(scopes: []const []const u8, expr: []const u8) SelectorEvaluator {
+        return .{ .scopes = scopes, .expr = expr };
+    }
+
+    fn skipWhitespace(self: *SelectorEvaluator) void {
+        while (self.pos < self.expr.len and (self.expr[self.pos] == ' ' or self.expr[self.pos] == '\t')) {
+            self.pos += 1;
+        }
+    }
+
+    fn parsePrimary(self: *SelectorEvaluator) bool {
+        self.skipWhitespace();
+        if (self.pos >= self.expr.len) return false;
+
+        if (self.expr[self.pos] == '(') {
+            self.pos += 1;
+            const res = self.parseOr();
+            self.skipWhitespace();
+            if (self.pos < self.expr.len and self.expr[self.pos] == ')') {
+                self.pos += 1;
+            }
+            return res;
+        }
+
+        const start = self.pos;
+        while (self.pos < self.expr.len) {
+            const ch = self.expr[self.pos];
+            if (std.ascii.isAlphanumeric(ch) or ch == '.' or ch == '-' or ch == '_') {
+                self.pos += 1;
+            } else {
+                break;
+            }
+        }
+        if (start == self.pos) return false;
+        const scope_name = self.expr[start..self.pos];
+        return matchesScope(self.scopes, scope_name);
+    }
+
+    fn parseOr(self: *SelectorEvaluator) bool {
+        var res = self.parseAnd();
+        while (true) {
+            self.skipWhitespace();
+            if (self.pos < self.expr.len and self.expr[self.pos] == '|') {
+                self.pos += 1;
+                const right = self.parseAnd();
+                res = res or right;
+            } else {
+                break;
+            }
+        }
+        return res;
+    }
+
+    fn parseAnd(self: *SelectorEvaluator) bool {
+        var res = self.parsePrimary();
+        while (true) {
+            self.skipWhitespace();
+            if (self.pos >= self.expr.len) break;
+            const ch = self.expr[self.pos];
+            if (ch == '-') {
+                self.pos += 1;
+                const right = self.parsePrimary();
+                res = res and !right;
+            } else if (ch == '&') {
+                self.pos += 1;
+                const right = self.parsePrimary();
+                res = res and right;
+            } else if (ch == '|' or ch == ')') {
+                break;
+            } else {
+                const right = self.parsePrimary();
+                res = res and right;
+            }
+        }
+        return res;
+    }
+};
+
+pub fn matchesScopeSelector(scopes: []const []const u8, selector: []const u8) bool {
+    var alt_it = std.mem.splitScalar(u8, selector, ',');
+    while (alt_it.next()) |alt| {
+        const trimmed = std.mem.trim(u8, alt, " \t\r\n");
+        if (trimmed.len == 0) continue;
+        var trimmed_alt = trimmed;
+        if (std.mem.startsWith(u8, trimmed_alt, "L:")) {
+            trimmed_alt = trimmed_alt[2..];
+        } else if (std.mem.startsWith(u8, trimmed_alt, "R:")) {
+            trimmed_alt = trimmed_alt[2..];
+        }
+        var eval = SelectorEvaluator.init(scopes, trimmed_alt);
+        if (eval.parseOr()) return true;
+    }
+    return false;
+}
+
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const Syntax = grammar.Syntax;
@@ -66,22 +177,23 @@ const Match = struct {
                 continue;
             }
             if (escape and std.ascii.isDigit(ch)) {
+                const digit: u8 = blk: {
+                    const d = ch - '0';
+                    if (config.max_match_ranges > 9 and idx + 1 < target.len) {
+                        // check for another digit if allowed the config
+                        const ch2 = target[idx + 1];
+                        if (std.ascii.isDigit(ch2)) {
+                            const d2 = ch2 - '0';
+                            skip = 1;
+                            const dd = (d * 10) + d2;
+                            break :blk dd;
+                        }
+                    }
+                    break :blk d;
+                };
+                var found = false;
                 for (0..self.count) |i| {
                     const r = self.ranges[i];
-                    const digit: u8 = blk: {
-                        const d = ch - '0';
-                        if (config.max_match_ranges > 9) {
-                            // check for another digit if allowed the config
-                            const ch2 = target[idx + 1];
-                            if (std.ascii.isDigit(ch2)) {
-                                const d2 = ch2 - '0';
-                                skip = 1;
-                                const dd = (d * 10) + d2;
-                                break :blk dd;
-                            }
-                        }
-                        break :blk d;
-                    };
                     if (digit == r.group) {
                         _ = output.pop().?;
                         for (r.start..r.end) |bi| {
@@ -91,7 +203,12 @@ const Match = struct {
                             }
                             try output.append(allocator, rch);
                         }
+                        found = true;
+                        break;
                     }
+                }
+                if (!found) {
+                    _ = output.pop().?;
                 }
             } else {
                 try output.append(allocator, ch);
@@ -850,35 +967,137 @@ pub const Parser = struct {
     }
 
     fn matchPatterns(self: *Parser, syntax: *const Syntax, patterns: ?std.ArrayList(*Syntax), block: []const u8, start: usize, end: usize) Match {
-        _ = syntax;
         var earliest_match = Match{};
-        if (patterns) |pats| {
-            for (pats.items) |p| {
-                const ls = p.resolve(p, self.lang.syntax);
-                if (ls) |syn| {
-                    const m = self.matchBegin(@constCast(syn), block, start, end);
-                    if (m.count > 0) {
-                        // std.debug.print(" m: {s} {}-{} {s}\n", .{m.syntax.?.getName(), m.start, m.end, block[m.start..m.end]});
-                        // if matched correctly at the current position, no need to scan further, we have our match
-                        if (m.start == start) {
-                            earliest_match = m;
-                            break;
-                        }
-                        if (earliest_match.count == 0) {
-                            earliest_match = m;
-                        } else if (earliest_match.start > m.start) {
-                            // nearer to current position is the earlier match
-                            earliest_match = m;
-                        } else if (earliest_match.start == m.start and earliest_match.end < m.end) {
-                            earliest_match = m;
+
+        var left_injections: std.ArrayList(*Syntax) = .empty;
+        defer left_injections.deinit(self.allocator);
+        var right_injections: std.ArrayList(*Syntax) = .empty;
+        defer right_injections.deinit(self.allocator);
+
+        if (syntax.scope_name.len > 0) {
+            if (self.current_state) |state| {
+                var scopes: std.ArrayList([]const u8) = .empty;
+                defer scopes.deinit(self.allocator);
+            for (state.stack.items) |ctx| {
+                const name = ctx.syntax.getName();
+                if (name.len > 0) {
+                    var it = std.mem.splitScalar(u8, name, ' ');
+                    while (it.next()) |tok| {
+                        if (tok.len > 0) {
+                            scopes.append(self.allocator, tok) catch {};
                         }
                     }
                 }
             }
-            // if (earliest_match.count > 0) {
-            //     std.debug.print("result: {s}\n", .{earliest_match.syntax.?.getName()});
-            // }
+
+            if (scopes.items.len > 0) {
+                // Collect injections from self.lang
+                if (self.lang.syntax) |root_syn| {
+                    if (root_syn.injections) |*injs| {
+                        var inj_it = injs.iterator();
+                        while (inj_it.next()) |inj_kv| {
+                            const selector = inj_kv.key_ptr.*;
+                            const inj_node = inj_kv.value_ptr.*;
+                            if (matchesScopeSelector(scopes.items, selector)) {
+                                var is_right = false;
+                                var alt_it = std.mem.splitScalar(u8, selector, ',');
+                                while (alt_it.next()) |alt| {
+                                    const trimmed = std.mem.trim(u8, alt, " \t\r\n");
+                                    if (std.mem.startsWith(u8, trimmed, "R:")) {
+                                        is_right = true;
+                                        break;
+                                    }
+                                }
+                                if (inj_node.patterns) |inj_pats| {
+                                    for (inj_pats.items) |ip| {
+                                        if (is_right) {
+                                            right_injections.append(self.allocator, ip) catch {};
+                                        } else {
+                                            left_injections.append(self.allocator, ip) catch {};
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Collect injections from other loaded grammars
+                if (grammar.GrammarLibrary.getLibrary()) |gml| {
+                    var cache_it = gml.cache.iterator();
+                    while (cache_it.next()) |kv| {
+                        const g = kv.value_ptr.*;
+                        if (g == self.lang) continue;
+                        if (g.syntax) |root_syn| {
+                            if (root_syn.injections) |*injs| {
+                                var inj_it = injs.iterator();
+                                while (inj_it.next()) |inj_kv| {
+                                    const selector = inj_kv.key_ptr.*;
+                                    const inj_node = inj_kv.value_ptr.*;
+                                    if (matchesScopeSelector(scopes.items, selector)) {
+                                        var is_right = false;
+                                        var alt_it = std.mem.splitScalar(u8, selector, ',');
+                                        while (alt_it.next()) |alt| {
+                                            const trimmed = std.mem.trim(u8, alt, " \t\r\n");
+                                            if (std.mem.startsWith(u8, trimmed, "R:")) {
+                                                is_right = true;
+                                                break;
+                                            }
+                                        }
+                                        if (inj_node.patterns) |inj_pats| {
+                                            for (inj_pats.items) |ip| {
+                                                if (is_right) {
+                                                    right_injections.append(self.allocator, ip) catch {};
+                                                } else {
+                                                    left_injections.append(self.allocator, ip) catch {};
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
+    }
+
+        var all_pats: std.ArrayList(*Syntax) = .empty;
+        defer all_pats.deinit(self.allocator);
+
+        for (left_injections.items) |p| {
+            all_pats.append(self.allocator, p) catch {};
+        }
+        if (patterns) |pats| {
+            for (pats.items) |p| {
+                all_pats.append(self.allocator, p) catch {};
+            }
+        }
+        for (right_injections.items) |p| {
+            all_pats.append(self.allocator, p) catch {};
+        }
+
+        for (all_pats.items) |p| {
+            const ls = p.resolve(p, self.lang.syntax);
+            if (ls) |syn| {
+                const m = self.matchBegin(@constCast(syn), block, start, end);
+                if (m.count > 0) {
+                    if (m.start == start) {
+                        earliest_match = m;
+                        break;
+                    }
+                    if (earliest_match.count == 0) {
+                        earliest_match = m;
+                    } else if (earliest_match.start > m.start) {
+                        earliest_match = m;
+                    } else if (earliest_match.start == m.start and earliest_match.end < m.end) {
+                        earliest_match = m;
+                    }
+                }
+            }
+        }
+
         return earliest_match;
     }
 

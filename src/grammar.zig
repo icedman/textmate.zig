@@ -82,6 +82,7 @@ pub const Syntax = struct {
     rx_while: Rule = Rule{},
 
     repository: ?std.StringHashMap(*Syntax) = null,
+    injections: ?std.StringHashMap(*Syntax) = null,
 
     // children nodes
     patterns: ?std.ArrayList(*Syntax) = null,
@@ -211,6 +212,7 @@ pub const Syntax = struct {
             .rx_begin = Rule{ .expr = if (obj.get("begin")) |v| try strings_arena.append(v.string) else null },
             .rx_while = Rule{ .expr = if (obj.get("while")) |v| try strings_arena.append(v.string) else null },
             .rx_end = Rule{ .expr = if (obj.get("end")) |v| try strings_arena.append(v.string) else null },
+            .injections = null,
         };
 
         const include = obj.get("include");
@@ -246,6 +248,7 @@ pub const Syntax = struct {
         syntax.while_captures = try parseSyntaxMap(allocator, json, "whileCaptures", syntax, strings_arena);
         syntax.end_captures = try parseSyntaxMap(allocator, json, "endCaptures", syntax, strings_arena);
         syntax.repository = try parseSyntaxMap(allocator, json, "repository", syntax, strings_arena);
+        syntax.injections = try parseSyntaxMap(allocator, json, "injections", syntax, strings_arena);
 
         // std.debug.print("syntax address {*}-{*}\n", .{syntax, syntax.parent});
         return syntax;
@@ -291,6 +294,7 @@ pub const Syntax = struct {
 
         const capture_entries = [_]CapturesEntry{
             .{ .map_ptr = &self.repository },
+            .{ .map_ptr = &self.injections },
             .{ .map_ptr = &self.captures },
             .{ .map_ptr = &self.begin_captures },
             .{ .map_ptr = &self.end_captures },
@@ -392,7 +396,8 @@ pub const Syntax = struct {
             }
 
             // include another grammar
-            if (include_path[0] == 's' and (std.mem.indexOf(u8, include_path, "source.") orelse 1) == 0) {
+            if ((std.mem.indexOf(u8, include_path, "source.") orelse 1) == 0 or
+                (std.mem.indexOf(u8, include_path, "text.") orelse 1) == 0) {
                 var source_scope = include_path;
 
                 // Some may point to specific a syntax (source.js#comments)
