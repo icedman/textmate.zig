@@ -28,6 +28,15 @@ var line_tests_failed: usize = 0;
 
 var end_on_fail = false;
 
+const FailedTest = struct {
+    suite: []const u8,
+    desc: []const u8,
+    line: []const u8,
+    line_index: usize,
+};
+
+var failed_tests: std.ArrayList(FailedTest) = .empty;
+
 fn compare_tokens(hay: *ArrayList([]const u8), needles: std.json.Value) bool {
     var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
     var eq = true;
@@ -51,7 +60,7 @@ fn compare_tokens(hay: *ArrayList([]const u8), needles: std.json.Value) bool {
     return eq;
 }
 
-pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_path: []const u8) !bool {
+pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_path: []const u8, suite_name: []const u8) !bool {
     var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
     var buf: [1024]u8 = undefined; // fixed buffer
     GrammarLibrary.initLibrary(allocator) catch {
@@ -95,6 +104,7 @@ pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_p
         defer grammar.deinit();
 
         const desc = json.object.get("desc");
+        const desc_str = if (desc) |d| d.string else "No description";
         if (desc) |d| {
             stdout.print("===========\n{s}\n===========\n", .{d.string}) catch {};
         }
@@ -122,7 +132,7 @@ pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_p
             if (ll == .array) {
                 proc.startDocument();
                 var first_line = true;
-                for (ll.array.items) |l| {
+                for (ll.array.items, 0..) |l, l_idx| {
                     collect.clearRetainingCapacity();
 
                     const line = l.object.get("line").?.string;
@@ -157,6 +167,17 @@ pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_p
                         try stdout.print("line test failed\n", .{});
                         try resetColor(stdout);
                         line_tests_failed += 1;
+
+                        const f_suite = try allocator.dupe(u8, suite_name);
+                        const f_desc = try allocator.dupe(u8, desc_str);
+                        const f_line = try allocator.dupe(u8, line);
+                        try failed_tests.append(allocator, FailedTest{
+                            .suite = f_suite,
+                            .desc = f_desc,
+                            .line = f_line,
+                            .line_index = l_idx + 1,
+                        });
+
                         if (end_on_fail) {
                             return false;
                         }
@@ -200,7 +221,7 @@ pub fn run_test_suit(allocator: std.mem.Allocator, base_path: []const u8, source
                 //     std.debug.print("skipping...{s}\n", .{item.object.get("desc").?.string});
                 //     continue;
                 // }
-                const res = run_parse_test(allocator, item, base_path) catch {
+                const res = run_parse_test(allocator, item, base_path, file_path) catch {
                     std.debug.print("unable to finish test\n", .{});
                     if (end_on_fail) {
                         return false;
@@ -273,6 +294,16 @@ pub fn main() !void {
 
     const allocator = gpa.allocator();
 
+    failed_tests = .empty;
+    defer {
+        for (failed_tests.items) |t| {
+            allocator.free(t.suite);
+            allocator.free(t.desc);
+            allocator.free(t.line);
+        }
+        failed_tests.deinit(allocator);
+    }
+
     var args = std.process.args();
     _ = args.next(); // skip binary name
     while (args.next()) |arg| {
@@ -291,6 +322,16 @@ pub fn main() !void {
 
     stdout.print("\n==================\n", .{}) catch {};
     stdout.print("line tests: {}/{}\n", .{ line_tests_passed, line_tests }) catch {};
+
+    if (failed_tests.items.len > 0) {
+        try setColorRgb(stdout, Rgb{ .r = 255, .g = 50, .b = 50, .a = 255 });
+        stdout.print("\nFailed Tests Summary:\n", .{}) catch {};
+        try resetColor(stdout);
+        for (failed_tests.items) |t| {
+            stdout.print("  - [{s}] {s} (Line {}: \"{s}\")\n", .{ t.suite, t.desc, t.line_index, t.line }) catch {};
+        }
+        stdout.print("\n", .{}) catch {};
+    }
 }
 
 const std = @import("std");
