@@ -1652,7 +1652,7 @@
           "name": "support.function.experimental.wolfram"
         },
         {
-          "match": "System`V(?:alenceErrorHandling|alenceFilling|aluePreprocessingFunction|andermondeMatrix|arianceGammaPointProcess|ariogramFunction|ariogramModel|ectorAround|erifyDerivedKey|erifyDigitalSignature|erifyFileSignature|erifyInterpretation|ideo|ideoCapture|ideoCombine|ideoDelete|ideoExtractFrames|ideoFrameList|ideoFrameMap|ideoGenerator|ideoInsert|ideoIntervals|ideoJoin|ideoMap|ideoMajson|ideoMapTimeSeries|ideoPadding|ideoPause|ideoPlay|ideoQ|ideoRecord|ideoReplace|ideoScreenCapture|ideoSplit|ideoStop|ideoStreams??|ideoTimeStretch|ideoTrackSelection|ideoTranscode|ideoTransparency|ideoTrim)(?![$`[:alnum:]])",
+          "match": "System`V(?:alenceErrorHandling|alenceFilling|aluePreprocessingFunction|andermondeMatrix|arianceGammaPointProcess|ariogramFunction|ariogramModel|ectorAround|erifyDerivedKey|erifyDigitalSignature|erifyFileSignature|erifyInterpretation|ideo|ideoCapture|ideoCombine|ideoDelete|ideoExtractFrames|ideoFrameList|ideoFrameMap|ideoGenerator|ideoInsert|ideoIntervals|ideoJoin|ideoMap|ideoMapList|ideoMapTimeSeries|ideoPadding|ideoPause|ideoPlay|ideoQ|ideoRecord|ideoReplace|ideoScreenCapture|ideoSplit|ideoStop|ideoStreams??|ideoTimeStretch|ideoTrackSelection|ideoTranscode|ideoTransparency|ideoTrim)(?![$`[:alnum:]])",
           "name": "support.function.experimental.wolfram"
         },
         {
@@ -2264,7 +2264,7 @@
           "name": "support.function.experimental.wolfram"
         },
         {
-          "match": "V(?:alenceErrorHandling|alenceFilling|aluePreprocessingFunction|andermondeMatrix|arianceGammaPointProcess|ariogramFunction|ariogramModel|ectorAround|erifyDerivedKey|erifyDigitalSignature|erifyFileSignature|erifyInterpretation|ideo|ideoCapture|ideoCombine|ideoDelete|ideoExtractFrames|ideoFrameList|ideoFrameMap|ideoGenerator|ideoInsert|ideoIntervals|ideoJoin|ideoMap|ideoMajson|ideoMapTimeSeries|ideoPadding|ideoPause|ideoPlay|ideoQ|ideoRecord|ideoReplace|ideoScreenCapture|ideoSplit|ideoStop|ideoStreams??|ideoTimeStretch|ideoTrackSelection|ideoTranscode|ideoTransparency|ideoTrim)(?![$`[:alnum:]])",
+          "match": "V(?:alenceErrorHandling|alenceFilling|aluePreprocessingFunction|andermondeMatrix|arianceGammaPointProcess|ariogramFunction|ariogramModel|ectorAround|erifyDerivedKey|erifyDigitalSignature|erifyFileSignature|erifyInterpretation|ideo|ideoCapture|ideoCombine|ideoDelete|ideoExtractFrames|ideoFrameList|ideoFrameMap|ideoGenerator|ideoInsert|ideoIntervals|ideoJoin|ideoMap|ideoMapList|ideoMapTimeSeries|ideoPadding|ideoPause|ideoPlay|ideoQ|ideoRecord|ideoReplace|ideoScreenCapture|ideoSplit|ideoStop|ideoStreams??|ideoTimeStretch|ideoTrackSelection|ideoTranscode|ideoTransparency|ideoTrim)(?![$`[:alnum:]])",
           "name": "support.function.experimental.wolfram"
         },
         {
