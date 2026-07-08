@@ -137,7 +137,7 @@ pub const Processor = struct {
         var i = self.captures.items.len;
         var close_syntax: ?*Syntax = null;
         while (i > 0) : (i -= 1) {
-            if (self.captures.items[i - 1].syntax == c.syntax) {
+            if (self.captures.items[i - 1].syntax == c.syntax and std.mem.eql(u8, self.captures.items[i - 1].scope, c.scope)) {
                 self.captures.items[i - 1].end = c.end;
                 close_syntax = c.syntax;
             } else if (close_syntax != null and close_syntax != c.syntax) {

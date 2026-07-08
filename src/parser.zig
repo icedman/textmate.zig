@@ -680,7 +680,7 @@ pub const Parser = struct {
         // }
 
         // if all this syntax has are patterns, check patterns
-        if (syntax.rx_match.valid != .Valid and syntax.rx_begin.valid != .Valid) {
+        if (syntax.rx_match.expr == null and syntax.rx_begin.expr == null) {
             return self.matchPatterns(syntax, syntax.patterns, block, start, end);
         }
 
@@ -715,15 +715,35 @@ pub const Parser = struct {
                     while (state.stack.items.len > i) {
                         const pop_ctx = state.stack.items[state.stack.items.len - 1];
                         if (self.processor) |proc| {
-                            const name = pop_ctx.syntax.getName();
-                            var c = ParseCapture{
-                                .start = start,
-                                .end = start,
-                                .syntax = pop_ctx.syntax,
-                                .atom = pop_ctx.syntax.atom,
-                                .scope = name,
-                            };
-                            proc.closeTag(&c);
+                            if (pop_ctx.syntax.content_name.len > 0) {
+                                var c = ParseCapture{
+                                    .start = start,
+                                    .end = start,
+                                    .syntax = pop_ctx.syntax,
+                                    .atom = pop_ctx.syntax.atom,
+                                    .scope = pop_ctx.syntax.content_name,
+                                };
+                                proc.closeTag(&c);
+                            }
+                            if (pop_ctx.syntax.name.len > 0) {
+                                var c = ParseCapture{
+                                    .start = start,
+                                    .end = start,
+                                    .syntax = pop_ctx.syntax,
+                                    .atom = pop_ctx.syntax.atom,
+                                    .scope = pop_ctx.syntax.name,
+                                };
+                                proc.closeTag(&c);
+                            } else if (pop_ctx.syntax.name.len == 0 and pop_ctx.syntax.scope_name.len > 0) {
+                                var c = ParseCapture{
+                                    .start = start,
+                                    .end = start,
+                                    .syntax = pop_ctx.syntax,
+                                    .atom = pop_ctx.syntax.atom,
+                                    .scope = pop_ctx.syntax.scope_name,
+                                };
+                                proc.closeTag(&c);
+                            }
                         }
                         state.pop("matchWhile");
                     }
@@ -1120,15 +1140,35 @@ pub const Parser = struct {
                             }
 
                             if (self.processor) |proc| {
-                                const name = end_syn.getName();
-                                var c = Capture{
-                                    .start = end_match.start,
-                                    .end = end_match.end,
-                                    .syntax = end_syn,
-                                    .atom = end_syn.atom,
-                                    .scope = name,
-                                };
-                                proc.closeTag(&c);
+                                if (end_syn.content_name.len > 0) {
+                                    var c = Capture{
+                                        .start = end_match.start,
+                                        .end = end_match.start,
+                                        .syntax = end_syn,
+                                        .atom = end_syn.atom,
+                                        .scope = end_syn.content_name,
+                                    };
+                                    proc.closeTag(&c);
+                                }
+                                if (end_syn.name.len > 0) {
+                                    var c = Capture{
+                                        .start = end_match.start,
+                                        .end = end_match.end,
+                                        .syntax = end_syn,
+                                        .atom = end_syn.atom,
+                                        .scope = end_syn.name,
+                                    };
+                                    proc.closeTag(&c);
+                                } else if (end_syn.name.len == 0 and end_syn.scope_name.len > 0) {
+                                    var c = Capture{
+                                        .start = end_match.start,
+                                        .end = end_match.end,
+                                        .syntax = end_syn,
+                                        .atom = end_syn.atom,
+                                        .scope = end_syn.scope_name,
+                                    };
+                                    proc.closeTag(&c);
+                                }
                             }
 
                             // std.debug.print("pop {*} {s} {s}\n", .{ end_syn, end_syn.getName(), block[end_match.start..end_match.end] });
@@ -1167,15 +1207,35 @@ pub const Parser = struct {
                                 }
 
                                 if (self.processor) |proc| {
-                                    const name = match_syn.getName();
-                                    var c = Capture{
-                                        .start = pattern_match.start,
-                                        .end = pattern_match.end,
-                                        .syntax = match_syn,
-                                        .atom = match_syn.atom,
-                                        .scope = name,
-                                    };
-                                    proc.openTag(&c);
+                                    if (match_syn.name.len > 0) {
+                                        var c = Capture{
+                                            .start = pattern_match.start,
+                                            .end = pattern_match.end,
+                                            .syntax = match_syn,
+                                            .atom = match_syn.atom,
+                                            .scope = match_syn.name,
+                                        };
+                                        proc.openTag(&c);
+                                    }
+                                    if (match_syn.content_name.len > 0) {
+                                        var c = Capture{
+                                            .start = pattern_match.end,
+                                            .end = pattern_match.end,
+                                            .syntax = match_syn,
+                                            .atom = match_syn.atom,
+                                            .scope = match_syn.content_name,
+                                        };
+                                        proc.openTag(&c);
+                                    } else if (match_syn.name.len == 0 and match_syn.scope_name.len > 0) {
+                                        var c = Capture{
+                                            .start = pattern_match.start,
+                                            .end = pattern_match.end,
+                                            .syntax = match_syn,
+                                            .atom = match_syn.atom,
+                                            .scope = match_syn.scope_name,
+                                        };
+                                        proc.openTag(&c);
+                                    }
                                 }
 
                                 try self.collectMatch(match_syn, &pattern_match, block);

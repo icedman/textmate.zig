@@ -34,20 +34,25 @@ pub const Rule = struct {
 
     // TODO change to void - regex compile errors are blamed on user-defined grammars - fail silently
     pub fn compile(self: *Rule, regex: []const u8) !void {
-        // std.debug.print("rx: {s} {}\n", .{regex, regex.len});
-        const re = oni.Regex.init(
-            regex,
-            .{},
-            oni.Encoding.utf8,
-            oni.Syntax.default,
-            null,
-        ) catch |err| {
+        var err_info: oni.c.c.OnigErrorInfo = undefined;
+        var self_val: oni.c.c.OnigRegex = undefined;
+        const code = oni.c.c.onig_new(
+            &self_val,
+            regex.ptr,
+            regex.ptr + regex.len,
+            oni.c.c.ONIG_OPTION_CAPTURE_GROUP,
+            @ptrCast(@alignCast(oni.Encoding.utf8)),
+            @ptrCast(@alignCast(oni.Syntax.ruby)),
+            &err_info,
+        );
+        if (code < 0) {
+            var err_buf: [oni.errors.MAX_ERROR_LEN]u8 = undefined;
+            const len = oni.c.c.onig_error_code_to_str(err_buf[0..].ptr, code, &err_info);
+            std.debug.print("ONIGURUMA COMPILE ERROR for '{s}': {s} ({})\n", .{regex, err_buf[0..@intCast(len)], code});
             self.valid = .Invalid;
-            // std.debug.print("failed rx: {s} {}\n", .{regex, regex.len});
-            return err;
-        };
-        errdefer re.deinit();
-        self.regex = re;
+            return error.RegexCompileError;
+        }
+        self.regex = oni.Regex{ .value = self_val };
         self.valid = .Valid;
         self.id = strings.toHash(regex);
     }
@@ -436,7 +441,6 @@ pub const Syntax = struct {
                         syntax.include = ls;
                         return s;
                     }
-                    return null;
                 } else {
                     return syntax;
                 }
@@ -457,13 +461,13 @@ pub const Syntax = struct {
     }
 
     pub fn getName(self: *const Syntax) []const u8 {
-        if (self.content_name.len > 0) {
-            return self.content_name;
-        }
         if (self.scope_name.len > 0) {
             return self.scope_name;
         }
-        return self.name;
+        if (self.name.len > 0) {
+            return self.name;
+        }
+        return self.content_name;
     }
 
     pub fn dump(self: *const Syntax, depth: u32, stats: bool) void {
