@@ -6,6 +6,42 @@ O(n) ~ Time is linear to number of lines
 
 ## Release mode runs
 
+commit b6d194c497e98d2f2a3b47b5ccb8f98b1e4f0cbc
+
+* moved over to zig 0.16.0
+* 76/80 test cases passed
+* accuracy over speed
+
+tinywl.c
+
+lines: 1001
+execs: 66406
+execs/line: 66
+skips: 285220
+warmup in 0.066312s
+done in 0.537299s
+state depth: 1
+max state depth: 7
+max processor depth: 25
+grammar: c
+theme: dracula-soft
+theme atoms: 208
+
+sqlite3.c
+
+lines: 222905
+execs: 14359364
+execs/line: 64
+skips: 58473731
+warmup in 0.056275s
+done in 85.206440s
+state depth: 1
+max state depth: 14
+max processor depth: 113
+grammar: c
+theme: dracula-soft
+theme atoms: 208
+
 commit 462206d98f2beb4870dff3d22f58f13f815ec5b1
 * regressed back to 8.5s. From here on prioritize passing tests and correctness over speed.
 * note than rendering takes around 1s

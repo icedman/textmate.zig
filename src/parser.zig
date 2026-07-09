@@ -3,122 +3,13 @@ const oni = @import("oniguruma");
 const grammar = @import("grammar.zig");
 const strings = @import("strings.zig");
 const atoms = @import("atoms.zig");
+const scope = @import("scopes.zig");
 const config = @import("config.zig");
 const processor = @import("processor/processor.zig");
 
-fn matchesScope(scopes: []const []const u8, target: []const u8) bool {
-    for (scopes) |s| {
-        if (std.mem.startsWith(u8, s, target)) {
-            if (s.len == target.len or s[target.len] == '.') {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-const SelectorEvaluator = struct {
-    scopes: []const []const u8,
-    expr: []const u8,
-    pos: usize = 0,
-
-    fn init(scopes: []const []const u8, expr: []const u8) SelectorEvaluator {
-        return .{ .scopes = scopes, .expr = expr };
-    }
-
-    fn skipWhitespace(self: *SelectorEvaluator) void {
-        while (self.pos < self.expr.len and (self.expr[self.pos] == ' ' or self.expr[self.pos] == '\t')) {
-            self.pos += 1;
-        }
-    }
-
-    fn parsePrimary(self: *SelectorEvaluator) bool {
-        self.skipWhitespace();
-        if (self.pos >= self.expr.len) return false;
-
-        if (self.expr[self.pos] == '(') {
-            self.pos += 1;
-            const res = self.parseOr();
-            self.skipWhitespace();
-            if (self.pos < self.expr.len and self.expr[self.pos] == ')') {
-                self.pos += 1;
-            }
-            return res;
-        }
-
-        const start = self.pos;
-        while (self.pos < self.expr.len) {
-            const ch = self.expr[self.pos];
-            if (std.ascii.isAlphanumeric(ch) or ch == '.' or ch == '-' or ch == '_') {
-                self.pos += 1;
-            } else {
-                break;
-            }
-        }
-        if (start == self.pos) return false;
-        const scope_name = self.expr[start..self.pos];
-        return matchesScope(self.scopes, scope_name);
-    }
-
-    fn parseOr(self: *SelectorEvaluator) bool {
-        var res = self.parseAnd();
-        while (true) {
-            self.skipWhitespace();
-            if (self.pos < self.expr.len and self.expr[self.pos] == '|') {
-                self.pos += 1;
-                const right = self.parseAnd();
-                res = res or right;
-            } else {
-                break;
-            }
-        }
-        return res;
-    }
-
-    fn parseAnd(self: *SelectorEvaluator) bool {
-        var res = self.parsePrimary();
-        while (true) {
-            self.skipWhitespace();
-            if (self.pos >= self.expr.len) break;
-            const ch = self.expr[self.pos];
-            if (ch == '-') {
-                self.pos += 1;
-                const right = self.parsePrimary();
-                res = res and !right;
-            } else if (ch == '&') {
-                self.pos += 1;
-                const right = self.parsePrimary();
-                res = res and right;
-            } else if (ch == '|' or ch == ')') {
-                break;
-            } else {
-                const right = self.parsePrimary();
-                res = res and right;
-            }
-        }
-        return res;
-    }
-};
-
-pub fn matchesScopeSelector(scopes: []const []const u8, selector: []const u8) bool {
-    var alt_it = std.mem.splitScalar(u8, selector, ',');
-    while (alt_it.next()) |alt| {
-        const trimmed = std.mem.trim(u8, alt, " \t\r\n");
-        if (trimmed.len == 0) continue;
-        var trimmed_alt = trimmed;
-        if (std.mem.startsWith(u8, trimmed_alt, "L:")) {
-            trimmed_alt = trimmed_alt[2..];
-        } else if (std.mem.startsWith(u8, trimmed_alt, "R:")) {
-            trimmed_alt = trimmed_alt[2..];
-        }
-        var eval = SelectorEvaluator.init(scopes, trimmed_alt);
-        if (eval.parseOr()) return true;
-    }
-    return false;
-}
-
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
+const ArrayListUnmanaged = std.ArrayListUnmanaged;
 const Syntax = grammar.Syntax;
 const Rule = grammar.Rule;
 const Atom = atoms.Atom;
@@ -161,12 +52,13 @@ const Match = struct {
     anchor_start: usize = 0,
     anchor_end: usize = 0,
 
+    // TODO output: ArrayList(u8) vs output *[MAX_SCOPE_LEN]u8 ...
     fn applyRef(
         self: *const Match,
         block: []const u8,
         target: []const u8,
         escape_character: u8,
-        output: *ArrayList(u8),
+        output: *ArrayListUnmanaged(u8),
         allocator: Allocator,
     ) !usize {
         var escape = false;
@@ -224,7 +116,7 @@ const Match = struct {
         self: *const Match,
         block: []const u8,
         target: []const u8,
-        output: *ArrayList(u8),
+        output: *ArrayListUnmanaged(u8),
         allocator: Allocator,
     ) !usize {
         return try self.applyRef(block, target, '\\', output, allocator);
@@ -356,10 +248,15 @@ pub const ParseState = struct {
 
         const m = match;
         {
+            var output_buf: [256]u8 = undefined;
+
             if (syntax.rx_end.has_references) {
                 if (syntax.rx_end.expr) |regexs| {
-                    var output = try ArrayList(u8).initCapacity(self.allocator, regexs.len + 64);
-                    defer output.deinit(self.allocator);
+                    // var output = try ArrayList(u8).initCapacity(self.allocator, regexs.len + 64);
+                    // defer output.deinit(self.allocator);
+
+                    var output = std.ArrayListUnmanaged(u8).initBuffer(&output_buf);
+
                     _ = try m.applyReferences(block, regexs, &output, self.allocator);
                     const expr = try self.owner.strings.appendUnique(output.items);
                     const regex_id = strings.toHash(expr);
@@ -385,8 +282,11 @@ pub const ParseState = struct {
                 }
                 if (syntax.rx_while.has_references) {
                     if (syntax.rx_while.expr) |regexs| {
-                        var output = try ArrayList(u8).initCapacity(self.allocator, regexs.len + 64);
-                        defer output.deinit(self.allocator);
+                        var output = std.ArrayListUnmanaged(u8).initBuffer(&output_buf);
+
+                        // var output = try ArrayList(u8).initCapacity(self.allocator, regexs.len + 64);
+                        // defer output.deinit(self.allocator);
+
                         _ = try m.applyReferences(block, regexs, &output, self.allocator);
                         const expr = try self.owner.strings.appendUnique(output.items);
                         const regex_id = strings.toHash(expr);
@@ -969,15 +869,17 @@ pub const Parser = struct {
     fn matchPatterns(self: *Parser, syntax: *const Syntax, patterns: ?std.ArrayList(*Syntax), block: []const u8, start: usize, end: usize) Match {
         var earliest_match = Match{};
 
-        var left_injections: std.ArrayList(*Syntax) = .empty;
-        defer left_injections.deinit(self.allocator);
-        var right_injections: std.ArrayList(*Syntax) = .empty;
-        defer right_injections.deinit(self.allocator);
+        var left_injections_buffer: [128]*Syntax = undefined;
+        var left_injections = std.ArrayListUnmanaged(*Syntax).initBuffer(&left_injections_buffer);
+
+        var right_injections_buffer: [128]*Syntax = undefined;
+        var right_injections = std.ArrayListUnmanaged(*Syntax).initBuffer(&right_injections_buffer);
 
         if (syntax.scope_name.len > 0) {
             if (self.current_state) |state| {
-                var scopes: std.ArrayList([]const u8) = .empty;
-                defer scopes.deinit(self.allocator);
+                var scopes_buffer: [64][]const u8 = undefined;
+                var scopes = std.ArrayListUnmanaged([]const u8).initBuffer(&scopes_buffer);
+
                 for (state.stack.items) |ctx| {
                     const name = ctx.syntax.getName();
                     if (name.len > 0) {
@@ -998,7 +900,7 @@ pub const Parser = struct {
                             while (inj_it.next()) |inj_kv| {
                                 const selector = inj_kv.key_ptr.*;
                                 const inj_node = inj_kv.value_ptr.*;
-                                if (matchesScopeSelector(scopes.items, selector)) {
+                                if (scope.matchesScopeSelector(scopes.items, selector)) {
                                     var is_right = false;
                                     var alt_it = std.mem.splitScalar(u8, selector, ',');
                                     while (alt_it.next()) |alt| {
@@ -1011,9 +913,9 @@ pub const Parser = struct {
                                     if (inj_node.patterns) |inj_pats| {
                                         for (inj_pats.items) |ip| {
                                             if (is_right) {
-                                                right_injections.append(self.allocator, ip) catch {};
+                                                right_injections.appendBounded(ip) catch {};
                                             } else {
-                                                left_injections.append(self.allocator, ip) catch {};
+                                                left_injections.appendBounded(ip) catch {};
                                             }
                                         }
                                     }
@@ -1034,7 +936,7 @@ pub const Parser = struct {
                                     while (inj_it.next()) |inj_kv| {
                                         const selector = inj_kv.key_ptr.*;
                                         const inj_node = inj_kv.value_ptr.*;
-                                        if (matchesScopeSelector(scopes.items, selector)) {
+                                        if (scope.matchesScopeSelector(scopes.items, selector)) {
                                             var is_right = false;
                                             var alt_it = std.mem.splitScalar(u8, selector, ',');
                                             while (alt_it.next()) |alt| {
@@ -1047,9 +949,9 @@ pub const Parser = struct {
                                             if (inj_node.patterns) |inj_pats| {
                                                 for (inj_pats.items) |ip| {
                                                     if (is_right) {
-                                                        right_injections.append(self.allocator, ip) catch {};
+                                                        right_injections.appendBounded(ip) catch {};
                                                     } else {
-                                                        left_injections.append(self.allocator, ip) catch {};
+                                                        left_injections.appendBounded(ip) catch {};
                                                     }
                                                 }
                                             }
@@ -1063,19 +965,19 @@ pub const Parser = struct {
             }
         }
 
-        var all_pats: std.ArrayList(*Syntax) = .empty;
-        defer all_pats.deinit(self.allocator);
+        var pats_buffer: [128]*Syntax = undefined;
+        var all_pats = std.ArrayListUnmanaged(*Syntax).initBuffer(&pats_buffer);
 
         for (left_injections.items) |p| {
-            all_pats.append(self.allocator, p) catch {};
+            all_pats.appendBounded(p) catch {};
         }
         if (patterns) |pats| {
             for (pats.items) |p| {
-                all_pats.append(self.allocator, p) catch {};
+                all_pats.appendBounded(p) catch {};
             }
         }
         for (right_injections.items) |p| {
-            all_pats.append(self.allocator, p) catch {};
+            all_pats.appendBounded(p) catch {};
         }
 
         for (all_pats.items) |p| {
@@ -1112,8 +1014,10 @@ pub const Parser = struct {
                 .end = match.end,
                 .syntax = @constCast(syntax),
             };
-            var cscope = try ArrayList(u8).initCapacity(self.allocator, name.len + 24);
-            defer cscope.deinit(self.allocator);
+
+            var buffer: [128]u8 = undefined;
+            var cscope = std.ArrayListUnmanaged(u8).initBuffer(&buffer);
+
             if (try match.applyCaptures(block, name, &cscope, self.allocator) == 0) {
                 if (match.regex) |rx| {
                     if (config.enable_scope_atoms and !rx.has_references) {
@@ -1136,11 +1040,13 @@ pub const Parser = struct {
 
     fn collectCaptures(self: *Parser, match: *const Match, captures: *const std.StringHashMap(*Syntax), block: []const u8) !void {
         // std.debug.print("collectCaptures\n", .{});
+        var key_buf: [32]u8 = undefined; // is this enough to hold any int as string?
+        var scope_buf: [128]u8 = undefined;
+
         for (0..match.count) |i| {
-            var buf: [32]u8 = undefined; // is this enough to hold any int as string?
             const range = match.ranges[i];
             if (range.start == 0 and range.end == 0) continue;
-            const key = std.fmt.bufPrint(&buf, "{}", .{range.group}) catch {
+            const key = std.fmt.bufPrint(&key_buf, "{}", .{range.group}) catch {
                 continue;
             };
 
@@ -1159,8 +1065,8 @@ pub const Parser = struct {
                     // theme is not interested in this
                     if (config.enable_scope_atoms_skip and syn.atom.id == 1) continue;
 
-                    var cscope = try ArrayList(u8).initCapacity(self.allocator, syn.name.len + 24);
-                    defer cscope.deinit(self.allocator);
+                    var cscope = std.ArrayListUnmanaged(u8).initBuffer(&scope_buf);
+
                     if (try match.applyCaptures(block, syn.name, &cscope, self.allocator) == 0) {
                         if (match.regex) |rx| {
                             if (config.enable_scope_atoms and !rx.has_references) {
@@ -1212,8 +1118,8 @@ pub const Parser = struct {
                                             .syntax = p,
                                         };
 
-                                        var cscope = try ArrayList(u8).initCapacity(self.allocator, p.name.len + 24);
-                                        defer cscope.deinit(self.allocator);
+                                        var cscope = std.ArrayListUnmanaged(u8).initBuffer(&scope_buf);
+
                                         if (try m.applyCaptures(block, p.name, &cscope, self.allocator) == 0) {
                                             if (config.enable_scope_atoms) {
                                                 if (self.atoms) |at| {
