@@ -48,7 +48,7 @@ pub const Rule = struct {
         if (code < 0) {
             var err_buf: [oni.errors.MAX_ERROR_LEN]u8 = undefined;
             const len = oni.c.c.onig_error_code_to_str(err_buf[0..].ptr, code, &err_info);
-            std.debug.print("ONIGURUMA COMPILE ERROR for '{s}': {s} ({})\n", .{regex, err_buf[0..@intCast(len)], code});
+            std.debug.print("ONIGURUMA COMPILE ERROR for '{s}': {s} ({})\n", .{ regex, err_buf[0..@intCast(len)], code });
             self.valid = .Invalid;
             return error.RegexCompileError;
         }
@@ -397,7 +397,8 @@ pub const Syntax = struct {
 
             // include another grammar
             if ((std.mem.indexOf(u8, include_path, "source.") orelse 1) == 0 or
-                (std.mem.indexOf(u8, include_path, "text.") orelse 1) == 0) {
+                (std.mem.indexOf(u8, include_path, "text.") orelse 1) == 0)
+            {
                 var source_scope = include_path;
 
                 // Some may point to specific a syntax (source.js#comments)

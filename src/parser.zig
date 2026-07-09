@@ -738,7 +738,7 @@ pub const Parser = struct {
 
                 if (should_cache and config.enable_match_caching and m.count == 0) {
                     if (syntax.rx_match.id != 0 and !syntax.rx_match.is_anchored and !syntax.rx_match.is_anchored_at_start)
-                         _ = self.match_cache.put(syntax.rx_match.id, m) catch {};
+                        _ = self.match_cache.put(syntax.rx_match.id, m) catch {};
                 }
                 if (m.count > 0) {
                     return m;
@@ -978,78 +978,79 @@ pub const Parser = struct {
             if (self.current_state) |state| {
                 var scopes: std.ArrayList([]const u8) = .empty;
                 defer scopes.deinit(self.allocator);
-            for (state.stack.items) |ctx| {
-                const name = ctx.syntax.getName();
-                if (name.len > 0) {
-                    var it = std.mem.splitScalar(u8, name, ' ');
-                    while (it.next()) |tok| {
-                        if (tok.len > 0) {
-                            scopes.append(self.allocator, tok) catch {};
+                for (state.stack.items) |ctx| {
+                    const name = ctx.syntax.getName();
+                    if (name.len > 0) {
+                        var it = std.mem.splitScalar(u8, name, ' ');
+                        while (it.next()) |tok| {
+                            if (tok.len > 0) {
+                                scopes.append(self.allocator, tok) catch {};
+                            }
                         }
                     }
                 }
-            }
 
-            if (scopes.items.len > 0) {
-                // Collect injections from self.lang
-                if (self.lang.syntax) |root_syn| {
-                    if (root_syn.injections) |*injs| {
-                        var inj_it = injs.iterator();
-                        while (inj_it.next()) |inj_kv| {
-                            const selector = inj_kv.key_ptr.*;
-                            const inj_node = inj_kv.value_ptr.*;
-                            if (matchesScopeSelector(scopes.items, selector)) {
-                                var is_right = false;
-                                var alt_it = std.mem.splitScalar(u8, selector, ',');
-                                while (alt_it.next()) |alt| {
-                                    const trimmed = std.mem.trim(u8, alt, " \t\r\n");
-                                    if (std.mem.startsWith(u8, trimmed, "R:")) {
-                                        is_right = true;
-                                        break;
+                if (scopes.items.len > 0) {
+                    // Collect injections from self.lang
+                    if (self.lang.syntax) |root_syn| {
+                        if (root_syn.injections) |*injs| {
+                            var inj_it = injs.iterator();
+                            while (inj_it.next()) |inj_kv| {
+                                const selector = inj_kv.key_ptr.*;
+                                const inj_node = inj_kv.value_ptr.*;
+                                if (matchesScopeSelector(scopes.items, selector)) {
+                                    var is_right = false;
+                                    var alt_it = std.mem.splitScalar(u8, selector, ',');
+                                    while (alt_it.next()) |alt| {
+                                        const trimmed = std.mem.trim(u8, alt, " \t\r\n");
+                                        if (std.mem.startsWith(u8, trimmed, "R:")) {
+                                            is_right = true;
+                                            break;
+                                        }
                                     }
-                                }
-                                if (inj_node.patterns) |inj_pats| {
-                                    for (inj_pats.items) |ip| {
-                                        if (is_right) {
-                                            right_injections.append(self.allocator, ip) catch {};
-                                        } else {
-                                            left_injections.append(self.allocator, ip) catch {};
+                                    if (inj_node.patterns) |inj_pats| {
+                                        for (inj_pats.items) |ip| {
+                                            if (is_right) {
+                                                right_injections.append(self.allocator, ip) catch {};
+                                            } else {
+                                                left_injections.append(self.allocator, ip) catch {};
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
                     }
-                }
 
-                // Collect injections from other loaded grammars
-                if (grammar.GrammarLibrary.getLibrary()) |gml| {
-                    var cache_it = gml.cache.iterator();
-                    while (cache_it.next()) |kv| {
-                        const g = kv.value_ptr.*;
-                        if (g == self.lang) continue;
-                        if (g.syntax) |root_syn| {
-                            if (root_syn.injections) |*injs| {
-                                var inj_it = injs.iterator();
-                                while (inj_it.next()) |inj_kv| {
-                                    const selector = inj_kv.key_ptr.*;
-                                    const inj_node = inj_kv.value_ptr.*;
-                                    if (matchesScopeSelector(scopes.items, selector)) {
-                                        var is_right = false;
-                                        var alt_it = std.mem.splitScalar(u8, selector, ',');
-                                        while (alt_it.next()) |alt| {
-                                            const trimmed = std.mem.trim(u8, alt, " \t\r\n");
-                                            if (std.mem.startsWith(u8, trimmed, "R:")) {
-                                                is_right = true;
-                                                break;
+                    // Collect injections from other loaded grammars
+                    if (grammar.GrammarLibrary.getLibrary()) |gml| {
+                        var cache_it = gml.cache.iterator();
+                        while (cache_it.next()) |kv| {
+                            const g = kv.value_ptr.*;
+                            if (g == self.lang) continue;
+                            if (g.syntax) |root_syn| {
+                                if (root_syn.injections) |*injs| {
+                                    var inj_it = injs.iterator();
+                                    while (inj_it.next()) |inj_kv| {
+                                        const selector = inj_kv.key_ptr.*;
+                                        const inj_node = inj_kv.value_ptr.*;
+                                        if (matchesScopeSelector(scopes.items, selector)) {
+                                            var is_right = false;
+                                            var alt_it = std.mem.splitScalar(u8, selector, ',');
+                                            while (alt_it.next()) |alt| {
+                                                const trimmed = std.mem.trim(u8, alt, " \t\r\n");
+                                                if (std.mem.startsWith(u8, trimmed, "R:")) {
+                                                    is_right = true;
+                                                    break;
+                                                }
                                             }
-                                        }
-                                        if (inj_node.patterns) |inj_pats| {
-                                            for (inj_pats.items) |ip| {
-                                                if (is_right) {
-                                                    right_injections.append(self.allocator, ip) catch {};
-                                                } else {
-                                                    left_injections.append(self.allocator, ip) catch {};
+                                            if (inj_node.patterns) |inj_pats| {
+                                                for (inj_pats.items) |ip| {
+                                                    if (is_right) {
+                                                        right_injections.append(self.allocator, ip) catch {};
+                                                    } else {
+                                                        left_injections.append(self.allocator, ip) catch {};
+                                                    }
                                                 }
                                             }
                                         }
@@ -1061,7 +1062,6 @@ pub const Parser = struct {
                 }
             }
         }
-    }
 
         var all_pats: std.ArrayList(*Syntax) = .empty;
         defer all_pats.deinit(self.allocator);

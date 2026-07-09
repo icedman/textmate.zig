@@ -69,7 +69,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     less_exe_mod.addImport("textmate_lib", lib_mod);
-    
+
     const test_runner_mod = b.createModule(.{
         .root_source_file = b.path("src/test_runner.zig"),
         .target = target,
@@ -116,14 +116,14 @@ pub fn build(b: *std.Build) void {
     lua_library.linkSystemLibrary("lua");
     lua_library.linkSystemLibrary("luajit");
     b.installArtifact(lua_library);
-    
+
     const test_runner_exe = b.addExecutable(.{
         .name = "test_runner",
         .root_module = test_runner_mod,
     });
     b.installArtifact(test_runner_exe);
     const run_test_runner_cmd = b.addRunArtifact(test_runner_exe);
-    
+
     // oniguruma
     if (b.lazyDependency("oniguruma", .{
         .target = target,
@@ -166,7 +166,7 @@ pub fn build(b: *std.Build) void {
 
     // const run_test_runner_step = b.step("tests", "Run textmate tests");
     // run_test_runner_step.dependOn(&run_test_runner_cmd.step);
-    
+
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
     const lib_unit_tests = b.addTest(.{
