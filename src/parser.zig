@@ -349,8 +349,8 @@ pub const Parser = struct {
 
     // Line parsing caches.
     match_cache: std.AutoHashMap(u64, Match), // Syntax-level cache mapping rule hashes to Match structs.
-    exec_cache: std.AutoHashMap(u64, Match),  // Regex-level cache mapping regex pattern hashes to Match structs.
-    begin_matches: std.ArrayList(Match),       // Tracks current match history to prevent endless loop cycles.
+    exec_cache: std.AutoHashMap(u64, Match), // Regex-level cache mapping regex pattern hashes to Match structs.
+    begin_matches: std.ArrayList(Match), // Tracks current match history to prevent endless loop cycles.
 
     // Map of runtime-compiled rules (e.g. dynamic patterns generated from backreferences).
     regex_map: std.AutoHashMap(u64, grammar.Rule),
@@ -847,6 +847,7 @@ pub const Parser = struct {
     fn matchPatterns(self: *Parser, syntax: *const Syntax, patterns: ?std.ArrayList(*Syntax), block: []const u8, start: usize, end: usize) Match {
         var earliest_match = Match{};
 
+        // TODO handle injections at grammar load time?
         var left_injections_items: []const *Syntax = &.{};
         var right_injections_items: []const *Syntax = &.{};
 
