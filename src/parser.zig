@@ -472,15 +472,14 @@ pub const Parser = struct {
                 should_cache = !rx.is_anchored and !rx.is_anchored_at_start;
                 if (should_cache) {
                     if (self.exec_cache.get(rx.id)) |mm| {
-                        if (mm.anchor_start == hard_start and mm.start > hard_start) {
-                            // std.debug.print("findMatch cache {s} {} {}-{}\n", .{rx.expr orelse "", start, mm.start, mm.end});
+                        if (mm.anchor_start <= hard_start and mm.start >= hard_start and mm.count > 0) {
                             self.regex_skips += 1;
                             var res = mm;
                             res.syntax = syntax;
                             res.regex = rx;
                             return res;
                         }
-                        if (mm.anchor_start == hard_start and mm.count == 0) {
+                        if (mm.anchor_start <= hard_start and mm.count == 0) {
                             self.regex_skips += 1;
                             var res = mm;
                             res.syntax = syntax;
@@ -570,10 +569,8 @@ pub const Parser = struct {
                 // std.debug.print("{s}\n", .{syntax.content_name});
                 // }
 
-                if (should_cache and (m.count == 0 or (m.count > 0 and m.start > hard_start))) {
-                    if (!rx.is_anchored and !rx.is_anchored_at_start) {
-                        self.exec_cache.put(rx.id, m) catch {};
-                    }
+                if (should_cache) {
+                    self.exec_cache.put(rx.id, m) catch {};
                 }
 
                 return m;
@@ -631,7 +628,7 @@ pub const Parser = struct {
                 //     std.debug.print("{s}\n\t {s} {s} {}\n", .{syntax.rx_match.expr orelse "", syntax.getName(), block[start..end], m.count});
                 // }
 
-                if (should_cache and config.enable_match_caching and m.count == 0) {
+                if (should_cache and config.enable_match_caching) {
                     if (syntax.rx_match.id != 0 and !syntax.rx_match.is_anchored and !syntax.rx_match.is_anchored_at_start)
                         _ = self.match_cache.put(syntax.rx_match.id, m) catch {};
                 }
@@ -676,7 +673,7 @@ pub const Parser = struct {
                     return Match{};
                 }
 
-                if (should_cache and config.enable_match_caching and m.count == 0) {
+                if (should_cache and config.enable_match_caching) {
                     if (!syntax.rx_begin.is_anchored and !syntax.rx_begin.is_anchored_at_start)
                         _ = self.match_cache.put(syntax.rx_begin.id, m) catch {};
                 }
