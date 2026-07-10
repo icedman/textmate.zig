@@ -270,6 +270,7 @@ pub const ParseState = struct {
                                 // if unable to compile... don't push otherwise we won't be able to exit
                                 return;
                             };
+                            self.owner.regex_compiles += 1;
                             if (sc.rx_end.id > 0) {
                                 // std.debug.print("{} {s} {}\n", .{sc.rx_end.id, expr, expr.len});
                                 try self.owner.regex_map.put(sc.rx_end.id, sc.rx_end);
@@ -292,6 +293,7 @@ pub const ParseState = struct {
                                 sc.rx_while.compile(expr) catch {
                                     // std.debug.print("unable to compile {s} < {s}<\n", .{ regexs, expr });
                                 };
+                                self.owner.regex_compiles += 1;
                                 if (sc.rx_while.id > 0) {
                                     try self.owner.regex_map.put(sc.rx_while.id, sc.rx_while);
                                 }
@@ -371,6 +373,7 @@ pub const Parser = struct {
     regex_skips: u32 = 0,
     total_pats: usize = 0,
     deepest: u32 = 0,
+    regex_compiles: u32 = 0,
 
     current_state: ?*ParseState = null,
 
@@ -1433,6 +1436,7 @@ pub const Parser = struct {
         self.regex_skips = 0;
         self.total_pats = 0;
         self.deepest = 0;
+        self.regex_compiles = 0;
     }
 
     pub fn serialize(self: *Parser, state: *ParseState, serial: *std.ArrayList(StateContextPack)) !void {

@@ -280,6 +280,7 @@ pub fn main() !void {
             std.debug.print("patterns/line: {}\n", .{par.total_pats / line_no});
         }
         std.debug.print("skips: {}\n", .{par.regex_skips});
+        std.debug.print("compiles: {}\n", .{par.regex_compiles});
         std.debug.print("warmup in {d:.6}s\n", .{warm_elapsed});
         std.debug.print("done in {d:.6}s\n", .{elapsed});
         std.debug.print("state depth: {}\n", .{state.size()});
