@@ -372,6 +372,9 @@ pub const Parser = struct {
 
     current_state: ?*ParseState = null,
 
+    // Persistent region buffer to avoid heap allocations on every search
+    region: oni.Region = .{},
+
     pub fn init(allocator: Allocator, lang: *grammar.Grammar) !Parser {
         return Parser{
             .allocator = allocator,
@@ -382,6 +385,7 @@ pub const Parser = struct {
             .regex_map = std.AutoHashMap(u64, grammar.Rule).init(allocator),
             .strings = try StringsArena.init(allocator),
             .transient_strings = try StringsArena.init(allocator),
+            .region = .{},
         };
     }
 
@@ -400,6 +404,7 @@ pub const Parser = struct {
         self.regex_map.deinit();
         self.strings.deinit();
         self.transient_strings.deinit();
+        self.region.deinit();
     }
 
     pub fn initState(self: *Parser) !ParseState {
@@ -497,24 +502,23 @@ pub const Parser = struct {
                 break :blk false;
             };
 
-            const reg = blk: {
-                var result: oni.Region = .{};
-                _ = @constCast(re).searchAdvanced(block, hard_start, hard_end, &result, .{
+            const matched = blk: {
+                _ = @constCast(re).searchAdvanced(block, hard_start, hard_end, &self.region, .{
                     .not_begin_string = false,
                     .not_end_string = (hard_start != hard_end and block[hard_end - 1] == '\n'),
                     .not_begin_position = not_begin_pos,
                 }) catch |err| {
                     if (err == error.Mismatch) {
-                        break :blk null; // return null instead
+                        break :blk false;
                     } else {
                         return Match{};
                     }
                 };
-                break :blk result;
+                break :blk true;
             };
 
-            if (reg) |*r| {
-                defer @constCast(r).deinit();
+            if (matched) {
+                const r = &self.region;
                 var m = Match{
                     .syntax = syntax,
                     .regex = rx,
