@@ -231,6 +231,7 @@ pub const ParseState = struct {
         if (self.stack.items.len > 0) {
             _ = self.stack.pop();
             _ = where;
+            self.owner.injections_dirty = true;
             // std.debug.print("state pop {} - {s}\n", .{ self.size(), where });
         }
     }
@@ -303,6 +304,7 @@ pub const ParseState = struct {
         }
 
         _ = try self.stack.append(self.allocator, sc);
+        self.owner.injections_dirty = true;
         _ = where;
         // std.debug.print("push {s}\n", .{syntax.getName()});
     }
@@ -375,6 +377,10 @@ pub const Parser = struct {
     // Persistent region buffer to avoid heap allocations on every search
     region: oni.Region = .{},
 
+    left_injections: std.ArrayList(*Syntax),
+    right_injections: std.ArrayList(*Syntax),
+    injections_dirty: bool = true,
+
     pub fn init(allocator: Allocator, lang: *grammar.Grammar) !Parser {
         return Parser{
             .allocator = allocator,
@@ -386,6 +392,9 @@ pub const Parser = struct {
             .strings = try StringsArena.init(allocator),
             .transient_strings = try StringsArena.init(allocator),
             .region = .{},
+            .left_injections = .empty,
+            .right_injections = .empty,
+            .injections_dirty = true,
         };
     }
 
@@ -405,6 +414,8 @@ pub const Parser = struct {
         self.strings.deinit();
         self.transient_strings.deinit();
         self.region.deinit();
+        self.left_injections.deinit(self.allocator);
+        self.right_injections.deinit(self.allocator);
     }
 
     pub fn initState(self: *Parser) !ParseState {
@@ -865,89 +876,91 @@ pub const Parser = struct {
     fn matchPatterns(self: *Parser, syntax: *const Syntax, patterns: ?std.ArrayList(*Syntax), block: []const u8, start: usize, end: usize) Match {
         var earliest_match = Match{};
 
-        var left_injections_buffer: [32]*Syntax = undefined;
-        var left_injections = std.ArrayListUnmanaged(*Syntax).initBuffer(&left_injections_buffer);
-
-        var right_injections_buffer: [32]*Syntax = undefined;
-        var right_injections = std.ArrayListUnmanaged(*Syntax).initBuffer(&right_injections_buffer);
+        var left_injections_items: []const *Syntax = &.{};
+        var right_injections_items: []const *Syntax = &.{};
 
         if (syntax.scope_name.len > 0) {
             if (self.current_state) |state| {
-                var scopes_buffer: [64][]const u8 = undefined;
-                var scopes = std.ArrayListUnmanaged([]const u8).initBuffer(&scopes_buffer);
+                if (self.injections_dirty) {
+                    self.left_injections.clearRetainingCapacity();
+                    self.right_injections.clearRetainingCapacity();
 
-                for (state.stack.items) |ctx| {
-                    const name = ctx.syntax.getName();
-                    if (name.len > 0) {
-                        var it = std.mem.splitScalar(u8, name, ' ');
-                        while (it.next()) |tok| {
-                            if (tok.len > 0) {
-                                scopes.append(self.allocator, tok) catch {};
+                    var scopes_buffer: [64][]const u8 = undefined;
+                    var scopes = std.ArrayListUnmanaged([]const u8).initBuffer(&scopes_buffer);
+
+                    for (state.stack.items) |ctx| {
+                        const name = ctx.syntax.getName();
+                        if (name.len > 0) {
+                            var it = std.mem.splitScalar(u8, name, ' ');
+                            while (it.next()) |tok| {
+                                if (tok.len > 0) {
+                                    scopes.append(self.allocator, tok) catch {};
+                                }
                             }
                         }
                     }
-                }
 
-                if (scopes.items.len > 0) {
-                    // Collect injections from self.lang
-                    if (self.lang.syntax) |root_syn| {
-                        if (root_syn.injections) |*injs| {
-                            var inj_it = injs.iterator();
-                            while (inj_it.next()) |inj_kv| {
-                                const selector = inj_kv.key_ptr.*;
-                                const inj_node = inj_kv.value_ptr.*;
-                                if (scope.matchesScopeSelector(scopes.items, selector)) {
-                                    var is_right = false;
-                                    var alt_it = std.mem.splitScalar(u8, selector, ',');
-                                    while (alt_it.next()) |alt| {
-                                        const trimmed = std.mem.trim(u8, alt, " \t\r\n");
-                                        if (std.mem.startsWith(u8, trimmed, "R:")) {
-                                            is_right = true;
-                                            break;
+                    if (scopes.items.len > 0) {
+                        // Collect injections from self.lang
+                        if (self.lang.syntax) |root_syn| {
+                            if (root_syn.injections) |*injs| {
+                                var inj_it = injs.iterator();
+                                while (inj_it.next()) |inj_kv| {
+                                    const selector = inj_kv.key_ptr.*;
+                                    const inj_node = inj_kv.value_ptr.*;
+                                    if (scope.matchesScopeSelector(scopes.items, selector)) {
+                                        var is_right = false;
+                                        var alt_it = std.mem.splitScalar(u8, selector, ',');
+                                        while (alt_it.next()) |alt| {
+                                            const trimmed = std.mem.trim(u8, alt, " \t\r\n");
+                                            if (std.mem.startsWith(u8, trimmed, "R:")) {
+                                                is_right = true;
+                                                break;
+                                            }
                                         }
-                                    }
-                                    if (inj_node.patterns) |inj_pats| {
-                                        for (inj_pats.items) |ip| {
-                                            if (is_right) {
-                                                right_injections.appendBounded(ip) catch {};
-                                            } else {
-                                                left_injections.appendBounded(ip) catch {};
+                                        if (inj_node.patterns) |inj_pats| {
+                                            for (inj_pats.items) |ip| {
+                                                if (is_right) {
+                                                    self.right_injections.append(self.allocator, ip) catch {};
+                                                } else {
+                                                    self.left_injections.append(self.allocator, ip) catch {};
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
 
-                    // Collect injections from other loaded grammars
-                    if (grammar.GrammarLibrary.getLibrary()) |gml| {
-                        var cache_it = gml.cache.iterator();
-                        while (cache_it.next()) |kv| {
-                            const g = kv.value_ptr.*;
-                            if (g == self.lang) continue;
-                            if (g.syntax) |root_syn| {
-                                if (root_syn.injections) |*injs| {
-                                    var inj_it = injs.iterator();
-                                    while (inj_it.next()) |inj_kv| {
-                                        const selector = inj_kv.key_ptr.*;
-                                        const inj_node = inj_kv.value_ptr.*;
-                                        if (scope.matchesScopeSelector(scopes.items, selector)) {
-                                            var is_right = false;
-                                            var alt_it = std.mem.splitScalar(u8, selector, ',');
-                                            while (alt_it.next()) |alt| {
-                                                const trimmed = std.mem.trim(u8, alt, " \t\r\n");
-                                                if (std.mem.startsWith(u8, trimmed, "R:")) {
-                                                    is_right = true;
-                                                    break;
+                        // Collect injections from other loaded grammars
+                        if (grammar.GrammarLibrary.getLibrary()) |gml| {
+                            var cache_it = gml.cache.iterator();
+                            while (cache_it.next()) |kv| {
+                                const g = kv.value_ptr.*;
+                                if (g == self.lang) continue;
+                                if (g.syntax) |root_syn| {
+                                    if (root_syn.injections) |*injs| {
+                                        var inj_it = injs.iterator();
+                                        while (inj_it.next()) |inj_kv| {
+                                            const selector = inj_kv.key_ptr.*;
+                                            const inj_node = inj_kv.value_ptr.*;
+                                            if (scope.matchesScopeSelector(scopes.items, selector)) {
+                                                var is_right = false;
+                                                var alt_it = std.mem.splitScalar(u8, selector, ',');
+                                                while (alt_it.next()) |alt| {
+                                                    const trimmed = std.mem.trim(u8, alt, " \t\r\n");
+                                                    if (std.mem.startsWith(u8, trimmed, "R:")) {
+                                                        is_right = true;
+                                                        break;
+                                                    }
                                                 }
-                                            }
-                                            if (inj_node.patterns) |inj_pats| {
-                                                for (inj_pats.items) |ip| {
-                                                    if (is_right) {
-                                                        right_injections.appendBounded(ip) catch {};
-                                                    } else {
-                                                        left_injections.appendBounded(ip) catch {};
+                                                if (inj_node.patterns) |inj_pats| {
+                                                    for (inj_pats.items) |ip| {
+                                                        if (is_right) {
+                                                            self.right_injections.append(self.allocator, ip) catch {};
+                                                        } else {
+                                                            self.left_injections.append(self.allocator, ip) catch {};
+                                                        }
                                                     }
                                                 }
                                             }
@@ -957,14 +970,17 @@ pub const Parser = struct {
                             }
                         }
                     }
+                    self.injections_dirty = false;
                 }
+                left_injections_items = self.left_injections.items;
+                right_injections_items = self.right_injections.items;
             }
         }
 
         var pats_buffer: [256]*Syntax = undefined;
         var all_pats = std.ArrayListUnmanaged(*Syntax).initBuffer(&pats_buffer);
 
-        for (left_injections.items) |p| {
+        for (left_injections_items) |p| {
             all_pats.appendBounded(p) catch {};
         }
         if (patterns) |pats| {
@@ -972,7 +988,7 @@ pub const Parser = struct {
                 all_pats.appendBounded(p) catch {};
             }
         }
-        for (right_injections.items) |p| {
+        for (right_injections_items) |p| {
             all_pats.appendBounded(p) catch {};
         }
 
@@ -1433,6 +1449,7 @@ pub const Parser = struct {
             try sc.deserialize(self, item);
             try state.stack.append(sc);
         }
+        self.injections_dirty = true;
     }
 };
 

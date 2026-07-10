@@ -11,6 +11,7 @@ The TextMate parsing process runs in linear time $O(N)$ relative to the number o
 2. **Sub-optimal Regex Match Caching** *(Optimized)*: Cache retrieval conditions in [Parser.findMatch](file:///home/iceman/Developer/zig/textmate.zig/src/parser.zig#L433-L584) were overly restrictive. We have implemented range-based validation and cached successful matches to drastically reduce redundant regex engine searches.
 3. **Dynamic Selector Parsing**: Parsing complex scope selector expressions character-by-character at runtime for every rule evaluation.
 4. **Frequent Heap Allocations** *(Optimized)*: We have eliminated heap allocations and deallocations per regex execution by reusing a persistent [oni.Region](file:///home/iceman/Developer/zig/textmate.zig/pkg/oniguruma/region.zig#L4-L51) buffer inside the parser.
+5. **Over-evaluation of Child Patterns during End Matches** *(OPTIMIZED)*
 
 ---
 
@@ -28,6 +29,12 @@ For every call to `matchPatterns`, if the rule has a scope name, the parser:
 
 #### Why it is a bottleneck:
 The scope stack only changes when a rule context is **pushed**, **popped**, or **deserialized**. However, the parser executes `matchPatterns` at every matching step along a line. Re-evaluating and reconstructing active injections when the scope stack is identical results in >95% redundant computation.
+
+#### Architectural Reference: `syntect` (Rust)
+In [syntect](file:///home/iceman/Developer/zig/textmate.zig/resources/syntect/src/highlighting/highlighter.rs), scope and style state evaluations are optimized using a parallel caching stack ([HighlightState](file:///home/iceman/Developer/zig/textmate.zig/resources/syntect/src/highlighting/highlighter.rs#L59) which contains `styles` and `single_caches` parallel vectors). 
+* **Incremental Push**: When pushing a new scope, the style modifier is computed incrementally based on the previous stack's style.
+* **$O(1)$ Pop**: When popping a scope, the top style is simply popped from the styles vector without re-evaluation.
+By storing pre-evaluated styles per stack level, `syntect` completely avoids traversing the full scope stack or re-matching all scope selectors on most steps.
 
 ---
 
@@ -72,7 +79,7 @@ We added a persistent `region: oni.Region` field directly to the `Parser` struct
 
 ---
 
-### 5. Over-evaluation of Child Patterns during End Matches
+### 5. Over-evaluation of Child Patterns during End Matches **[OPTIMIZED]**
 **Location**: [Parser.parseLine](file:///home/iceman/Developer/zig/textmate.zig/src/parser.zig#L1219-L1226)
 
 #### The Issue:
@@ -101,13 +108,35 @@ The C grammar illustrates why these bottlenecks are so destructive:
 ## Actionable Recommendations
 
 ### Recommendation 1: Implement Stack-Based Injection Caching
-Add cached injection fields to the `Parser` struct:
+
+Drawing inspiration from `syntect`'s parallel stack cache design, we can optimize grammar injection lookup by avoiding scope-selector parsing and stack traversal during normal pattern matching steps. We propose two design options:
+
+#### Option A: Parser-Level Dirty Caching (Simplest)
+Add cached injection fields and an invalidation flag to the `Parser` struct:
 ```zig
 left_injections: std.ArrayList(*Syntax),
 right_injections: std.ArrayList(*Syntax),
 injections_dirty: bool = true,
 ```
-Mark `injections_dirty = true` on `push`, `pop`, and `deserialize`. In `matchPatterns`, only re-collect and re-evaluate injections if `injections_dirty` is true, otherwise reuse the cached list.
+1. In `push`, `pop`, and `deserialize`, set `injections_dirty = true`.
+2. In `matchPatterns`, if `injections_dirty` is true, re-collect active injections (evaluating selectors) and set `injections_dirty = false`. Otherwise, immediately reuse `left_injections` and `right_injections`.
+
+* **Pros**: Simple to implement, low memory footprint, and requires zero modifications to the serialized `StateContext` structures.
+
+#### Option B: Parallel Injection Stack / Context-Level Caching (Most Performant)
+Store the pre-computed active injections directly inside each [StateContext](file:///home/iceman/Developer/zig/textmate.zig/src/parser.zig#L158-L190) (or in a parallel stack owned by the parser):
+```zig
+const StateContext = struct {
+    // ... existing fields ...
+    left_injections: std.ArrayListUnmanaged(*Syntax) = .{},
+    right_injections: std.ArrayListUnmanaged(*Syntax) = .{},
+};
+```
+1. When a new context is **pushed** onto the stack, compute its active injections by merging the parent context's injections with any new injections matched by the new scope level.
+2. When a context is **popped**, simply pop it off the stack. The new top context already contains its pre-computed injection lists.
+3. During `matchPatterns`, fetch active injections directly from the top stack context in $O(1)$ time.
+
+* **Pros**: Reaches $O(1)$ injection lookup per step, eliminates redundant injection scans even when backtracking or switching between deeply nested contexts, and follows the clean parallel-caching stack pattern used by `syntect`.
 
 ### Recommendation 2: Improve Regex Cache Matching Conditions **[RESOLVED & IMPLEMENTED]**
 We implemented range-based validation for cached mismatches and matches, and enabled caching for successful matches:
@@ -121,5 +150,5 @@ Parse selector strings once into an AST or token stream during grammar JSON load
 ### Recommendation 4: Reuse Oniguruma Region Buffers **[RESOLVED & IMPLEMENTED]**
 Added a persistent `region` buffer to the `Parser` struct, avoiding heap allocation/deallocation on every single search step.
 
-### Recommendation 5: Optimize End-Match Short-Circuiting
+### Recommendation 5: Optimize End-Match Short-Circuiting **[RESOLVED & IMPLEMENTED]**
 Relax the short-circuiting condition in `parseLine` so that if an end match is found at the current position, the parser can skip child pattern matching without requiring the match to extend to the end of the line.
