@@ -25,6 +25,7 @@ pub const SpanCaptures = struct {
 // TODO comptime this
 pub const Processor = struct {
     allocator: Allocator,
+    io: std.Io = undefined,
     captures: ArrayList(ParseCapture),
     spans: ArrayList(SpanCaptures),
 
@@ -282,9 +283,10 @@ pub const Processor = struct {
 };
 
 pub const NullProcessor = struct {
-    pub fn init(allocator: Allocator) !Processor {
+    pub fn init(io: std.Io, allocator: Allocator) !Processor {
         return Processor{
             .allocator = allocator,
+            .io = io,
             .captures = try ArrayList(ParseCapture).initCapacity(allocator, 32),
             .spans = try ArrayList(SpanCaptures).initCapacity(allocator, 32),
         };

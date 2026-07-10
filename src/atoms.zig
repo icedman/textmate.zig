@@ -83,18 +83,22 @@ pub fn extractAtom(scope_: []const u8, map: *std.StringHashMap(u32)) void {
 
 // Given the default 60 themes only 743 unique IDs were generated (u128 for ID with u10 for 11 atom IDs will be more than enough)
 fn testLoadingAllThemes(allocator: std.mem.Allocator) !void {
+    var threaded = std.Io.Threaded.init(allocator, .{});
+    defer threaded.deinit();
+    const io = threaded.io();
+
     var map = std.StringHashMap(u32).init(allocator);
     defer map.deinit();
 
     var list = std.ArrayList(ThemeInfo).init(allocator);
     defer list.deinit();
-    try resources.listThemes(allocator, "./src/themes", &list);
+    try resources.listThemes(io, allocator, "./src/themes", &list);
 
     var themes = std.ArrayList(theme.Theme).init(allocator);
     defer themes.deinit();
     for (list.items) |item| {
         const p: []const u8 = &item.full_path;
-        const thm = theme.Theme.init(allocator, strings.toSlice([]const u8, p)) catch {
+        const thm = theme.Theme.init(io, allocator, strings.toSlice([]const u8, p)) catch {
             unreachable;
         };
 

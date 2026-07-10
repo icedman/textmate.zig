@@ -28,7 +28,7 @@ pub const GrammarInfo = struct {
     id: usize = 0, // for caching purposed
     name: [MAX_NAME_LENGTH]u8 = [_]u8{0} ** MAX_NAME_LENGTH,
     scope_name: [MAX_NAME_LENGTH]u8 = [_]u8{0} ** MAX_NAME_LENGTH,
-    full_path: [std.fs.max_path_bytes]u8 = [_]u8{0} ** std.fs.max_path_bytes,
+    full_path: [std.Io.Dir.max_path_bytes]u8 = [_]u8{0} ** std.Io.Dir.max_path_bytes,
     file_types: [MAX_FILE_TYPES][MAX_EXT_LENGTH]u8 = [_][MAX_EXT_LENGTH]u8{[_]u8{0} ** MAX_EXT_LENGTH} ** MAX_FILE_TYPES,
     file_types_count: u8 = 0,
     inject_only: bool = false,
@@ -41,22 +41,22 @@ pub const ThemeInfo = struct {
     id: usize = 0, // for caching purposes
     name: [MAX_NAME_LENGTH]u8 = [_]u8{0} ** MAX_NAME_LENGTH,
     author: [MAX_NAME_LENGTH]u8 = [_]u8{0} ** MAX_NAME_LENGTH,
-    full_path: [std.fs.max_path_bytes]u8 = [_]u8{0} ** std.fs.max_path_bytes,
+    full_path: [std.Io.Dir.max_path_bytes]u8 = [_]u8{0} ** std.Io.Dir.max_path_bytes,
     embedded_file: ?[]const u8 = null,
 };
 
-pub fn getGrammarInfo(allocator: Allocator, path: []const u8, full_path: []const u8) !GrammarInfo {
+pub fn getGrammarInfo(io: std.Io, allocator: Allocator, path: []const u8, full_path: []const u8) !GrammarInfo {
     // if (std.mem.indexOf(u8, path, ".plist")) |_| {
     //     return error.InvalidGrammar;
     // }
     // std.debug.print("{s}\n", .{path});
     _ = path;
 
-    const file = try std.fs.cwd().openFile(full_path, .{});
-    defer file.close();
+    const file = try std.Io.Dir.cwd().openFile(io, full_path, .{});
+    defer file.close(io);
     // const file_size = (try file.stat()).size;
     // const file_contents = try file.readToEndAlloc(allocator, file_size);
-    const file_contents = try std.fs.cwd().readFileAlloc(full_path, allocator, .limited(1 << 30));
+    const file_contents = try std.Io.Dir.cwd().readFileAlloc(io, full_path, allocator, .limited(1 << 30));
     defer allocator.free(file_contents);
 
     const parsed = try std.json.parseFromSlice(std.json.Value, allocator, file_contents, .{ .ignore_unknown_fields = true });
@@ -114,18 +114,18 @@ pub fn getGrammarInfo(allocator: Allocator, path: []const u8, full_path: []const
 }
 
 /// read grammars from a directory
-pub fn listGrammars(allocator: Allocator, path: []const u8, list: *std.ArrayList(GrammarInfo)) !void {
-    const dir = std.fs.cwd().openDir(path, .{ .iterate = true }) catch unreachable;
+pub fn listGrammars(io: std.Io, allocator: Allocator, path: []const u8, list: *std.ArrayList(GrammarInfo)) !void {
+    const dir = std.Io.Dir.cwd().openDir(io, path, .{ .iterate = true }) catch unreachable;
     var walker = dir.walk(allocator) catch unreachable;
     defer walker.deinit();
 
-    while (try walker.next()) |entry| {
-        if (entry.kind != std.fs.File.Kind.file) {
+    while (try walker.next(io)) |entry| {
+        if (entry.kind != std.Io.File.Kind.file) {
             continue;
         }
-        const tmp = try std.fs.path.join(allocator, &.{ path, entry.path });
+        const tmp = try std.Io.Dir.path.join(allocator, &.{ path, entry.path });
         defer allocator.free(tmp);
-        var gi = try getGrammarInfo(allocator, entry.path, tmp);
+        var gi = try getGrammarInfo(io, allocator, entry.path, tmp);
 
         gi.id = list.items.len + 1;
 
@@ -140,8 +140,8 @@ pub fn listGrammars(allocator: Allocator, path: []const u8, list: *std.ArrayList
     }
 }
 
-pub fn addGrammar(allocator: Allocator, path: []const u8, list: *std.ArrayList(GrammarInfo)) !GrammarInfo {
-    var gi = try getGrammarInfo(allocator, path, path);
+pub fn addGrammar(io: std.Io, allocator: Allocator, path: []const u8, list: *std.ArrayList(GrammarInfo)) !GrammarInfo {
+    var gi = try getGrammarInfo(io, allocator, path, path);
     gi.id = list.items.len + 1;
     try list.append(allocator, gi);
     return gi;
@@ -149,19 +149,23 @@ pub fn addGrammar(allocator: Allocator, path: []const u8, list: *std.ArrayList(G
 
 test "get grammars" {
     const allocator = std.testing.allocator;
+    var threaded = std.Io.Threaded.init(allocator, .{});
+    defer threaded.deinit();
+    const io = threaded.io();
+
     var list = try std.ArrayList(GrammarInfo).initCapacity(allocator, 256);
     defer list.deinit(allocator);
-    try listGrammars(allocator, "./src/resources/grammars", &list);
+    try listGrammars(io, allocator, "./src/resources/grammars", &list);
 }
 
-pub fn getThemeInfo(allocator: Allocator, path: []const u8, full_path: []const u8) !ThemeInfo {
+pub fn getThemeInfo(io: std.Io, allocator: Allocator, path: []const u8, full_path: []const u8) !ThemeInfo {
     // std.debug.print("{s}\n", .{path});
     _ = path;
 
-    const file = try std.fs.cwd().openFile(full_path, .{});
-    defer file.close();
+    const file = try std.Io.Dir.cwd().openFile(io, full_path, .{});
+    defer file.close(io);
     // const file_size = (try file.stat()).size;
-    const file_contents = try std.fs.cwd().readFileAlloc(full_path, allocator, .limited(1 << 30));
+    const file_contents = try std.Io.Dir.cwd().readFileAlloc(io, full_path, allocator, .limited(1 << 30));
     // try file.readToEndAlloc(allocator, file_size);
     defer allocator.free(file_contents);
 
@@ -192,18 +196,18 @@ pub fn getThemeInfo(allocator: Allocator, path: []const u8, full_path: []const u
 }
 
 /// read themes from a directory
-pub fn listThemes(allocator: Allocator, path: []const u8, list: *std.ArrayList(ThemeInfo)) !void {
-    const dir = std.fs.cwd().openDir(path, .{ .iterate = true }) catch unreachable;
+pub fn listThemes(io: std.Io, allocator: Allocator, path: []const u8, list: *std.ArrayList(ThemeInfo)) !void {
+    const dir = std.Io.Dir.cwd().openDir(io, path, .{ .iterate = true }) catch unreachable;
     var walker = dir.walk(allocator) catch unreachable;
     defer walker.deinit();
 
-    while (try walker.next()) |entry| {
-        if (entry.kind != std.fs.File.Kind.file) {
+    while (try walker.next(io)) |entry| {
+        if (entry.kind != std.Io.File.Kind.file) {
             continue;
         }
-        const tmp = try std.fs.path.join(allocator, &.{ path, entry.path });
+        const tmp = try std.Io.Dir.path.join(allocator, &.{ path, entry.path });
         defer allocator.free(tmp);
-        const ti = try getThemeInfo(allocator, entry.path, tmp);
+        const ti = try getThemeInfo(io, allocator, entry.path, tmp);
 
         // std.debug.print("{s}\n", .{ti.name});
         // std.debug.print("  {s}\n", .{ti.author});
@@ -213,23 +217,23 @@ pub fn listThemes(allocator: Allocator, path: []const u8, list: *std.ArrayList(T
     }
 }
 
-pub fn addThemes(allocator: Allocator, path: []const u8, list: *std.ArrayList(ThemeInfo)) !void {
-    const ti = try getThemeInfo(allocator, path, path);
+pub fn addThemes(io: std.Io, allocator: Allocator, path: []const u8, list: *std.ArrayList(ThemeInfo)) !void {
+    const ti = try getThemeInfo(io, allocator, path, path);
     try list.append(allocator, ti);
 }
 
-pub fn addTheme(allocator: Allocator, path: []const u8, list: *std.ArrayList(ThemeInfo)) !ThemeInfo {
-    var gi = try getThemeInfo(allocator, path, path);
+pub fn addTheme(io: std.Io, allocator: Allocator, path: []const u8, list: *std.ArrayList(ThemeInfo)) !ThemeInfo {
+    var gi = try getThemeInfo(io, allocator, path, path);
     gi.id = list.items.len + 1;
     try list.append(allocator, gi);
     return gi;
 }
 
 // This is only used at build time to generate embedded.zig
-pub fn generateEmbeddedThemesFile(allocator: Allocator, writer: anytype, prefix: []const u8, path: []const u8) !void {
+pub fn generateEmbeddedThemesFile(io: std.Io, allocator: Allocator, writer: anytype, prefix: []const u8, path: []const u8) !void {
     var list = try std.ArrayList(ThemeInfo).initCapacity(allocator, 128);
     defer list.deinit(allocator);
-    try listThemes(allocator, path, &list);
+    try listThemes(io, allocator, path, &list);
 
     try writer.print("{s}", .{
         \\// This is a generated file. Do not edit manually
@@ -277,10 +281,10 @@ pub fn generateEmbeddedThemesFile(allocator: Allocator, writer: anytype, prefix:
     try writer.print("{c}\n", .{'}'});
 }
 
-pub fn generateEmbeddedGrammarsFile(allocator: Allocator, writer: anytype, prefix: []const u8, path: []const u8) !void {
+pub fn generateEmbeddedGrammarsFile(io: std.Io, allocator: Allocator, writer: anytype, prefix: []const u8, path: []const u8) !void {
     var list = try std.ArrayList(GrammarInfo).initCapacity(allocator, 256);
     defer list.deinit(allocator);
-    try listGrammars(allocator, path, &list);
+    try listGrammars(io, allocator, path, &list);
 
     try writer.print("{s}", .{
         \\
@@ -343,13 +347,16 @@ pub fn generateEmbeddedGrammarsFile(allocator: Allocator, writer: anytype, prefi
 
 test "get themes" {
     const allocator = std.testing.allocator;
+    var threaded = std.Io.Threaded.init(allocator, .{});
+    defer threaded.deinit();
+    const io = threaded.io();
 
     var stdout_buffer: [1024]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     const stdout = &stdout_writer.interface;
 
-    try generateEmbeddedThemesFile(allocator, stdout, "theme_", "./src/resources/themes");
-    try generateEmbeddedGrammarsFile(allocator, stdout, "grammar_", "./src/resources/grammars");
+    try generateEmbeddedThemesFile(io, allocator, stdout, "theme_", "./src/resources/themes");
+    try generateEmbeddedGrammarsFile(io, allocator, stdout, "grammar_", "./src/resources/grammars");
 
     // try stdout.flush();
 }

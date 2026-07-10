@@ -20,17 +20,17 @@ pub fn build(b: *std.Build) void {
                 defer assets_buffer.deinit(bb.allocator);
 
                 const themes_path = try bb.build_root.join(bb.allocator, &.{"src/resources/themes"});
-                try res.generateEmbeddedThemesFile(bb.allocator, res.ArrayListWriter{ .list = &assets_buffer, .allocator = bb.allocator }, "theme_", themes_path);
+                try res.generateEmbeddedThemesFile(bb.graph.io, bb.allocator, res.ArrayListWriter{ .list = &assets_buffer, .allocator = bb.allocator }, "theme_", themes_path);
 
                 const grammars_path = try bb.build_root.join(bb.allocator, &.{"src/resources/grammars"});
-                try res.generateEmbeddedGrammarsFile(bb.allocator, res.ArrayListWriter{ .list = &assets_buffer, .allocator = bb.allocator }, "grammar_", grammars_path);
+                try res.generateEmbeddedGrammarsFile(bb.graph.io, bb.allocator, res.ArrayListWriter{ .list = &assets_buffer, .allocator = bb.allocator }, "grammar_", grammars_path);
 
                 const embed_path = try bb.cache_root.join(bb.allocator, &.{"embedded.zig"});
                 std.debug.print("{s}\n", .{embed_path});
 
-                const embed_file = try std.fs.cwd().createFile(embed_path, .{ .truncate = true });
-                defer embed_file.close();
-                try embed_file.writeAll(assets_buffer.items);
+                const embed_file = try std.Io.Dir.createFileAbsolute(bb.graph.io, embed_path, .{});
+                defer embed_file.close(bb.graph.io);
+                try embed_file.writeStreamingAll(bb.graph.io, assets_buffer.items);
             }
         }.make,
     });
@@ -113,8 +113,8 @@ pub fn build(b: *std.Build) void {
         .root_module = lua_mod,
         .linkage = .dynamic,
     });
-    lua_library.linkSystemLibrary("lua");
-    lua_library.linkSystemLibrary("luajit");
+    lua_library.root_module.linkSystemLibrary("lua", .{});
+    lua_library.root_module.linkSystemLibrary("luajit", .{});
     b.installArtifact(lua_library);
 
     const test_runner_exe = b.addExecutable(.{

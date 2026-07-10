@@ -25,17 +25,17 @@ const Rgb = theme.Rgb;
 pub const RenderProcessor = struct {
     pub fn endLine(self: *Processor) void {
         var stdout_buffer: [1024]u8 = undefined;
-        var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+        var stdout_writer = std.Io.File.stdout().writer(self.io, &stdout_buffer);
         const stdout = &stdout_writer.interface;
         const spans = self.produce() catch @panic("unable to produce");
 
         if (self.theme) |thm| {
+            const fg_style = thm.getColor("editor.foreground") orelse thm.getColor("foreground");
+            const bg_style = thm.getColor("editor.background") orelse thm.getColor("background");
             const default_style = theme.Style{
-                .foreground_rgb = (thm.getColor("editor.foreground") orelse
-                    thm.getColor("foreground") orelse theme.Style{}).foreground_rgb,
+                .foreground_rgb = if (fg_style) |s| s.foreground_rgb else null,
                 // all colors in "colors" map will be in the foreground -> this is going to be a pitfall
-                .background_rgb = (thm.getColor("editor.background") orelse
-                    thm.getColor("background") orelse theme.Style{}).foreground_rgb,
+                .background_rgb = if (bg_style) |s| s.foreground_rgb else null,
             };
             for (spans.items) |span| {
                 var style = default_style;
@@ -66,9 +66,9 @@ pub const RenderProcessor = struct {
         stdout.flush() catch {};
     }
 
-    pub fn init(allocator: Allocator) !Processor {
+    pub fn init(io: std.Io, allocator: Allocator) !Processor {
         const self = RenderProcessor;
-        var proc = try NullProcessor.init(allocator);
+        var proc = try NullProcessor.init(io, allocator);
         proc.end_line_fn = self.endLine;
         return proc;
     }

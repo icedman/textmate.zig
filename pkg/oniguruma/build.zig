@@ -41,7 +41,7 @@ pub fn build(b: *std.Build) !void {
         module.linkSystemLibrary("oniguruma", dynamic_link_opts);
 
         if (test_exe) |exe| {
-            exe.linkSystemLibrary2("oniguruma", dynamic_link_opts);
+            exe.root_module.linkSystemLibrary("oniguruma", dynamic_link_opts);
         }
     } else {
         const lib = try buildLib(b, module, .{
@@ -50,7 +50,7 @@ pub fn build(b: *std.Build) !void {
         });
 
         if (test_exe) |exe| {
-            exe.linkLibrary(lib);
+            exe.root_module.linkLibrary(lib);
         }
     }
 }
@@ -68,7 +68,7 @@ fn buildLib(b: *std.Build, module: *std.Build.Module, options: anytype) !*std.Bu
         .linkage = .static,
     });
     const t = target.result;
-    lib.linkLibC();
+    lib.root_module.link_libc = true;
 
     if (target.result.os.tag.isDarwin()) {
         const apple_sdk = @import("apple_sdk");
@@ -76,10 +76,10 @@ fn buildLib(b: *std.Build, module: *std.Build.Module, options: anytype) !*std.Bu
     }
 
     if (b.lazyDependency("oniguruma", .{})) |upstream| {
-        lib.addIncludePath(upstream.path("src"));
+        lib.root_module.addIncludePath(upstream.path("src"));
         module.addIncludePath(upstream.path("src"));
 
-        lib.addConfigHeader(b.addConfigHeader(.{
+        lib.root_module.addConfigHeader(b.addConfigHeader(.{
             .style = .{ .cmake = upstream.path("src/config.h.cmake.in") },
         }, .{
             .PACKAGE = "oniguruma",
@@ -103,7 +103,7 @@ fn buildLib(b: *std.Build, module: *std.Build.Module, options: anytype) !*std.Bu
         var flags = try std.ArrayList([]const u8).initCapacity(b.allocator, 2048);
         defer flags.deinit(b.allocator);
         try flags.appendSlice(b.allocator, &.{});
-        lib.addCSourceFiles(.{
+        lib.root_module.addCSourceFiles(.{
             .root = upstream.path(""),
             .flags = flags.items,
             .files = &.{

@@ -17,7 +17,8 @@ const Rgb = theme.Rgb;
 
 pub const RenderHtmlProcessor = struct {
     pub fn startDocument(self: *Processor) void {
-        var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
+        var stdout_writer = std.Io.File.stdout().writerStreaming(self.io, &.{});
+        const stdout = &stdout_writer.interface;
 
         if (self.theme) |thm| {
             const bg_color = thm.getColor("editor.background") orelse
@@ -35,8 +36,8 @@ pub const RenderHtmlProcessor = struct {
     }
 
     pub fn endDocument(self: *Processor) void {
-        _ = self;
-        var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
+        var stdout_writer = std.Io.File.stdout().writerStreaming(self.io, &.{});
+        const stdout = &stdout_writer.interface;
 
         stdout.writeAll("</pre></body></html>") catch {};
         stdout.flush() catch {};
@@ -67,15 +68,16 @@ pub const RenderHtmlProcessor = struct {
     }
 
     pub fn endLine(self: *Processor) void {
-        var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
+        var stdout_writer = std.Io.File.stdout().writerStreaming(self.io, &.{});
+        const stdout = &stdout_writer.interface;
         const spans = self.produce() catch @panic("unable to produce");
 
         if (self.theme) |thm| {
+            const fg_style = thm.getColor("editor.foreground") orelse thm.getColor("foreground");
+            const bg_style = thm.getColor("editor.background") orelse thm.getColor("background");
             const default_style = theme.Style{
-                .foreground_rgb = (thm.getColor("editor.foreground") orelse
-                    thm.getColor("foreground") orelse theme.Style{}).foreground_rgb,
-                .background_rgb = (thm.getColor("editor.background") orelse
-                    thm.getColor("background") orelse theme.Style{}).foreground_rgb,
+                .foreground_rgb = if (fg_style) |s| s.foreground_rgb else null,
+                .background_rgb = if (bg_style) |s| s.foreground_rgb else null,
             };
             for (spans.items) |span| {
                 var style = default_style;
@@ -98,9 +100,9 @@ pub const RenderHtmlProcessor = struct {
         stdout.flush() catch {};
     }
 
-    pub fn init(allocator: Allocator) !Processor {
+    pub fn init(io: std.Io, allocator: Allocator) !Processor {
         const self = RenderHtmlProcessor;
-        var proc = try NullProcessor.init(allocator);
+        var proc = try NullProcessor.init(io, allocator);
         proc.start_document_fn = self.startDocument;
         proc.end_document_fn = self.endDocument;
         proc.end_line_fn = self.endLine;

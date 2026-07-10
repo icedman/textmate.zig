@@ -2,7 +2,8 @@ const oni = lib.oni;
 const Rule = lib.Rule;
 const Grammar = lib.Grammar;
 
-pub fn main() !void {
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
     const allocator = std.heap.page_allocator;
 
     std.debug.print("implement me\n", .{});
@@ -39,7 +40,7 @@ pub fn main() !void {
         std.debug.print("no regex compiled!\n", .{});
     }
 
-    const g = try Grammar.init(allocator, "./src/resources/grammars/markdown.json");
+    const g = try Grammar.init(io, allocator, "./src/resources/grammars/markdown.json");
     defer g.deinit();
 }
 

@@ -18,20 +18,22 @@ const Rgb = theme.Rgb;
 // dump Processor
 pub const DumpProcessor = struct {
     pub fn startLine(self: *Processor, block: []const u8) void {
-        var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
+        var stdout_writer = std.Io.File.stdout().writerStreaming(self.io, &.{});
+        const stdout = &stdout_writer.interface;
         _ = block;
         stdout.print("[[==================================\n", .{}) catch {};
         stdout.print("{s}\n", .{self.block orelse "?"}) catch {};
     }
 
     pub fn endLine(self: *Processor) void {
-        var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
-        _ = self;
+        var stdout_writer = std.Io.File.stdout().writerStreaming(self.io, &.{});
+        const stdout = &stdout_writer.interface;
         stdout.print("----------------------------------]]\n\n", .{}) catch {};
     }
 
     pub fn openTag(self: *Processor, cap: *ParseCapture) void {
-        var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
+        var stdout_writer = std.Io.File.stdout().writerStreaming(self.io, &.{});
+        const stdout = &stdout_writer.interface;
         if (self.block) |b| {
             const text = b[cap.start..cap.end];
             stdout.print("open: {s} {}-{} {s}\n", .{ text, cap.start, cap.end, cap.scope }) catch {};
@@ -39,7 +41,8 @@ pub const DumpProcessor = struct {
     }
 
     pub fn closeTag(self: *Processor, cap: *ParseCapture) void {
-        var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
+        var stdout_writer = std.Io.File.stdout().writerStreaming(self.io, &.{});
+        const stdout = &stdout_writer.interface;
         if (self.block) |b| {
             const text = b[cap.start..cap.end];
             stdout.print("close: {s} {}-{} {s}\n", .{ text, cap.start, cap.end, cap.scope }) catch {};
@@ -47,7 +50,8 @@ pub const DumpProcessor = struct {
     }
 
     pub fn capture(self: *Processor, cap: *ParseCapture) void {
-        var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
+        var stdout_writer = std.Io.File.stdout().writerStreaming(self.io, &.{});
+        const stdout = &stdout_writer.interface;
         if (self.block) |b| {
             if (cap.start >= b.len) return;
             const text = b[cap.start..cap.end];
@@ -55,9 +59,9 @@ pub const DumpProcessor = struct {
         }
     }
 
-    pub fn init(allocator: Allocator) !Processor {
+    pub fn init(io: std.Io, allocator: Allocator) !Processor {
         const self = DumpProcessor;
-        var proc = try NullProcessor.init(allocator);
+        var proc = try NullProcessor.init(io, allocator);
         proc.start_line_fn = self.startLine;
         proc.end_line_fn = self.endLine;
         proc.open_tag_fn = self.openTag;

@@ -1422,7 +1422,7 @@ test "test references" {
     m.ranges[1].end = 5;
     var output = try ArrayList(u8).initCapacity(std.testing.allocator, 64);
     defer output.deinit(std.testing.allocator);
-    _ = try m.applyReferences(block, "hello \\1 world \\2.", &output, std.testing.allocator);
+    _ = try m.applyReferences(block, "hello \\1 world \\2.", &output);
 
     const expectedOutput = "hello ab world de.";
     try std.testing.expectEqualStrings(output.items[0..expectedOutput.len], expectedOutput);

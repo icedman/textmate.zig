@@ -16,6 +16,7 @@ var theThemeLibrary: ?*ThemeLibrary = null;
 
 pub const ThemeLibrary = struct {
     allocator: Allocator = undefined,
+    io: std.Io = undefined,
     themes: std.ArrayList(ThemeInfo) = undefined,
     cache: std.AutoHashMap(usize, *Theme) = undefined,
 
@@ -36,11 +37,11 @@ pub const ThemeLibrary = struct {
     }
 
     pub fn addThemes(self: *ThemeLibrary, path: []const u8) !void {
-        try resources.listThemes(self.allocator, path, &self.themes);
+        try resources.listThemes(self.io, self.allocator, path, &self.themes);
     }
 
     pub fn addTheme(self: *ThemeLibrary, path: []const u8) !ThemeInfo {
-        return try resources.addTheme(self.allocator, path, &self.themes);
+        return try resources.addTheme(self.io, self.allocator, path, &self.themes);
     }
 
     pub fn addEmbeddedThemes(self: *ThemeLibrary) !void {
@@ -60,7 +61,7 @@ pub const ThemeLibrary = struct {
                     return t;
                 }
                 const p: []const u8 = &item.full_path;
-                const t = try Theme.init(self.allocator, strings.toSlice([]const u8, p));
+                const t = try Theme.init(self.io, self.allocator, strings.toSlice([]const u8, p));
                 try self.cache.put(item.id, t);
                 return t;
             }
@@ -81,7 +82,7 @@ pub const ThemeLibrary = struct {
                     return t;
                 }
                 const p: []const u8 = &item.full_path;
-                const t = try Theme.init(self.allocator, strings.toSlice([]const u8, p));
+                const t = try Theme.init(self.io, self.allocator, strings.toSlice([]const u8, p));
                 try self.cache.put(item.id, t);
                 return t;
             }
@@ -89,10 +90,11 @@ pub const ThemeLibrary = struct {
         return error.NotFound;
     }
 
-    pub fn initLibrary(allocator: Allocator) !void {
+    pub fn initLibrary(io: std.Io, allocator: Allocator) !void {
         theThemeLibrary = try allocator.create(ThemeLibrary);
         if (theThemeLibrary) |lib| {
             lib.allocator = allocator;
+            lib.io = io;
             try lib.init();
         }
     }
@@ -213,15 +215,15 @@ pub const Theme = struct {
         settings: ?Style = null,
     };
 
-    pub fn init(allocator: Allocator, source_path: []const u8) !*Theme {
-        const file = std.fs.cwd().openFile(source_path, .{}) catch |err| {
+    pub fn init(io: std.Io, allocator: Allocator, source_path: []const u8) !*Theme {
+        const file = std.Io.Dir.cwd().openFile(io, source_path, .{}) catch |err| {
             std.debug.print("unable to open {s}\n", .{source_path});
             return err;
         };
-        defer file.close();
+        defer file.close(io);
         // const file_size = (try file.stat()).size;
         // const file_contents = try file.readToEndAlloc(allocator, file_size);
-        const file_contents = try std.fs.cwd().readFileAlloc(source_path, allocator, .limited(1 << 30));
+        const file_contents = try std.Io.Dir.cwd().readFileAlloc(io, source_path, allocator, .limited(1 << 30));
         defer allocator.free(file_contents);
         return Theme.parse(allocator, file_contents);
     }
@@ -570,7 +572,11 @@ pub const Theme = struct {
 };
 
 pub fn runTests(comptime testing: anytype, verbosely: bool) !void {
-    var thm = try Theme.init(testing.allocator, "data/tests/dracula.json");
+    var threaded = std.Io.Threaded.init(testing.allocator, .{});
+    defer threaded.deinit();
+    const io = threaded.io();
+
+    var thm = try Theme.init(io, testing.allocator, "data/tests/dracula.json");
     defer thm.deinit();
 
     // thm.root.dump(0);

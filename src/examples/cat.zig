@@ -18,30 +18,24 @@ const RenderHtmlProcessor = lib.RenderHtmlProcessor;
 const TEST_WITH_GPA = true;
 
 fn printUsage() void {
-    var stdout_buffer: [1024]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
-    const stdout = &stdout_writer.interface;
-    stdout.print("Usage: textmate_zig [options] filename\n", .{}) catch {};
-    stdout.print(" -s printout stats\n", .{}) catch {};
-    stdout.print(" -m html output\n", .{}) catch {};
-    stdout.print(" -n null output\n", .{}) catch {};
-    stdout.print(" -d dump parsed scopes\n", .{}) catch {};
-    stdout.print(" -g <grammar name> provide grammar by name\n", .{}) catch {};
-    stdout.print(" -t <theme name> provide theme by name\n", .{}) catch {};
-    stdout.print(" -r <path> resources path containing 'themes' and/or 'grammars' folder\n", .{}) catch {};
-    stdout.print(" -l list avaiable themes and grammars\n", .{}) catch {};
-    stdout.flush() catch {};
+    std.debug.print("Usage: textmate_zig [options] filename\n", .{});
+    std.debug.print(" -s printout stats\n", .{});
+    std.debug.print(" -m html output\n", .{});
+    std.debug.print(" -n null output\n", .{});
+    std.debug.print(" -d dump parsed scopes\n", .{});
+    std.debug.print(" -g <grammar name> provide grammar by name\n", .{});
+    std.debug.print(" -t <theme name> provide theme by name\n", .{});
+    std.debug.print(" -r <path> resources path containing 'themes' and/or 'grammars' folder\n", .{});
+    std.debug.print(" -l list avaiable themes and grammars\n", .{});
 }
 
-pub fn main() !void {
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
     var stdout_buffer: [2048]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     const stdout = &stdout_writer.interface;
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-
-    const allocator = if (TEST_WITH_GPA and builtin.mode == .Debug) gpa.allocator() else std.heap.page_allocator;
+    const allocator = if (TEST_WITH_GPA and builtin.mode == .Debug) init.gpa else std.heap.page_allocator;
 
     try oni.init(&.{oni.Encoding.utf8});
     try oni.testing.ensureInit();
@@ -49,14 +43,14 @@ pub fn main() !void {
     var dump: bool = false;
     var nllu: bool = false;
     var html: bool = false;
-    var list: bool = false;
     var stats: bool = false;
     var grammar_path: ?[]const u8 = null;
     var theme_path: ?[]const u8 = null;
     var file_path: ?[]const u8 = null;
     var resources_path: ?[]const u8 = null;
 
-    var args = std.process.args();
+    var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
+    defer args.deinit();
     var arg = args.next(); // skips the executable name
     while (arg != null) {
         arg = args.next();
@@ -78,16 +72,16 @@ pub fn main() !void {
         } else if (std.mem.eql(u8, arg.?, "-h")) {
             printUsage();
             return;
-        } else if (std.mem.eql(u8, arg.?, "-l")) {
-            list = true;
         } else {
             file_path = arg;
         }
     }
 
-    const warm_start = std.time.nanoTimestamp();
+    const list = theme_path == null and grammar_path == null and file_path == null;
 
-    ThemeLibrary.initLibrary(allocator) catch {
+    const warm_start = std.Io.Timestamp.now(io, .awake);
+
+    ThemeLibrary.initLibrary(io, allocator) catch {
         return;
     };
     defer ThemeLibrary.deinitLibrary();
@@ -96,7 +90,7 @@ pub fn main() !void {
             std.debug.print("unable to add embedded themes\n", .{});
         };
         if (resources_path) |rp| {
-            const themes_path = try std.fs.path.join(allocator, &.{ rp, "themes" });
+            const themes_path = try std.Io.Dir.path.join(allocator, &.{ rp, "themes" });
             thl.addThemes(themes_path) catch {
                 std.debug.print("unable to add themes directory\n", .{});
             };
@@ -111,7 +105,7 @@ pub fn main() !void {
         }
     }
 
-    GrammarLibrary.initLibrary(allocator) catch {
+    GrammarLibrary.initLibrary(io, allocator) catch {
         return;
     };
     defer GrammarLibrary.deinitLibrary();
@@ -120,7 +114,7 @@ pub fn main() !void {
             std.debug.print("unable to add embedded grammars\n", .{});
         };
         if (resources_path) |rp| {
-            const grammars_path = try std.fs.path.join(allocator, &.{ rp, "grammars" });
+            const grammars_path = try std.Io.Dir.path.join(allocator, &.{ rp, "grammars" });
             gml.addGrammars(grammars_path) catch {
                 std.debug.print("unable to add grammars directory\n", .{});
             };
@@ -199,13 +193,13 @@ pub fn main() !void {
 
     var proc = blk: {
         if (dump) {
-            break :blk try DumpProcessor.init(allocator);
+            break :blk try DumpProcessor.init(io, allocator);
         } else if (nllu) {
-            break :blk try NullProcessor.init(allocator);
+            break :blk try NullProcessor.init(io, allocator);
         } else if (html) {
-            break :blk try RenderHtmlProcessor.init(allocator);
+            break :blk try RenderHtmlProcessor.init(io, allocator);
         } else {
-            break :blk try RenderProcessor.init(allocator);
+            break :blk try RenderProcessor.init(io, allocator);
         }
     };
 
@@ -216,20 +210,20 @@ pub fn main() !void {
 
     par.resetStats();
     const path = file_path orelse "";
-    var file = std.fs.cwd().openFile(path, .{}) catch {
+    var file = std.Io.Dir.cwd().openFile(io, path, .{}) catch {
         std.debug.print("unable to open file {s}\n", .{file_path orelse ""});
         return;
     };
-    defer file.close();
+    defer file.close(io);
 
     var buf: [1024]u8 = undefined;
     var line_no: usize = 1;
-    var reader = file.reader(&buf);
+    var reader = file.reader(io, &buf);
 
-    const warm_end = std.time.nanoTimestamp();
-    const warm_elapsed = @as(f64, @floatFromInt(warm_end - warm_start)) / 1_000_000_000.0;
+    const warm_end = std.Io.Timestamp.now(io, .awake);
+    const warm_elapsed = @as(f64, @floatFromInt(warm_start.durationTo(warm_end).nanoseconds)) / 1_000_000_000.0;
 
-    const start = std.time.nanoTimestamp();
+    const start = std.Io.Timestamp.now(io, .awake);
     proc.startDocument();
 
     var line_writer = std.Io.Writer.Allocating.init(allocator);
@@ -268,8 +262,8 @@ pub fn main() !void {
     } else |err| if (err != error.EndOfStream) return err;
 
     proc.endDocument();
-    const end = std.time.nanoTimestamp();
-    const elapsed = @as(f64, @floatFromInt(end - start)) / 1_000_000_000.0;
+    const end = std.Io.Timestamp.now(io, .awake);
+    const elapsed = @as(f64, @floatFromInt(start.durationTo(end).nanoseconds)) / 1_000_000_000.0;
 
     if (stats) {
         std.debug.print("==================\n", .{});

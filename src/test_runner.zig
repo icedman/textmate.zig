@@ -36,9 +36,11 @@ const FailedTest = struct {
 };
 
 var failed_tests: std.ArrayList(FailedTest) = .empty;
+var io: std.Io = undefined;
 
 fn compare_tokens(hay: *ArrayList([]const u8), needles: std.json.Value) bool {
-    var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
+    var stdout_writer = std.Io.File.stdout().writerStreaming(io, &.{});
+    const stdout = &stdout_writer.interface;
     var eq = true;
     for (needles.array.items) |n| {
         const ns = n.string;
@@ -61,9 +63,10 @@ fn compare_tokens(hay: *ArrayList([]const u8), needles: std.json.Value) bool {
 }
 
 pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_path: []const u8, suite_name: []const u8) !bool {
-    var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
+    var stdout_writer = std.Io.File.stdout().writerStreaming(io, &.{});
+    const stdout = &stdout_writer.interface;
     var buf: [1024]u8 = undefined; // fixed buffer
-    GrammarLibrary.initLibrary(allocator) catch {
+    GrammarLibrary.initLibrary(io, allocator) catch {
         return false;
     };
     defer GrammarLibrary.deinitLibrary();
@@ -95,7 +98,7 @@ pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_p
             //     return error.UnsupportedFile;
             // }
             try stdout.print("{s}\n", .{s});
-            gmr = try Grammar.init(allocator, s);
+            gmr = try Grammar.init(io, allocator, s);
             // gmr.syntax.?.dump(0, false);
         }
     }
@@ -115,7 +118,7 @@ pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_p
         var state = try par.initState();
         defer state.deinit();
 
-        var proc = try TestProcessor.init(allocator);
+        var proc = try TestProcessor.init(io, allocator);
         defer proc.deinit();
 
         par.processor = &proc;
@@ -199,15 +202,16 @@ pub fn run_parse_test(allocator: std.mem.Allocator, json: std.json.Value, base_p
 }
 
 pub fn run_test_suit(allocator: std.mem.Allocator, base_path: []const u8, source_path: []const u8) !bool {
-    var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
+    var stdout_writer = std.Io.File.stdout().writerStreaming(io, &.{});
+    const stdout = &stdout_writer.interface;
     var buf: [1024]u8 = undefined; // fixed buffer
     const file_path = try std.fmt.bufPrint(&buf, "{s}/{s}", .{ base_path, source_path });
 
-    const file = try std.fs.cwd().openFile(file_path, .{});
-    defer file.close();
+    const file = try std.Io.Dir.cwd().openFile(io, file_path, .{});
+    defer file.close(io);
     // const file_size = (try file.stat()).size;
     // const file_contents = try file.readToEndAlloc(allocator, file_size);
-    const file_contents = try std.fs.cwd().readFileAlloc(file_path, allocator, .limited(1 << 30));
+    const file_contents = try std.Io.Dir.cwd().readFileAlloc(io, file_path, allocator, .limited(1 << 30));
     defer allocator.free(file_contents);
 
     const parsed = try std.json.parseFromSlice(std.json.Value, allocator, file_contents, .{ .ignore_unknown_fields = true });
@@ -240,8 +244,9 @@ pub fn run_test_suit(allocator: std.mem.Allocator, base_path: []const u8, source
 }
 
 pub fn run_theme_library(allocator: std.mem.Allocator) !void {
-    var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
-    ThemeLibrary.initLibrary(allocator) catch {
+    var stdout_writer = std.Io.File.stdout().writerStreaming(io, &.{});
+    const stdout = &stdout_writer.interface;
+    ThemeLibrary.initLibrary(io, allocator) catch {
         return;
     };
     defer ThemeLibrary.deinitLibrary();
@@ -261,8 +266,9 @@ pub fn run_theme_library(allocator: std.mem.Allocator) !void {
 }
 
 pub fn run_grammar_library(allocator: std.mem.Allocator) !void {
-    var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
-    GrammarLibrary.initLibrary(allocator) catch {
+    var stdout_writer = std.Io.File.stdout().writerStreaming(io, &.{});
+    const stdout = &stdout_writer.interface;
+    GrammarLibrary.initLibrary(io, allocator) catch {
         return;
     };
     defer GrammarLibrary.deinitLibrary();
@@ -286,10 +292,12 @@ pub fn run_grammar_library(allocator: std.mem.Allocator) !void {
     stdout.flush() catch {};
 }
 
-pub fn main() !void {
-    var stdout = @constCast(&std.fs.File.stdout().writerStreaming(&.{}).interface);
+pub fn main(init: std.process.Init) !void {
+    io = init.io;
+    var stdout_writer = std.Io.File.stdout().writerStreaming(io, &.{});
+    const stdout = &stdout_writer.interface;
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
 
     const allocator = gpa.allocator();
@@ -304,7 +312,8 @@ pub fn main() !void {
         failed_tests.deinit(allocator);
     }
 
-    var args = std.process.args();
+    var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
+    defer args.deinit();
     _ = args.next(); // skip binary name
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--end-on-fail") or std.mem.eql(u8, arg, "-e")) {

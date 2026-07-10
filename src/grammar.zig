@@ -522,6 +522,7 @@ var theGrammarLibrary: ?*GrammarLibrary = null;
 
 pub const GrammarLibrary = struct {
     allocator: Allocator = undefined,
+    io: std.Io = undefined,
     grammars: std.ArrayList(GrammarInfo) = undefined,
     cache: std.AutoHashMap(usize, *Grammar) = undefined,
 
@@ -543,7 +544,7 @@ pub const GrammarLibrary = struct {
     }
 
     pub fn addGrammars(self: *GrammarLibrary, path: []const u8) !void {
-        try resources.listGrammars(self.allocator, path, &self.grammars);
+        try resources.listGrammars(self.io, self.allocator, path, &self.grammars);
     }
 
     pub fn addEmbeddedGrammars(self: *GrammarLibrary) !void {
@@ -551,7 +552,7 @@ pub const GrammarLibrary = struct {
     }
 
     pub fn addGrammar(self: *GrammarLibrary, path: []const u8) !GrammarInfo {
-        return try resources.addGrammar(self.allocator, path, &self.grammars);
+        return try resources.addGrammar(self.io, self.allocator, path, &self.grammars);
     }
 
     pub fn applyInjectors(self: *GrammarLibrary, grammar: *Grammar) void {
@@ -598,7 +599,7 @@ pub const GrammarLibrary = struct {
                     return g;
                 }
                 const p: []const u8 = &item.full_path;
-                const g = try Grammar.init(self.allocator, strings.toSlice([]const u8, p));
+                const g = try Grammar.init(self.io, self.allocator, strings.toSlice([]const u8, p));
                 self.applyInjectors(g);
                 try self.cache.put(item.id, g);
                 return g;
@@ -623,7 +624,7 @@ pub const GrammarLibrary = struct {
                     return g;
                 }
                 const p: []const u8 = &item.full_path;
-                const g = try Grammar.init(self.allocator, strings.toSlice([]const u8, p));
+                const g = try Grammar.init(self.io, self.allocator, strings.toSlice([]const u8, p));
                 self.applyInjectors(g);
                 try self.cache.put(item.id, g);
                 return g;
@@ -665,7 +666,7 @@ pub const GrammarLibrary = struct {
                             return g;
                         }
                         const p: []const u8 = &item.full_path;
-                        const g = try Grammar.init(self.allocator, strings.toSlice([]const u8, p));
+                        const g = try Grammar.init(self.io, self.allocator, strings.toSlice([]const u8, p));
                         self.applyInjectors(g);
                         try self.cache.put(item.id, g);
                         return g;
@@ -686,7 +687,7 @@ pub const GrammarLibrary = struct {
                         return g;
                     }
                     const p: []const u8 = &item.full_path;
-                    const g = try Grammar.init(self.allocator, strings.toSlice([]const u8, p));
+                    const g = try Grammar.init(self.io, self.allocator, strings.toSlice([]const u8, p));
                     self.applyInjectors(g);
                     try self.cache.put(item.id, g);
                     return g;
@@ -710,7 +711,7 @@ pub const GrammarLibrary = struct {
                     return g;
                 }
                 const p: []const u8 = &item.full_path;
-                const g = try Grammar.init(self.allocator, strings.toSlice([]const u8, p));
+                const g = try Grammar.init(self.io, self.allocator, strings.toSlice([]const u8, p));
                 // self.applyInjectors(g);
                 try self.cache.put(item.id, g);
                 return g;
@@ -719,10 +720,11 @@ pub const GrammarLibrary = struct {
         return error.NotFound;
     }
 
-    pub fn initLibrary(allocator: Allocator) !void {
+    pub fn initLibrary(io: std.Io, allocator: Allocator) !void {
         theGrammarLibrary = try allocator.create(GrammarLibrary);
         if (theGrammarLibrary) |lib| {
             lib.allocator = allocator;
+            lib.io = io;
             try lib.init();
         }
     }
@@ -757,12 +759,12 @@ pub const Grammar = struct {
     // TODO release this after parse (requires that all string values be allocated and copied)
     strings: StringsArena,
 
-    pub fn init(allocator: Allocator, source_path: []const u8) !*Grammar {
-        const file = try std.fs.cwd().openFile(source_path, .{});
-        defer file.close();
+    pub fn init(io: std.Io, allocator: Allocator, source_path: []const u8) !*Grammar {
+        const file = try std.Io.Dir.cwd().openFile(io, source_path, .{});
+        defer file.close(io);
         // const file_size = (try file.stat()).size;
         // const file_contents = try file.readToEndAlloc(allocator, file_size);
-        const file_contents = try std.fs.cwd().readFileAlloc(source_path, allocator, .limited(1 << 30));
+        const file_contents = try std.Io.Dir.cwd().readFileAlloc(io, source_path, allocator, .limited(1 << 30));
         defer allocator.free(file_contents);
         // TODO apply injectors
         return Grammar.parse(allocator, file_contents);
@@ -834,7 +836,11 @@ pub const Grammar = struct {
 };
 
 pub fn runTests(comptime testing: anytype, verbosely: bool) !void {
-    var gmr = try Grammar.init(testing.allocator, "data/tests/c.tmLanguage.json");
+    var threaded = std.Io.Threaded.init(testing.allocator, .{});
+    defer threaded.deinit();
+    const io = threaded.io();
+
+    var gmr = try Grammar.init(io, testing.allocator, "data/tests/c.tmLanguage.json");
     defer gmr.deinit();
     _ = verbosely;
 

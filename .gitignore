@@ -1,6 +1,7 @@
 # Zig cache & build artifacts
 .zig-cache/
 zig-out/
+zig-pkg/
 
 # If using `zig build test` or `zig build install`
 test-output/
@@ -36,4 +37,4 @@ Desktop.ini
 *_.zig
 
 reference/
-NOTES.md
+resources/
