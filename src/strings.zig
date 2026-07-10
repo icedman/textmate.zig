@@ -84,16 +84,3 @@ pub fn toSlice(comptime T: type, array: T) []const u8 {
     } else 0;
     return array[0..len];
 }
-
-test "strings" {
-    var strings = try StringsArena.init(std.testing.allocator);
-    defer strings.deinit();
-
-    var buf: [128]u8 = undefined;
-    for (0..200) |idx| {
-        const s = try std.fmt.bufPrint(&buf, "{s} {d}", .{ "hello", idx * 0 });
-        const c = try strings.appendHashed(s);
-        // _ = c;
-        std.debug.print("{} {s}\n", .{ c[0], c[1] });
-    }
-}

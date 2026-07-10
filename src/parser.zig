@@ -159,11 +159,11 @@ const StateContext = struct {
     pub fn serialize(self: *StateContext, parser: *Parser) StateContextPack {
         _ = parser;
         return .{
-            self.syntax.id,
-            self.anchor_start,
-            self.start,
-            self.rx_while.id,
-            self.rx_end.id,
+            .syntax = self.syntax.id,
+            .anchor_start = self.anchor_start,
+            .start = self.start,
+            .rx_while = self.rx_while.id,
+            .rx_end = self.rx_end.id,
         };
     }
 
@@ -963,6 +963,7 @@ pub const Parser = struct {
                         break;
                     }
 
+                    // short circuit
                     if (earliest_match.count == 0) {
                         earliest_match = m;
                     } else if (earliest_match.start > m.start) {
@@ -1395,7 +1396,7 @@ pub const Parser = struct {
     pub fn serialize(self: *Parser, state: *ParseState, serial: *std.ArrayList(StateContextPack)) !void {
         serial.clearRetainingCapacity();
         for (state.stack.items) |*item| {
-            try serial.append(item.serialize(self));
+            try serial.append(self.allocator, item.serialize(self));
         }
     }
 
@@ -1404,7 +1405,7 @@ pub const Parser = struct {
         for (serial.items) |item| {
             var sc = StateContext{ .syntax = self.lang.syntax.? };
             try sc.deserialize(self, item);
-            try state.stack.append(sc);
+            try state.stack.append(state.allocator, sc);
         }
         self.injections_dirty = true;
     }
@@ -1426,4 +1427,56 @@ test "test references" {
 
     const expectedOutput = "hello ab world de.";
     try std.testing.expectEqualStrings(output.items[0..expectedOutput.len], expectedOutput);
+}
+
+test "serialize and deserialize parse state" {
+    const grammar_json =
+        \\{
+        \\  "scopeName": "source.test",
+        \\  "patterns": [
+        \\    {
+        \\      "name": "block",
+        \\      "begin": "\\{",
+        \\      "end": "\\}"
+        \\    }
+        \\  ]
+        \\}
+    ;
+
+    const allocator = std.testing.allocator;
+
+    var gmr = try grammar.Grammar.initWithData(allocator, grammar_json);
+    defer gmr.deinit();
+
+    var par = try Parser.init(allocator, gmr);
+    defer par.deinit();
+
+    var state = try par.initState();
+    defer state.deinit();
+
+    const line = "{\n";
+    try par.parseLine(&state, line, true);
+
+    try std.testing.expect(false);
+
+    var serial = try std.ArrayList(StateContextPack).initCapacity(allocator, 16);
+    defer serial.deinit(allocator);
+    try par.serialize(&state, &serial);
+
+    try std.testing.expectEqual(state.stack.items.len, serial.items.len);
+
+    var deserialized_state = try par.initState();
+    defer deserialized_state.deinit();
+
+    try par.deserialize(&deserialized_state, &serial);
+
+    try std.testing.expectEqual(state.stack.items.len, deserialized_state.stack.items.len);
+    for (state.stack.items, 0..) |item, i| {
+        const deserialized_item = deserialized_state.stack.items[i];
+        try std.testing.expectEqual(item.syntax, deserialized_item.syntax);
+        try std.testing.expectEqual(item.anchor_start, deserialized_item.anchor_start);
+        try std.testing.expectEqual(item.start, deserialized_item.start);
+        try std.testing.expectEqual(item.rx_while.id, deserialized_item.rx_while.id);
+        try std.testing.expectEqual(item.rx_end.id, deserialized_item.rx_end.id);
+    }
 }

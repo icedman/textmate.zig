@@ -194,18 +194,6 @@ pub const Syntax = struct {
             syntax.deinit();
         }
 
-        // const include = obj.get("include");
-        // if (include) |path| {
-        //     syntax.* = Syntax{
-        //         .id = @intFromPtr(syntax),
-        //         .name = "",
-        //         .content_name = "",
-        //         .scope_name = "",
-        //         .include_path = try strings_arena.append(path.string),
-        //     };
-        //     return syntax;
-        // }
-
         syntax.* = Syntax{
             .id = @intFromPtr(syntax),
             .name = try strings_arena.append(if (obj.get("name")) |v| if (v == .string) v.string else "" else ""),

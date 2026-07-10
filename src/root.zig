@@ -38,4 +38,9 @@ const testing = std.testing;
 
 test {
     testing.refAllDecls(@This());
+    _ = @import("parser.zig");
+    _ = @import("grammar.zig");
+    _ = @import("theme.zig");
+    _ = @import("atoms.zig");
 }
+

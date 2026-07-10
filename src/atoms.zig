@@ -92,7 +92,7 @@ fn testLoadingAllThemes(allocator: std.mem.Allocator) !void {
 
     var list = std.ArrayList(ThemeInfo).init(allocator);
     defer list.deinit();
-    try resources.listThemes(io, allocator, "./src/themes", &list);
+    try resources.listThemes(io, allocator, "./src/resources/themes", &list);
 
     var themes = std.ArrayList(theme.Theme).init(allocator);
     defer themes.deinit();
@@ -237,13 +237,17 @@ pub fn atomsCmp(a_: Atom, b_: Atom) u8 {
 }
 
 fn testTheme(allocator: std.mem.Allocator) !void {
+    var threaded = std.Io.Threaded.init(allocator, .{});
+    defer threaded.deinit();
+    const io = threaded.io();
+
     // dracula "meta.function.arguments variable.other.php"
     // everforest-dark "keyword, storage.type"
-    // var thm = theme.Theme.init(allocator, "./src/themes/aurora-x.json") catch {
-    // var thm = theme.Theme.init(allocator, "./src/themes/vitesse-dark.json") catch {
-    // var thm = theme.Theme.init(allocator, "./src/themes/everforest-dark.json") catch {
-    var thm = theme.Theme.init(allocator, "./src/themes/monokai.json") catch {
-        // var thm = theme.Theme.init(allocator, "./src/themes/dracula.json") catch {
+    // var thm = theme.Theme.init(io, allocator, "./src/resources/themes/aurora-x.json") catch {
+    // var thm = theme.Theme.init(io, allocator, "./src/resources/themes/vitesse-dark.json") catch {
+    // var thm = theme.Theme.init(io, allocator, "./src/resources/themes/everforest-dark.json") catch {
+    var thm = theme.Theme.init(io, allocator, "./src/resources/themes/monokai.json") catch {
+        // var thm = theme.Theme.init(io, allocator, "./src/resources/themes/dracula.json") catch {
         unreachable;
     };
     defer thm.deinit();

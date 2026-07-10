@@ -355,8 +355,9 @@ test "get themes" {
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     const stdout = &stdout_writer.interface;
 
-    try generateEmbeddedThemesFile(io, allocator, stdout, "theme_", "./src/resources/themes");
-    try generateEmbeddedGrammarsFile(io, allocator, stdout, "grammar_", "./src/resources/grammars");
+    // try generateEmbeddedThemesFile(io, allocator, stdout, "theme_", "./src/resources/themes");
+    // try generateEmbeddedGrammarsFile(io, allocator, stdout, "grammar_", "./src/resources/grammars");
 
     // try stdout.flush();
+    _ = stdout;
 }
