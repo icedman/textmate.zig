@@ -277,6 +277,7 @@ pub fn main() !void {
         std.debug.print("execs: {}\n", .{par.regex_execs});
         if (line_no > 0) {
             std.debug.print("execs/line: {}\n", .{par.regex_execs / line_no});
+            std.debug.print("patterns/line: {}\n", .{par.total_pats / line_no});
         }
         std.debug.print("skips: {}\n", .{par.regex_skips});
         std.debug.print("warmup in {d:.6}s\n", .{warm_elapsed});

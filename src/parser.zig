@@ -252,9 +252,6 @@ pub const ParseState = struct {
 
             if (syntax.rx_end.has_references) {
                 if (syntax.rx_end.expr) |regexs| {
-                    // var output = try ArrayList(u8).initCapacity(self.allocator, regexs.len + 64);
-                    // defer output.deinit(self.allocator);
-
                     var output = std.ArrayListUnmanaged(u8).initBuffer(&output_buf);
 
                     _ = try m.applyReferences(block, regexs, &output, self.allocator);
@@ -283,9 +280,6 @@ pub const ParseState = struct {
                 if (syntax.rx_while.has_references) {
                     if (syntax.rx_while.expr) |regexs| {
                         var output = std.ArrayListUnmanaged(u8).initBuffer(&output_buf);
-
-                        // var output = try ArrayList(u8).initCapacity(self.allocator, regexs.len + 64);
-                        // defer output.deinit(self.allocator);
 
                         _ = try m.applyReferences(block, regexs, &output, self.allocator);
                         const expr = try self.owner.strings.appendUnique(output.items);
@@ -373,6 +367,7 @@ pub const Parser = struct {
     // stats
     regex_execs: u32 = 0,
     regex_skips: u32 = 0,
+    total_pats: usize = 0,
     deepest: u32 = 0,
 
     current_state: ?*ParseState = null,
@@ -869,10 +864,10 @@ pub const Parser = struct {
     fn matchPatterns(self: *Parser, syntax: *const Syntax, patterns: ?std.ArrayList(*Syntax), block: []const u8, start: usize, end: usize) Match {
         var earliest_match = Match{};
 
-        var left_injections_buffer: [128]*Syntax = undefined;
+        var left_injections_buffer: [32]*Syntax = undefined;
         var left_injections = std.ArrayListUnmanaged(*Syntax).initBuffer(&left_injections_buffer);
 
-        var right_injections_buffer: [128]*Syntax = undefined;
+        var right_injections_buffer: [32]*Syntax = undefined;
         var right_injections = std.ArrayListUnmanaged(*Syntax).initBuffer(&right_injections_buffer);
 
         if (syntax.scope_name.len > 0) {
@@ -965,7 +960,7 @@ pub const Parser = struct {
             }
         }
 
-        var pats_buffer: [128]*Syntax = undefined;
+        var pats_buffer: [256]*Syntax = undefined;
         var all_pats = std.ArrayListUnmanaged(*Syntax).initBuffer(&pats_buffer);
 
         for (left_injections.items) |p| {
@@ -981,6 +976,7 @@ pub const Parser = struct {
         }
 
         for (all_pats.items) |p| {
+            self.total_pats += 1;
             const ls = p.resolve(p, self.lang.syntax);
             if (ls) |syn| {
                 const m = self.matchBegin(@constCast(syn), block, start, end);
@@ -989,6 +985,7 @@ pub const Parser = struct {
                         earliest_match = m;
                         break;
                     }
+
                     if (earliest_match.count == 0) {
                         earliest_match = m;
                     } else if (earliest_match.start > m.start) {
@@ -1417,6 +1414,7 @@ pub const Parser = struct {
     pub fn resetStats(self: *Parser) void {
         self.regex_execs = 0;
         self.regex_skips = 0;
+        self.total_pats = 0;
         self.deepest = 0;
     }
 

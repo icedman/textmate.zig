@@ -46,9 +46,12 @@ pub const Rule = struct {
             &err_info,
         );
         if (code < 0) {
-            var err_buf: [oni.errors.MAX_ERROR_LEN]u8 = undefined;
-            const len = oni.c.c.onig_error_code_to_str(err_buf[0..].ptr, code, &err_info);
-            std.debug.print("ONIGURUMA COMPILE ERROR for '{s}': {s} ({})\n", .{ regex, err_buf[0..@intCast(len)], code });
+
+            // TODO: this happens on cpp
+            // var err_buf: [oni.errors.MAX_ERROR_LEN]u8 = undefined;
+            // const len = oni.c.c.onig_error_code_to_str(err_buf[0..].ptr, code, &err_info);
+            // std.debug.print("ONIGURUMA COMPILE ERROR for '{s}': {s} ({})\n", .{ regex, err_buf[0..@intCast(len)], code });
+
             self.valid = .Invalid;
             return error.RegexCompileError;
         }
