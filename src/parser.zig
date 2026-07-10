@@ -15,7 +15,8 @@ const Rule = grammar.Rule;
 const Atom = atoms.Atom;
 const StringsArena = strings.StringsArena;
 
-// capture is like MatchRange.. but atomic and should be serializable
+/// ParseCapture represents a matched scope with its start and end offsets, scope name,
+/// and associated grammar syntax/atom metadata.
 pub const ParseCapture = struct {
     start: usize = 0,
     end: usize = 0,
@@ -28,31 +29,31 @@ pub const ParseCapture = struct {
 
 const Capture = ParseCapture;
 
-// the lighter version of Capture, used internally
+/// MatchRange holds the capture group index and byte offsets within the current match.
 const MatchRange = struct {
     group: u16 = 0,
     start: usize = 0,
     end: usize = 0,
 };
 
-// every findMatch productes a Match, with MatchRanges holding the captured groups
+/// Match represents a single successful regex match, containing all its capture groups,
+/// target syntax, rule, and search boundaries.
 const Match = struct {
     syntax: ?*Syntax = null,
     regex: ?*Rule = null,
 
-    // is this expensive to pass around (copy)
+    // Captured ranges corresponding to Oniguruma match groups.
     ranges: [config.max_match_ranges]MatchRange = undefined,
     count: u8 = 0,
 
-    // this is just start and end of ranges[0]
+    // Start and end of the entire match (capture group 0).
     start: usize = 0,
     end: usize = 0,
 
-    // search anchors are the start and end of block sliced passed to findMatch
+    // Start and end offsets of the active block search range.
     anchor_start: usize = 0,
     anchor_end: usize = 0,
 
-    // TODO output: ArrayList(u8) vs output *[MAX_SCOPE_LEN]u8 ...
     fn applyRef(
         self: *const Match,
         block: []const u8,
@@ -145,9 +146,7 @@ const Match = struct {
     }
 };
 
-// StateContext holds the context of a single character match is made for a Syntax
-// It is store only if the Syntax would require further matching with its children patterns
-// This should be serializable as this is what the parse state stack contains
+/// StateContextPack is a packed serializable representation of a StateContext.
 const StateContextPack = packed struct {
     syntax: u64,
     anchor_start: u32,
@@ -155,6 +154,8 @@ const StateContextPack = packed struct {
     rx_while: u64,
     rx_end: u64,
 };
+/// StateContext holds the parsing context of a matched rule. It is stored on the stack
+/// to track nested rule states, scope stack tags, and dynamic while/end patterns.
 const StateContext = struct {
     syntax: *Syntax,
 
@@ -163,7 +164,7 @@ const StateContext = struct {
     start: u32 = 0,
     zero_width_begin: bool = false,
 
-    // Parser owns these at regex_map and responsible for oni.Regex.deinit not StateContext
+    // The dynamic regex rules owned by the Parser's regex_map.
     rx_while: Rule = Rule{},
     rx_end: Rule = Rule{},
     anchor_position: i32 = -1,
@@ -188,8 +189,7 @@ const StateContext = struct {
     }
 };
 
-/// ParseState is a StateContext stack
-/// This should be (de)serializable
+/// ParseState holds the stack of active StateContext layers during parsing.
 pub const ParseState = struct {
     allocator: Allocator,
     stack: std.ArrayList(StateContext),
@@ -232,7 +232,6 @@ pub const ParseState = struct {
             _ = self.stack.pop();
             _ = where;
             self.owner.injections_dirty = true;
-            // std.debug.print("state pop {} - {s}\n", .{ self.size(), where });
         }
     }
 
@@ -339,27 +338,24 @@ pub const ParseState = struct {
     }
 };
 
-// Parser is where the heavy work is done
-// It parses a single line but can receive ParseState from a previous line parse for continuance
+/// Parser highlights line buffers and maintains rule matching state, regex cache maps,
+/// and injection definitions.
 pub const Parser = struct {
     allocator: Allocator,
     lang: *grammar.Grammar,
 
-    // processor
+    // Output target for processed scopes and captures.
     processor: ?*processor.Processor = null,
 
-    // Cache for line parsing
-    // syntax level cache
-    match_cache: std.AutoHashMap(u64, Match),
-    // regex level cache
-    exec_cache: std.AutoHashMap(u64, Match),
-    // matches at line parse - to watch endless loops
-    begin_matches: std.ArrayList(Match),
+    // Line parsing caches.
+    match_cache: std.AutoHashMap(u64, Match), // Syntax-level cache mapping rule hashes to Match structs.
+    exec_cache: std.AutoHashMap(u64, Match),  // Regex-level cache mapping regex pattern hashes to Match structs.
+    begin_matches: std.ArrayList(Match),       // Tracks current match history to prevent endless loop cycles.
 
-    // runtime-compiled (with dynamic patterns) are save for sharing a (de)serialization
+    // Map of runtime-compiled rules (e.g. dynamic patterns generated from backreferences).
     regex_map: std.AutoHashMap(u64, grammar.Rule),
 
-    // optionally attach a theme's atoms here for faster scope resolution
+    // Map of theme scope rules/settings to resolve styles rapidly.
     atoms: ?*std.StringHashMap(u32) = null,
 
     strings: StringsArena,
@@ -368,7 +364,7 @@ pub const Parser = struct {
     cycle_detected: bool = false,
     current_anchor_position: i32 = -1,
 
-    // stats
+    // Performance statistics.
     regex_execs: u32 = 0,
     regex_skips: u32 = 0,
     total_pats: usize = 0,
@@ -377,7 +373,7 @@ pub const Parser = struct {
 
     current_state: ?*ParseState = null,
 
-    // Persistent region buffer to avoid heap allocations on every search
+    // Persistent Oniguruma region buffer to avoid per-search heap allocations.
     region: oni.Region = .{},
 
     left_injections: std.ArrayList(*Syntax),
@@ -431,7 +427,6 @@ pub const Parser = struct {
     fn getAnchorPosition(self: *Parser) i32 {
         if (self.current_state) |state| {
             if (state.top()) |t| {
-                // std.debug.print("getAnchorPosition top={s} anchor={}\n", .{ t.syntax.getName(), t.anchor_position });
                 return t.anchor_position;
             }
         }
@@ -448,10 +443,9 @@ pub const Parser = struct {
         return Match{};
     }
 
-    // findMatch. Regular expression matching. This is where all the CPU usage goes.
+    /// Executes a regular expression search on the target block within the specified start/end offsets.
+    /// Uses exec_cache lookup/validation to skip redundant searches.
     fn findMatch(self: *Parser, syntax: *Syntax, rx: *Rule, regex: ?oni.Regex, block: []const u8, start: usize, end: usize) Match {
-        // std.debug.print("findMatch syntax='{s}' pattern='{s}' start={} end={} anchor_pos={}\n", .{ syntax.getName(), rx.expr orelse "", start, end, self.current_anchor_position });
-
         if (regex) |*re| {
             if (rx.is_anchored_at_start and !self.first_line) {
                 return Match{};
@@ -464,10 +458,8 @@ pub const Parser = struct {
             const hard_start: usize = start;
             const anchor_pos = self.current_anchor_position;
             if (rx.is_anchored) {
-                // \G in oniguruma means start of previous match
-
-                // when pattern is merely "\\G", it is merely to re-assert matching at the last matched position
-                // in this case, simulate a successful match
+                // If the pattern is merely a "\\G" anchor assertion, we simulate a successful match
+                // at the anchor position to avoid spawning a full Oniguruma search.
                 if (rx.is_anchor_assertion) {
                     if (anchor_pos == -1 or hard_start != @as(usize, @intCast(anchor_pos))) {
                         return Match{};
@@ -598,15 +590,8 @@ pub const Parser = struct {
         return Match{};
     }
 
-    /// matchBegin is where the regex patterns are checked.
-    /// It is also where caching would(should) be done
-    /// Caching is based on:
-    /// 1. position-expression.
-    ///     - Cache the result of expression executed against a block at a specific position
-    ///     - Some rules may have nested loops hence expressions may be checked more than once
-    /// 2. > position-expression.
-    ///     - Cache also matches with match position ahead of current position
-    ///     - Matched expression may be defeated by earlier matches but it may be usefyl as current position moves forward
+    /// Matches the 'match' pattern or 'begin' pattern of the syntax rules against the block.
+    /// Utilizes and maintains match_cache for faster lookups.
     fn matchBegin(self: *Parser, syntax_: *Syntax, block: []const u8, start: usize, end: usize) Match {
         // guard against unresolved syntax being passed
         const syntax = @constCast(syntax_.resolve(syntax_, self.lang.syntax) orelse syntax_);
@@ -615,7 +600,7 @@ pub const Parser = struct {
         // match
         if (syntax.rx_match.valid == .Valid) {
             if (syntax.rx_match.regex) |regex| {
-                // check of matching has been previously cached (for the same position in the buffer)
+                // check if matching has been previously cached (for the same position in the buffer)
                 var should_cache = false;
                 const m = blk: {
                     if (syntax.rx_match.is_anchored or syntax.rx_match.is_anchored_at_start) {
@@ -641,10 +626,6 @@ pub const Parser = struct {
                     }
                     break :blk null;
                 } orelse self.findMatch(syntax, &syntax.rx_match, regex, block, start, end);
-
-                // if (m.count > 0) {
-                //     std.debug.print("{s}\n\t {s} {s} {}\n", .{syntax.rx_match.expr orelse "", syntax.getName(), block[start..end], m.count});
-                // }
 
                 if (should_cache and config.enable_match_caching) {
                     if (syntax.rx_match.id != 0 and !syntax.rx_match.is_anchored and !syntax.rx_match.is_anchored_at_start)
@@ -800,33 +781,18 @@ pub const Parser = struct {
         return Match{};
     }
 
-    /// TODO matchEnd must also be cached. Also, some end expressions are similar (should also be cached)
+    /// Matches the 'end' pattern of the top stack context against the block.
+    /// Supports dynamic end patterns (from backreferences) and match_cache lookups.
     pub fn matchEnd(self: *Parser, state: *ParseState, block: []const u8, start: usize, end: usize) Match {
-        // prune if the stack is already too deep like deeply nested blocks
-        // This is merely now guard against intentionally written code
-        // if (state.size() > config.max_state_stack_depth) {
-        //     if (state.stack.items.len >= config.max_state_stack_depth) {
-        //         const new_len = state.stack.items.len - config.state_stack_prune;
-        //         @memcpy(
-        //             state.stack.items[0..new_len],
-        //             state.stack.items[config.state_stack_prune..state.stack.items.len],
-        //         );
-        //         state.stack.items.len = new_len;
-        //     }
-        // }
-
         const top = state.top();
         if (top) |t| {
             const syn = t.syntax;
-            // std.debug.print("matchEnd state={*} top={s} t.anchor_position={}\n", .{ state, syn.getName(), t.anchor_position });
             self.current_anchor_position = t.anchor_position;
             {
                 var end_match: Match = blk: {
                     if (t.rx_end.valid == .Valid) {
-                        // use dynamic end_regex here if one was compiled
-                        // not caching or result in this case
+                        // If a dynamic end regex was compiled, evaluate it without caching.
                         const m = self.findMatch(@constCast(syn), @constCast(&t.rx_end), t.rx_end.regex, block, start, end);
-                        // std.debug.print(">>>[{s}] match:{s} {} {}-{}\n", .{ block, t.rx_end.expr orelse "", m.count, start, end });
                         break :blk m;
                     }
 
@@ -876,6 +842,8 @@ pub const Parser = struct {
         return Match{};
     }
 
+    /// Searches for the earliest match among the rule's child patterns, as well as active injections.
+    /// Incorporates the cached injections map (Parser-Level Dirty Caching) to skip injection selector matches.
     fn matchPatterns(self: *Parser, syntax: *const Syntax, patterns: ?std.ArrayList(*Syntax), block: []const u8, start: usize, end: usize) Match {
         var earliest_match = Match{};
 
@@ -1172,14 +1140,10 @@ pub const Parser = struct {
         return false;
     }
 
-    // feed the parser a source code line. It must be terminated by a newline character '\n'.
+    /// Parses a single source code line (must be terminated by '\n').
+    /// Processes scopes, nested rules, and emits tokens via self.processor.
     pub fn parseLine(self: *Parser, state: *ParseState, block: []const u8, first_line: bool) !void {
         if (self.processor) |proc| proc.startLine(block);
-
-        // std.debug.print("\n--- parseLine: '{s}' (len={}, first_line={}) state={*} ---\n", .{ block, block.len, first_line, state });
-        // std.debug.print("Initial stack state:\n", .{});
-        // state.dump();
-        // std.debug.print("----------------------------------------\n", .{});
 
         if (block.len > config.max_line_len) {
             if (self.processor) |proc| proc.endLine();
