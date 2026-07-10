@@ -60,7 +60,6 @@ const Match = struct {
         target: []const u8,
         escape_character: u8,
         output: *ArrayListUnmanaged(u8),
-        allocator: Allocator,
     ) !usize {
         var escape = false;
         var skip: usize = 0;
@@ -92,9 +91,9 @@ const Match = struct {
                         for (r.start..r.end) |bi| {
                             const rch = block[bi];
                             if (rch == '*' or rch == '.') {
-                                try output.append(allocator, '\\');
+                                try output.appendBounded('\\');
                             }
-                            try output.append(allocator, rch);
+                            try output.appendBounded(rch);
                         }
                         found = true;
                         break;
@@ -104,7 +103,7 @@ const Match = struct {
                     _ = output.pop().?;
                 }
             } else {
-                try output.append(allocator, ch);
+                try output.appendBounded(ch);
             }
             escape = (!escape) and (ch == escape_character);
         }
@@ -113,24 +112,12 @@ const Match = struct {
         return output.items.len;
     }
 
-    pub fn applyReferences(
-        self: *const Match,
-        block: []const u8,
-        target: []const u8,
-        output: *ArrayListUnmanaged(u8),
-        allocator: Allocator,
-    ) !usize {
-        return try self.applyRef(block, target, '\\', output, allocator);
+    pub fn applyReferences(self: *const Match, block: []const u8, target: []const u8, output: *ArrayListUnmanaged(u8)) !usize {
+        return try self.applyRef(block, target, '\\', output);
     }
 
-    pub fn applyCaptures(
-        self: *const Match,
-        block: []const u8,
-        target: []const u8,
-        output: *ArrayList(u8),
-        allocator: Allocator,
-    ) !usize {
-        return try self.applyRef(block, target, '$', output, allocator);
+    pub fn applyCaptures(self: *const Match, block: []const u8, target: []const u8, output: *ArrayListUnmanaged(u8)) !usize {
+        return try self.applyRef(block, target, '$', output);
     }
 
     pub fn dump(self: *const Match, block: []const u8) void {
@@ -254,7 +241,7 @@ pub const ParseState = struct {
                 if (syntax.rx_end.expr) |regexs| {
                     var output = std.ArrayListUnmanaged(u8).initBuffer(&output_buf);
 
-                    _ = try m.applyReferences(block, regexs, &output, self.allocator);
+                    _ = try m.applyReferences(block, regexs, &output);
                     const expr = try self.owner.strings.appendUnique(output.items);
                     const regex_id = strings.toHash(expr);
                     {
@@ -282,7 +269,7 @@ pub const ParseState = struct {
                     if (syntax.rx_while.expr) |regexs| {
                         var output = std.ArrayListUnmanaged(u8).initBuffer(&output_buf);
 
-                        _ = try m.applyReferences(block, regexs, &output, self.allocator);
+                        _ = try m.applyReferences(block, regexs, &output);
                         const expr = try self.owner.strings.appendUnique(output.items);
                         const regex_id = strings.toHash(expr);
                         {
@@ -349,8 +336,8 @@ pub const Parser = struct {
 
     // Line parsing caches.
     match_cache: std.AutoHashMap(u64, Match), // Syntax-level cache mapping rule hashes to Match structs.
-    exec_cache: std.AutoHashMap(u64, Match),  // Regex-level cache mapping regex pattern hashes to Match structs.
-    begin_matches: std.ArrayList(Match),       // Tracks current match history to prevent endless loop cycles.
+    exec_cache: std.AutoHashMap(u64, Match), // Regex-level cache mapping regex pattern hashes to Match structs.
+    begin_matches: std.ArrayList(Match), // Tracks current match history to prevent endless loop cycles.
 
     // Map of runtime-compiled rules (e.g. dynamic patterns generated from backreferences).
     regex_map: std.AutoHashMap(u64, grammar.Rule),
@@ -856,7 +843,7 @@ pub const Parser = struct {
                     self.left_injections.clearRetainingCapacity();
                     self.right_injections.clearRetainingCapacity();
 
-                    var scopes_buffer: [64][]const u8 = undefined;
+                    var scopes_buffer: [16][]const u8 = undefined;
                     var scopes = std.ArrayListUnmanaged([]const u8).initBuffer(&scopes_buffer);
 
                     for (state.stack.items) |ctx| {
@@ -865,7 +852,9 @@ pub const Parser = struct {
                             var it = std.mem.splitScalar(u8, name, ' ');
                             while (it.next()) |tok| {
                                 if (tok.len > 0) {
-                                    scopes.append(self.allocator, tok) catch {};
+                                    scopes.appendBounded(tok) catch {
+                                        break;
+                                    };
                                 }
                             }
                         }
@@ -1003,7 +992,7 @@ pub const Parser = struct {
             var buffer: [128]u8 = undefined;
             var cscope = std.ArrayListUnmanaged(u8).initBuffer(&buffer);
 
-            if (try match.applyCaptures(block, name, &cscope, self.allocator) == 0) {
+            if (try match.applyCaptures(block, name, &cscope) == 0) {
                 if (match.regex) |rx| {
                     if (config.enable_scope_atoms and !rx.has_references) {
                         if (self.atoms) |at| {
@@ -1052,7 +1041,7 @@ pub const Parser = struct {
 
                     var cscope = std.ArrayListUnmanaged(u8).initBuffer(&scope_buf);
 
-                    if (try match.applyCaptures(block, syn.name, &cscope, self.allocator) == 0) {
+                    if (try match.applyCaptures(block, syn.name, &cscope) == 0) {
                         if (match.regex) |rx| {
                             if (config.enable_scope_atoms and !rx.has_references) {
                                 if (self.atoms) |at| {
@@ -1105,7 +1094,7 @@ pub const Parser = struct {
 
                                         var cscope = std.ArrayListUnmanaged(u8).initBuffer(&scope_buf);
 
-                                        if (try m.applyCaptures(block, p.name, &cscope, self.allocator) == 0) {
+                                        if (try m.applyCaptures(block, p.name, &cscope) == 0) {
                                             if (config.enable_scope_atoms) {
                                                 if (self.atoms) |at| {
                                                     if (p.atom.count == 0 and p.atom.id == 0) {

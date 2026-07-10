@@ -6,38 +6,42 @@ O(n) ~ Time is linear to number of lines
 
 ## Release mode runs
 
-commit b6d194c497e98d2f2a3b47b5ccb8f98b1e4f0cbc
+commit 3304f73940c399f938ca3e89b259b3194f9128fe
 
 * moved over to zig 0.16.0
 * 76/80 test cases passed
 * accuracy over speed
 
-tinywl.c
-
-lines: 1001
-execs: 66406
-execs/line: 66
-skips: 285220
-warmup in 0.066312s
-done in 0.537299s
-state depth: 1
-max state depth: 7
-max processor depth: 25
-grammar: c
-theme: dracula-soft
-theme atoms: 208
-
 sqlite3.c
 
 lines: 222905
-execs: 14359364
-execs/line: 64
-skips: 58473731
-warmup in 0.056275s
-done in 85.206440s
+execs: 15457668
+execs/line: 69
+patterns/line: 398
+skips: 54693911
+compiles: 0
+warmup in 0.010291s
+done in 6.577500s
 state depth: 1
 max state depth: 14
-max processor depth: 113
+max processor depth: 105
+grammar: c
+theme: gruvbox-dark-soft
+theme atoms: 160
+
+tinywl.c
+
+lines: 1001
+execs: 73294
+execs/line: 73
+patterns/line: 424
+skips: 260040
+compiles: 0
+warmup in 0.013129s
+done in 0.073267s
+state depth: 1
+max state depth: 7
+max processor depth: 21
 grammar: c
 theme: dracula-soft
 theme atoms: 208
