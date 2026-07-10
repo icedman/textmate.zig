@@ -1217,7 +1217,7 @@ pub const Parser = struct {
                     var end_match: Match = self.matchEnd(state, block, start, end);
                     var pattern_match: Match = Match{};
 
-                    if (!syn.apply_end_pattern_last and end_match.count > 0 and end_match.start == start and end_match.end + 1 >= end) {
+                    if (!syn.apply_end_pattern_last and end_match.count > 0 and end_match.start == start and (end_match.end == start or end_match.end + 1 >= end)) {
                         // end match is prioritized, remove?
                     } else {
                         pattern_match = self.matchPatterns(syn, syn.patterns, block, start, end);
