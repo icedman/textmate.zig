@@ -277,6 +277,7 @@ pub fn main(init: std.process.Init) !void {
         std.debug.print("compiles: {}\n", .{par.regex_compiles});
         std.debug.print("warmup in {d:.6}s\n", .{warm_elapsed});
         std.debug.print("done in {d:.6}s\n", .{elapsed});
+        std.debug.print("lines/sec: {}\n", .{@as(usize, @intFromFloat(@as(f64, @floatFromInt(line_no)) / elapsed))});
         std.debug.print("state depth: {}\n", .{state.size()});
         std.debug.print("max state depth: {}\n", .{par.deepest});
         std.debug.print("max processor depth: {}\n", .{proc.deepest});

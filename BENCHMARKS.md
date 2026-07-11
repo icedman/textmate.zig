@@ -8,6 +8,19 @@ O(n) ~ Time is linear to number of lines
 
 commit 3304f73940c399f938ca3e89b259b3194f9128fe
 
+*vs syncat*
+
+Highlight 222000 lines of C code at 5.68s.
+Just around 2s slower against Syntect on a 
+
+```sh
+./target/release/examples/syncat   3.88s user 0.23s system 96% cpu 4.271 total
+➜  syntect git:(master) time ./target/release/examples/syncat ~/Developer/zig/textmate.zig/data/tests/sqlite3.c
+
+./zig-out/bin/catx -t aurora-x -s ./data/tests/sqlite3.c  5.68s user 1.52s system 98% cpu 7.283 total
+➜  textmate.zig git:(main) ✗ time ./zig-out/bin/catx -t aurora-x -s ./data/tests/sqlite3.c
+```
+
 * moved over to zig 0.16.0
 * 76/80 test cases passed
 * accuracy over speed
