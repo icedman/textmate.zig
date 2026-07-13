@@ -26,7 +26,8 @@ fn printUsage() void {
     std.debug.print(" -g <grammar name> provide grammar by name\n", .{});
     std.debug.print(" -t <theme name> provide theme by name\n", .{});
     std.debug.print(" -r <path> resources path containing 'themes' and/or 'grammars' folder\n", .{});
-    std.debug.print(" -l list avaiable themes and grammars\n", .{});
+    std.debug.print(" -G list avaiable grammars\n", .{});
+    std.debug.print(" -T list avaiable themes\n", .{});
 }
 
 pub fn main(init: std.process.Init) !void {
@@ -43,6 +44,8 @@ pub fn main(init: std.process.Init) !void {
     var dump: bool = false;
     var nllu: bool = false;
     var html: bool = false;
+    var list_grammars: bool = false;
+    var list_themes: bool = false;
     var stats: bool = false;
     var grammar_path: ?[]const u8 = null;
     var theme_path: ?[]const u8 = null;
@@ -69,6 +72,10 @@ pub fn main(init: std.process.Init) !void {
             grammar_path = args.next();
         } else if (std.mem.eql(u8, arg.?, "-t")) {
             theme_path = args.next();
+        } else if (std.mem.eql(u8, arg.?, "-G")) {
+            list_grammars = true;
+        } else if (std.mem.eql(u8, arg.?, "-T")) {
+            list_themes = true;
         } else if (std.mem.eql(u8, arg.?, "-h")) {
             printUsage();
             return;
@@ -76,8 +83,6 @@ pub fn main(init: std.process.Init) !void {
             file_path = arg;
         }
     }
-
-    const list = theme_path == null and grammar_path == null and file_path == null;
 
     const warm_start = std.Io.Timestamp.now(io, .awake);
 
@@ -95,7 +100,7 @@ pub fn main(init: std.process.Init) !void {
                 std.debug.print("unable to add themes directory\n", .{});
             };
         }
-        if (list) {
+        if (list_themes) {
             std.debug.print("\nThemes ({}):\n", .{thl.themes.items.len});
             for (thl.themes.items, 0..) |item, i| {
                 std.debug.print("{s}  ", .{item.name});
@@ -119,7 +124,7 @@ pub fn main(init: std.process.Init) !void {
                 std.debug.print("unable to add grammars directory\n", .{});
             };
         }
-        if (list) {
+        if (list_grammars) {
             var injectors: usize = 0;
             for (gml.grammars.items) |item| {
                 if (item.inject_only) {
@@ -137,7 +142,7 @@ pub fn main(init: std.process.Init) !void {
         }
     }
 
-    if (list) {
+    if (list_grammars or list_themes) {
         return;
     }
 
