@@ -65,7 +65,7 @@
         //    // actually used.
         //    .lazy = false,
         //},
-        .oniguruma = .{ .path = "./pkg/oniguruma", .lazy = false },
+        .oniguruma = .{ .path = "./src/pkg/oniguruma", .lazy = false },
     },
 
     // Specifies the set of files and directories that are included in this package.
