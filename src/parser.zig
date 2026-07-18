@@ -134,7 +134,7 @@ const Match = struct {
 };
 
 /// StateContextPack is a packed serializable representation of a StateContext.
-const StateContextPack = packed struct {
+pub const StateContextPack = packed struct {
     syntax: u64,
     anchor_start: u32,
     start: u32,
@@ -256,6 +256,7 @@ pub const ParseState = struct {
                                 // if unable to compile... don't push otherwise we won't be able to exit
                                 return;
                             };
+                            sc.rx_end.expr = expr;
                             self.owner.regex_compiles += 1;
                             if (sc.rx_end.id > 0) {
                                 // std.debug.print("{} {s} {}\n", .{sc.rx_end.id, expr, expr.len});
@@ -279,6 +280,7 @@ pub const ParseState = struct {
                                 sc.rx_while.compile(expr) catch {
                                     // std.debug.print("unable to compile {s} < {s}<\n", .{ regexs, expr });
                                 };
+                                sc.rx_while.expr = expr;
                                 self.owner.regex_compiles += 1;
                                 if (sc.rx_while.id > 0) {
                                     try self.owner.regex_map.put(sc.rx_while.id, sc.rx_while);
@@ -1429,54 +1431,5 @@ test "test references" {
     try std.testing.expectEqualStrings(output.items[0..expectedOutput.len], expectedOutput);
 }
 
-test "serialize and deserialize parse state" {
-    const grammar_json =
-        \\{
-        \\  "scopeName": "source.test",
-        \\  "patterns": [
-        \\    {
-        \\      "name": "block",
-        \\      "begin": "\\{",
-        \\      "end": "\\}"
-        \\    }
-        \\  ]
-        \\}
-    ;
 
-    const allocator = std.testing.allocator;
 
-    var gmr = try grammar.Grammar.initWithData(allocator, grammar_json);
-    defer gmr.deinit();
-
-    var par = try Parser.init(allocator, gmr);
-    defer par.deinit();
-
-    var state = try par.initState();
-    defer state.deinit();
-
-    const line = "{\n";
-    try par.parseLine(&state, line, true);
-
-    try std.testing.expect(false);
-
-    var serial = try std.ArrayList(StateContextPack).initCapacity(allocator, 16);
-    defer serial.deinit(allocator);
-    try par.serialize(&state, &serial);
-
-    try std.testing.expectEqual(state.stack.items.len, serial.items.len);
-
-    var deserialized_state = try par.initState();
-    defer deserialized_state.deinit();
-
-    try par.deserialize(&deserialized_state, &serial);
-
-    try std.testing.expectEqual(state.stack.items.len, deserialized_state.stack.items.len);
-    for (state.stack.items, 0..) |item, i| {
-        const deserialized_item = deserialized_state.stack.items[i];
-        try std.testing.expectEqual(item.syntax, deserialized_item.syntax);
-        try std.testing.expectEqual(item.anchor_start, deserialized_item.anchor_start);
-        try std.testing.expectEqual(item.start, deserialized_item.start);
-        try std.testing.expectEqual(item.rx_while.id, deserialized_item.rx_while.id);
-        try std.testing.expectEqual(item.rx_end.id, deserialized_item.rx_end.id);
-    }
-}

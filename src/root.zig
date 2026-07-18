@@ -25,6 +25,7 @@ pub const Rule = grammar.Rule;
 pub const Parser = parser.Parser;
 pub const ParseState = parser.ParseState;
 pub const ParseCapture = parser.ParseCapture;
+pub const StateContextPack = parser.StateContextPack;
 
 pub const Processor = processor.Processor;
 pub const NullProcessor = processor.NullProcessor;
